@@ -1,0 +1,38 @@
+# 第三方资源说明（THIRD-PARTY NOTICES）
+
+本仓库（起飞日记 RiseDiary）的软件采用 GNU General Public License v3.0（GPL-3.0）发布，许可证全文见根目录 `LICENSE`。以下第三方资源与依赖按各自许可证使用。
+
+## 代码改编
+
+### AndroidLiquidGlass（含 backdrop、capsule）
+
+- 项目地址：https://github.com/Kyant0/AndroidLiquidGlass
+- 许可证：Apache License 2.0
+- 用途：
+  - 运行依赖 `io.github.kyant0:backdrop` 与 `io.github.kyant0:capsule`；
+  - 液态玻璃组件（开关、滑杆、底部导航栏）以及拖拽动画、手势检测、交互高光工具改编自该项目示例代码，并进行了本地化修改；对应源码文件头部使用 `SPDX-License-Identifier: GPL-3.0-only AND Apache-2.0` 双声明，改编部分在 GPL-3.0 项目中继续适用 Apache License 2.0。
+  - Apache License 2.0 完整正文见 `LICENSES/Apache-2.0.txt`（与上游许可证文本一致）。
+
+## 设计灵感
+
+### luleme
+
+- 项目地址：https://github.com/sky22333/luleme
+- 许可证：GNU General Public License v3.0
+- 说明：本项目的功能构思曾参考该项目，但未复制其代码；在此致谢其设计启发。两个仓库现均使用 GPL-3.0。
+
+## 构建工具
+
+- Gradle Wrapper（`gradlew` / `gradlew.bat`）：Apache License 2.0，保留原始文件头。
+
+## 运行依赖
+
+以下组件以 Apache License 2.0 发布，作为 GPL-3.0 项目的常规依赖使用（许可证彼此兼容）：
+
+- Jetpack Compose / Material 3 / Material Icons（AndroidX）
+- Room、DataStore、Navigation、Lifecycle、Activity、WorkManager、Biometric（AndroidX）
+- Hilt / Dagger（Google）
+- kotlinx.coroutines（JetBrains）
+- Vico（com.patrykandpatrick.vico，图表）
+
+如本说明遗漏了其他来源资源，请通过仓库 Issues 告知维护者补充。

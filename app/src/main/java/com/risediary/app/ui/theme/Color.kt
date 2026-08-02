@@ -1,0 +1,40 @@
+package com.risediary.app.ui.theme
+
+import androidx.compose.ui.graphics.Color
+
+val LightBackgroundStart = Color(0xFFF8FAFC)
+val LightBackgroundEnd = Color(0xFFE8EEF4)
+val LightSurface = Color(0xFFFFFFFF)
+val LightSurfaceBorder = Color(0xFFE0E0E0)
+val LightOnSurface = Color(0xFF1A1C1E)
+val LightOnSurfaceSecondary = Color(0xFF5F6368)
+val LightPrimary = Color(0xFF4A90D9)
+val LightSecondary = Color(0xFF3D7188)
+val LightSecondaryContainer = Color(0xFFDCECF4)
+val LightTertiary = Color(0xFF287A72)
+val LightTertiaryContainer = Color(0xFFD8F0EC)
+val LightSurfaceVariant = Color(0xFFEEF3F7)
+
+val DarkBackgroundStart = Color(0xFF1A1C1E)
+val DarkBackgroundEnd = Color(0xFF0D0F10)
+val DarkSurface = Color(0xFF1E1E22)
+val DarkSurfaceBorder = Color(0xFF3D3D42)
+val DarkOnSurface = Color(0xFFE8EAED)
+val DarkOnSurfaceSecondary = Color(0xFF9AA0A6)
+val DarkPrimary = Color(0xFF7BAEE0)
+val DarkSecondary = Color(0xFF9FC8DC)
+val DarkSecondaryContainer = Color(0xFF294653)
+val DarkTertiary = Color(0xFF83D3C8)
+val DarkTertiaryContainer = Color(0xFF1D4D48)
+val DarkSurfaceVariant = Color(0xFF2A3038)
+
+val CardBlue = Color(0xFF4A90D9)
+val CardGreen = Color(0xFF4CAF50)
+val CardOrange = Color(0xFFFF9800)
+val CardPurple = Color(0xFF9C27B0)
+val CardRed = Color(0xFFEF5350)
+val CardTeal = Color(0xFF009688)
+
+val StatusSuccess = Color(0xFF4CAF50)
+val StatusWarning = Color(0xFFFFA726)
+val StatusInfo = Color(0xFF42A5F5)

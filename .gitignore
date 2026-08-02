@@ -1,0 +1,53 @@
+# ===== Android / 构建产物 =====
+*.iml
+.gradle/
+.kotlin/
+build/
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+*.hprof
+*.log
+
+# Gradle Wrapper 需要随项目发布（保留 jar）
+!gradle/wrapper/gradle-wrapper.jar
+
+# ===== 本地环境与签名信息 =====
+/local.properties
+*.jks
+*.keystore
+keystore.properties
+
+# ===== IDE 与编辑器 =====
+.idea/
+*.iws
+*.ipr
+.vscode/
+.fleet/
+
+# ===== 操作系统杂项 =====
+.DS_Store
+Thumbs.db
+
+# ===== AI 助手 / 代理工具（不随项目发布）=====
+.agents/
+.claude/
+.codex/
+.cursor/
+.windsurf/
+.aider/
+.continue/
+AGENTS.md
+CLAUDE.md
+LLM.txt
+
+# ===== 思路、规范与过程文档（不随项目发布）=====
+docs/
+dev-logs/
+*.md
+!/README.md
+
+# ===== 本地交付物 =====
+/artifacts/
