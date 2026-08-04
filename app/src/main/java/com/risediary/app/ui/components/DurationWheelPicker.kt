@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.snapping.rememberSnapFlingBehavior
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
@@ -25,6 +26,7 @@ import androidx.compose.ui.unit.sp
 import com.kyant.capsule.ContinuousRoundedRectangle
 import kotlin.math.abs
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.collectLatest
 
 /**
  * Two-column scroll wheel picker for selecting minutes and seconds.
@@ -158,36 +160,40 @@ fun WheelColumn(
     val density = LocalDensity.current
     val count = range.last - range.first + 1
     val selectedInput = value.coerceIn(range)
-    val state = rememberLazyListState(
-        initialFirstVisibleItemIndex = selectedInput - range.first
-    )
+    val state = key(range.first, range.last) {
+        rememberLazyListState(
+            initialFirstVisibleItemIndex = selectedInput - range.first
+        )
+    }
 
     // Derive selected item from the viewport centre
-    val selectedValue by remember(state, range) {
+    val selectedValue by remember(state, range.first, range.last) {
         derivedStateOf {
-            val info = state.layoutInfo
-            if (info.visibleItemsInfo.isEmpty()) return@derivedStateOf selectedInput
-            val centreY = info.viewportStartOffset + info.viewportSize.height / 2
-            info.visibleItemsInfo
-                .minByOrNull { abs((it.offset + it.size / 2) - centreY) }
-                ?.index
-                ?.let { range.first + it }
-                ?.coerceIn(range)
-                ?: selectedInput
+            centeredValue(state, range, selectedInput)
         }
     }
 
+    val latestSelectedInput by rememberUpdatedState(selectedInput)
+    val latestOnValueChange by rememberUpdatedState(onValueChange)
+
     // Only report the selection once the user stops dragging/flinging. Updating the
     // parent on every frame while scrolling made the wheel janky and caused the
-    // LaunchedEffect(selectedInput) to fight the gesture.
-    LaunchedEffect(state) {
+    // LaunchedEffect(selectedInput) to fight the gesture. Read the current list
+    // position inside the coroutine: capturing selectedValue here would freeze the
+    // initial value for the lifetime of this effect.
+    LaunchedEffect(state, range.first, range.last) {
         snapshotFlow { state.isScrollInProgress }
             .distinctUntilChanged()
-            .collect { scrolling ->
+            .collectLatest { scrolling ->
                 if (!scrolling) {
-                    val settled = selectedValue
-                    if (settled != selectedInput) {
-                        onValueChange(settled)
+                    // Let a snap animation that starts on the pointer-up frame take
+                    // ownership before reading the final centred item.
+                    withFrameNanos { }
+                    if (!state.isScrollInProgress) {
+                        val settled = centeredValue(state, range, latestSelectedInput)
+                        if (settled != latestSelectedInput) {
+                            latestOnValueChange(settled)
+                        }
                     }
                 }
             }
@@ -261,4 +267,20 @@ fun WheelColumn(
             }
         }
     }
+}
+
+private fun centeredValue(
+    state: LazyListState,
+    range: IntRange,
+    fallback: Int
+): Int {
+    val info = state.layoutInfo
+    if (info.visibleItemsInfo.isEmpty()) return fallback
+    val centreY = info.viewportStartOffset + info.viewportSize.height / 2
+    return info.visibleItemsInfo
+        .minByOrNull { abs((it.offset + it.size / 2) - centreY) }
+        ?.index
+        ?.let { range.first + it }
+        ?.coerceIn(range)
+        ?: fallback
 }
