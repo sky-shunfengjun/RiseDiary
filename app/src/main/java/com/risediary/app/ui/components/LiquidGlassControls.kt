@@ -121,7 +121,7 @@ fun LiquidToggle(
             onDragStarted = {},
             onDragStopped = {
                 if (didDrag) {
-                    currentOnCheckedChange(fraction >= 0.5f)
+                    requestedToggleState(currentChecked, fraction)?.let(currentOnCheckedChange)
                     val authoritative = if (currentChecked) 1f else 0f
                     fraction = authoritative
                     animateToValue(authoritative)
@@ -265,4 +265,9 @@ fun LiquidToggle(
                 .size(40.dp, 24.dp)
         )
     }
+}
+
+internal fun requestedToggleState(currentChecked: Boolean, fraction: Float): Boolean? {
+    val requestedChecked = fraction >= 0.5f
+    return requestedChecked.takeUnless { it == currentChecked }
 }
