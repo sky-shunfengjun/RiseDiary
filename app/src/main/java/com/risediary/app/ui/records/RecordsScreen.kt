@@ -92,24 +92,28 @@ fun RecordsScreen(
     }
     var showDatePicker by remember { mutableStateOf(false) }
 
-    val recentlyDeleted = viewModel.recentlyDeleted
+    val pendingDeletions by viewModel.pendingDeletions.collectAsStateWithLifecycle()
+    val currentPendingDeletion = pendingDeletions.firstOrNull()
 
-    LaunchedEffect(recentlyDeleted, snackbarHostState) {
-        if (recentlyDeleted != null) {
+    LaunchedEffect(currentPendingDeletion?.id, snackbarHostState) {
+        if (currentPendingDeletion != null) {
             val result = snackbarHostState.showLiquidSnackbar(
                 message = "已删除记录",
                 actionLabel = "撤销",
                 tone = LiquidSnackbarTone.UNDO
             )
-            if (result == SnackbarResult.ActionPerformed) viewModel.undoDelete()
-            else viewModel.clearDeletedReference()
+            if (result == SnackbarResult.ActionPerformed) {
+                viewModel.undoDelete(currentPendingDeletion)
+            } else {
+                viewModel.finalizeDeletion(currentPendingDeletion.id)
+            }
         }
     }
 
     DisposableEffect(Unit) {
         onDispose {
             snackbarHostState.currentSnackbarData?.dismiss()
-            viewModel.clearDeletedReference()
+            viewModel.clearPendingDeletions()
         }
     }
 

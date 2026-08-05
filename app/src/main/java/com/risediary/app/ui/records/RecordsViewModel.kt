@@ -35,7 +35,8 @@ class RecordsViewModel @Inject constructor(
     var selectedTag by mutableStateOf<String?>(null)
     var startDate by mutableStateOf<LocalDate?>(null)
     var endDate by mutableStateOf<LocalDate?>(null)
-    var recentlyDeleted by mutableStateOf<Flight?>(null)
+    private val _pendingDeletions = MutableStateFlow<List<Flight>>(emptyList())
+    val pendingDeletions: StateFlow<List<Flight>> = _pendingDeletions.asStateFlow()
 
     fun filterByTag(tagName: String?) {
         selectedTag = tagName
@@ -49,21 +50,30 @@ class RecordsViewModel @Inject constructor(
     fun delete(flight: Flight) {
         viewModelScope.launch {
             flightRepo.delete(flight)
-            recentlyDeleted = flight
+            _pendingDeletions.update { enqueuePendingDeletion(it, flight) }
             runCatching { reminderScheduler.onFlightDataChanged() }
         }
     }
 
-    fun undoDelete() {
+    fun undoDelete(flight: Flight) {
         viewModelScope.launch {
-            recentlyDeleted?.let { flightRepo.insert(it) }
-            recentlyDeleted = null
+            if (_pendingDeletions.value.none { it.id == flight.id }) return@launch
+            flightRepo.insert(flight)
+            removePendingDeletion(flight.id)
             runCatching { reminderScheduler.onFlightDataChanged() }
         }
     }
 
-    fun clearDeletedReference() {
-        recentlyDeleted = null
+    fun finalizeDeletion(flightId: Long) {
+        removePendingDeletion(flightId)
+    }
+
+    fun clearPendingDeletions() {
+        _pendingDeletions.value = emptyList()
+    }
+
+    private fun removePendingDeletion(flightId: Long) {
+        _pendingDeletions.update { removePendingDeletion(it, flightId) }
     }
 
     fun filter(flights: List<Flight>): List<Flight> {
@@ -76,3 +86,9 @@ class RecordsViewModel @Inject constructor(
         }
     }
 }
+
+internal fun enqueuePendingDeletion(current: List<Flight>, flight: Flight): List<Flight> =
+    current.filterNot { it.id == flight.id } + flight
+
+internal fun removePendingDeletion(current: List<Flight>, flightId: Long): List<Flight> =
+    current.filterNot { it.id == flightId }

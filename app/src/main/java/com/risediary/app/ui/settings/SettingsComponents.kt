@@ -227,7 +227,8 @@ internal fun SettingsEditItem(
     subtitle: String,
     value: String,
     onValueChange: (String) -> Unit,
-    placeholder: String
+    placeholder: String,
+    inputTransform: (String) -> String = { it }
 ) {
     var editing by remember { mutableStateOf(false) }
     var text by remember(value) { mutableStateOf(value) }
@@ -251,7 +252,7 @@ internal fun SettingsEditItem(
                 Spacer(modifier = Modifier.height(6.dp))
                 OutlinedTextField(
                     value = text,
-                    onValueChange = { text = it },
+                    onValueChange = { text = inputTransform(it) },
                     placeholder = { Text(placeholder) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
