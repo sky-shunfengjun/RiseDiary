@@ -29,8 +29,8 @@ android {
         applicationId = "com.risediary.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 39
-        versionName = "v1.0.1 Dev1"
+        versionCode = 40
+        versionName = "v1.0.1 Dev2"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
     }

@@ -21,6 +21,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.risediary.app.ui.components.SecondaryPageScaffold
 import com.risediary.app.ui.components.LiquidAlertDialog
+import com.risediary.app.ui.components.LiquidSnackbarTone
+import com.risediary.app.ui.components.showLiquidSnackbar
 import com.risediary.app.ui.theme.CardRed
 import com.risediary.app.ui.theme.RiseCard
 
@@ -28,13 +30,12 @@ import com.risediary.app.ui.theme.RiseCard
 @Composable
 fun BackupRestoreScreen(
     navController: NavController,
+    snackbarHostState: SnackbarHostState,
     vm: BackupViewModel = hiltViewModel()
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val showClearDialog by vm.showClearConfirm.collectAsStateWithLifecycle()
-    val snackbarHostState = remember { SnackbarHostState() }
-
     // File picker for import
     val importLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -49,15 +50,27 @@ fun BackupRestoreScreen(
     }
 
     // Show snackbar on state changes
-    LaunchedEffect(state, message) {
+    LaunchedEffect(state, message, snackbarHostState) {
         when (state) {
             BackupState.SUCCESS -> {
-                snackbarHostState.showSnackbar(message)
-                vm.resetState()
+                try {
+                    snackbarHostState.showLiquidSnackbar(
+                        message = message,
+                        tone = LiquidSnackbarTone.SUCCESS
+                    )
+                } finally {
+                    vm.resetState()
+                }
             }
             BackupState.ERROR -> {
-                snackbarHostState.showSnackbar(message)
-                vm.resetState()
+                try {
+                    snackbarHostState.showLiquidSnackbar(
+                        message = message,
+                        tone = LiquidSnackbarTone.ERROR
+                    )
+                } finally {
+                    vm.resetState()
+                }
             }
             else -> {}
         }
@@ -66,7 +79,6 @@ fun BackupRestoreScreen(
     SecondaryPageScaffold(
         title = "备份与恢复",
         onBack = { navController.navigateUp() },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
     ) { padding ->
         Column(
             modifier = Modifier

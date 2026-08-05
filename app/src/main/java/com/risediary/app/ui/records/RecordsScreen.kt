@@ -31,8 +31,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarDuration
-import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SuggestionChip
@@ -42,6 +40,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -62,6 +61,8 @@ import com.risediary.app.data.repository.TagJson
 import com.risediary.app.ui.Screen
 import com.risediary.app.ui.components.LiquidAlertDialog
 import com.risediary.app.ui.components.LiquidDateRangePickerDialog
+import com.risediary.app.ui.components.LiquidSnackbarTone
+import com.risediary.app.ui.components.showLiquidSnackbar
 import com.risediary.app.ui.theme.RiseCard
 import java.time.Instant
 import java.time.LocalDate
@@ -72,6 +73,7 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun RecordsScreen(
     navController: NavController,
+    snackbarHostState: SnackbarHostState,
     viewModel: RecordsViewModel = hiltViewModel()
 ) {
     val currentTags by viewModel.tags.collectAsStateWithLifecycle()
@@ -88,22 +90,30 @@ fun RecordsScreen(
         (currentTags.map { it.name } + allFlights.flatMap { TagJson.decode(it.methodTags) })
             .distinct()
     }
-    val snackbarHostState = remember { SnackbarHostState() }
     var showDatePicker by remember { mutableStateOf(false) }
 
-    LaunchedEffect(viewModel.recentlyDeleted) {
-        if (viewModel.recentlyDeleted != null) {
-            val result = snackbarHostState.showSnackbar(
+    val recentlyDeleted = viewModel.recentlyDeleted
+
+    LaunchedEffect(recentlyDeleted, snackbarHostState) {
+        if (recentlyDeleted != null) {
+            val result = snackbarHostState.showLiquidSnackbar(
                 message = "已删除记录",
                 actionLabel = "撤销",
-                duration = SnackbarDuration.Long
+                tone = LiquidSnackbarTone.UNDO
             )
             if (result == SnackbarResult.ActionPerformed) viewModel.undoDelete()
             else viewModel.clearDeletedReference()
         }
     }
 
-    Scaffold(snackbarHost = { SnackbarHost(snackbarHostState) }) { padding ->
+    DisposableEffect(Unit) {
+        onDispose {
+            snackbarHostState.currentSnackbarData?.dismiss()
+            viewModel.clearDeletedReference()
+        }
+    }
+
+    Scaffold { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
@@ -325,7 +335,7 @@ private fun FlightCard(
         LiquidAlertDialog(
             onDismissRequest = { showDeleteConfirm = false },
             title = { Text("确认删除") },
-            text = { Text("删除后可在提示条中撤销。") },
+            text = { Text("确认删除这条记录吗？") },
             confirmButton = {
                 TextButton(
                     onClick = {
