@@ -22,4 +22,14 @@ class LiquidGlassControlsTest {
             requestedToggleState(currentChecked = true, fraction = 0f)
         )
     }
+
+    @Test
+    fun dragThresholdUsesHalfAsChecked() {
+        assertNull(requestedToggleState(currentChecked = false, fraction = 0.49f))
+        assertEquals(true, requestedToggleState(currentChecked = false, fraction = 0.5f))
+        assertEquals(true, requestedToggleState(currentChecked = false, fraction = 0.51f))
+        assertEquals(false, requestedToggleState(currentChecked = true, fraction = 0.49f))
+        assertNull(requestedToggleState(currentChecked = true, fraction = 0.5f))
+        assertNull(requestedToggleState(currentChecked = true, fraction = 0.51f))
+    }
 }

@@ -37,6 +37,7 @@ class RecordsViewModel @Inject constructor(
     var endDate by mutableStateOf<LocalDate?>(null)
     private val _pendingDeletions = MutableStateFlow<List<Flight>>(emptyList())
     val pendingDeletions: StateFlow<List<Flight>> = _pendingDeletions.asStateFlow()
+    private val deletionSession = PendingDeletionSession()
 
     fun filterByTag(tagName: String?) {
         selectedTag = tagName
@@ -48,9 +49,12 @@ class RecordsViewModel @Inject constructor(
     }
 
     fun delete(flight: Flight) {
+        val session = deletionSession.capture()
         viewModelScope.launch {
             flightRepo.delete(flight)
-            _pendingDeletions.update { enqueuePendingDeletion(it, flight) }
+            if (deletionSession.isCurrent(session)) {
+                _pendingDeletions.update { enqueuePendingDeletion(it, flight) }
+            }
             runCatching { reminderScheduler.onFlightDataChanged() }
         }
     }
@@ -69,6 +73,7 @@ class RecordsViewModel @Inject constructor(
     }
 
     fun clearPendingDeletions() {
+        deletionSession.clear()
         _pendingDeletions.value = emptyList()
     }
 
@@ -92,3 +97,16 @@ internal fun enqueuePendingDeletion(current: List<Flight>, flight: Flight): List
 
 internal fun removePendingDeletion(current: List<Flight>, flightId: Long): List<Flight> =
     current.filterNot { it.id == flightId }
+
+internal class PendingDeletionSession {
+    private var generation = 0L
+
+    fun capture(): Long = generation
+
+    fun clear() {
+        generation++
+    }
+
+    fun isCurrent(capturedGeneration: Long): Boolean =
+        capturedGeneration == generation
+}

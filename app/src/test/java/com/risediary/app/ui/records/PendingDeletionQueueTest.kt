@@ -39,6 +39,17 @@ class PendingDeletionQueueTest {
         assertEquals(listOf(updated), queue)
     }
 
+    @Test
+    fun staleDeleteCompletionIsRejectedAfterScreenSessionIsCleared() {
+        val session = PendingDeletionSession()
+        val capturedGeneration = session.capture()
+
+        session.clear()
+
+        assertEquals(false, session.isCurrent(capturedGeneration))
+        assertEquals(true, session.isCurrent(session.capture()))
+    }
+
     private fun flight(id: Long) = Flight(
         id = id,
         startTime = 1_000L,
