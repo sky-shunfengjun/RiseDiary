@@ -1,6 +1,11 @@
 package com.risediary.app.ui.records
 
 import com.risediary.app.data.entity.Flight
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.advanceUntilIdle
+import kotlinx.coroutines.test.runCurrent
+import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
@@ -48,6 +53,37 @@ class PendingDeletionQueueTest {
 
         assertEquals(false, session.isCurrent(capturedGeneration))
         assertEquals(true, session.isCurrent(session.capture()))
+    }
+
+    @Test
+    fun concurrentDeletesCannotCompleteInReverseOrder() = runTest {
+        val operations = PendingDeletionOperations()
+        val firstStarted = CompletableDeferred<Unit>()
+        val releaseFirst = CompletableDeferred<Unit>()
+        val completed = mutableListOf<Long>()
+
+        launch {
+            operations.run {
+                firstStarted.complete(Unit)
+                releaseFirst.await()
+                completed += 1L
+            }
+        }
+        firstStarted.await()
+
+        launch {
+            operations.run {
+                completed += 2L
+            }
+        }
+        runCurrent()
+
+        assertEquals(emptyList<Long>(), completed)
+
+        releaseFirst.complete(Unit)
+        advanceUntilIdle()
+
+        assertEquals(listOf(1L, 2L), completed)
     }
 
     private fun flight(id: Long) = Flight(

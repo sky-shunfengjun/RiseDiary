@@ -13,6 +13,7 @@ import com.risediary.app.reminder.ReminderScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -38,6 +39,7 @@ class RecordsViewModel @Inject constructor(
     private val _pendingDeletions = MutableStateFlow<List<Flight>>(emptyList())
     val pendingDeletions: StateFlow<List<Flight>> = _pendingDeletions.asStateFlow()
     private val deletionSession = PendingDeletionSession()
+    private val deletionOperations = PendingDeletionOperations()
 
     fun filterByTag(tagName: String?) {
         selectedTag = tagName
@@ -51,9 +53,11 @@ class RecordsViewModel @Inject constructor(
     fun delete(flight: Flight) {
         val session = deletionSession.capture()
         viewModelScope.launch {
-            flightRepo.delete(flight)
-            if (deletionSession.isCurrent(session)) {
-                _pendingDeletions.update { enqueuePendingDeletion(it, flight) }
+            deletionOperations.run {
+                flightRepo.delete(flight)
+                if (deletionSession.isCurrent(session)) {
+                    _pendingDeletions.update { enqueuePendingDeletion(it, flight) }
+                }
             }
             runCatching { reminderScheduler.onFlightDataChanged() }
         }
@@ -109,4 +113,17 @@ internal class PendingDeletionSession {
 
     fun isCurrent(capturedGeneration: Long): Boolean =
         capturedGeneration == generation
+}
+
+internal class PendingDeletionOperations {
+    private val mutex = Mutex()
+
+    suspend fun <T> run(block: suspend () -> T): T {
+        mutex.lock()
+        return try {
+            block()
+        } finally {
+            mutex.unlock()
+        }
+    }
 }
