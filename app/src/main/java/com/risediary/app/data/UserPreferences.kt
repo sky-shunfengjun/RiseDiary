@@ -48,7 +48,7 @@ class UserPreferences @Inject constructor(
     // --- Individual flows ---
 
     val username: Flow<String> = context.dataStore.data.map { prefs ->
-        prefs[KEY_USERNAME] ?: "机长"
+        UsernamePolicy.normalize(prefs[KEY_USERNAME].orEmpty())
     }
 
     val mlPerSpurt: Flow<Float> = context.dataStore.data.map { prefs ->
@@ -162,7 +162,7 @@ class UserPreferences @Inject constructor(
     // --- Setters ---
 
     suspend fun setUsername(value: String) {
-        context.dataStore.edit { it[KEY_USERNAME] = value }
+        context.dataStore.edit { it[KEY_USERNAME] = UsernamePolicy.normalize(value) }
     }
 
     suspend fun setMlPerSpurt(value: Float) {

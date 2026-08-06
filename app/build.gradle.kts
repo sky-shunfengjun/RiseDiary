@@ -29,8 +29,8 @@ android {
         applicationId = "com.risediary.app"
         minSdk = 26
         targetSdk = 34
-        versionCode = 38
-        versionName = "v1.0.0-beta"
+        versionCode = 42
+        versionName = "v1.0.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
     }
@@ -47,6 +47,9 @@ android {
     }
 
     buildTypes {
+        debug {
+            applicationIdSuffix = ".dev"
+        }
         release {
             isMinifyEnabled = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")

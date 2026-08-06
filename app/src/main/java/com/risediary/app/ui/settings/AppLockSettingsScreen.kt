@@ -76,10 +76,12 @@ fun AppLockSettingsScreen(
                         else stringResource(R.string.settings_app_lock_off),
                     checked = lockEnabled,
                     onCheckedChange = { enabled ->
-                        if (enabled) {
-                            navController.navigate("lock_setup")
-                        } else {
-                            showDisableDialog = true
+                        if (enabled != lockEnabled) {
+                            if (enabled) {
+                                navController.navigate("lock_setup")
+                            } else {
+                                showDisableDialog = true
+                            }
                         }
                     }
                 )

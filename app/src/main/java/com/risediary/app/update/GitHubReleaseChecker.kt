@@ -74,7 +74,8 @@ private data class ParsedVersion(
 )
 
 private val VERSION_PATTERN =
-    Regex("^[vV]?(\\d+)\\.(\\d+)(?:\\.(\\d+))?(?:-([0-9A-Za-z.-]+))?$")
+    Regex("^[vV]?(\\d+)\\.(\\d+)(?:\\.(\\d+))?(?:[-\\s]+([0-9A-Za-z][0-9A-Za-z._ -]*))?$")
+private val PRERELEASE_PART_PATTERN = Regex("[A-Za-z]+|\\d+")
 
 /** Returns true only when latest is a parseable semantic version newer than current. */
 internal fun isNewerVersion(current: String, latest: String): Boolean {
@@ -95,7 +96,14 @@ private fun parseVersion(value: String): ParsedVersion? {
         major = number(1),
         minor = number(2),
         patch = number(3),
-        prerelease = match.groupValues[4].takeIf { it.isNotBlank() }?.split('.')
+        prerelease = match.groupValues[4]
+            .takeIf { it.isNotBlank() }
+            ?.let { suffix ->
+                PRERELEASE_PART_PATTERN.findAll(suffix)
+                    .map { it.value.lowercase() }
+                    .toList()
+                    .takeIf(List<String>::isNotEmpty)
+            }
     )
 }
 

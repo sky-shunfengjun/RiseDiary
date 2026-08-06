@@ -13,6 +13,7 @@ import com.risediary.app.reminder.ReminderScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -35,7 +36,10 @@ class RecordsViewModel @Inject constructor(
     var selectedTag by mutableStateOf<String?>(null)
     var startDate by mutableStateOf<LocalDate?>(null)
     var endDate by mutableStateOf<LocalDate?>(null)
-    var recentlyDeleted by mutableStateOf<Flight?>(null)
+    private val _pendingDeletions = MutableStateFlow<List<Flight>>(emptyList())
+    val pendingDeletions: StateFlow<List<Flight>> = _pendingDeletions.asStateFlow()
+    private val deletionSession = PendingDeletionSession()
+    private val deletionOperations = PendingDeletionOperations()
 
     fun filterByTag(tagName: String?) {
         selectedTag = tagName
@@ -47,23 +51,38 @@ class RecordsViewModel @Inject constructor(
     }
 
     fun delete(flight: Flight) {
+        val session = deletionSession.capture()
         viewModelScope.launch {
-            flightRepo.delete(flight)
-            recentlyDeleted = flight
+            deletionOperations.run {
+                flightRepo.delete(flight)
+                if (deletionSession.isCurrent(session)) {
+                    _pendingDeletions.update { enqueuePendingDeletion(it, flight) }
+                }
+            }
             runCatching { reminderScheduler.onFlightDataChanged() }
         }
     }
 
-    fun undoDelete() {
+    fun undoDelete(flight: Flight) {
         viewModelScope.launch {
-            recentlyDeleted?.let { flightRepo.insert(it) }
-            recentlyDeleted = null
+            if (_pendingDeletions.value.none { it.id == flight.id }) return@launch
+            flightRepo.insert(flight)
+            removePendingDeletion(flight.id)
             runCatching { reminderScheduler.onFlightDataChanged() }
         }
     }
 
-    fun clearDeletedReference() {
-        recentlyDeleted = null
+    fun finalizeDeletion(flightId: Long) {
+        removePendingDeletion(flightId)
+    }
+
+    fun clearPendingDeletions() {
+        deletionSession.clear()
+        _pendingDeletions.value = emptyList()
+    }
+
+    private fun removePendingDeletion(flightId: Long) {
+        _pendingDeletions.update { removePendingDeletion(it, flightId) }
     }
 
     fun filter(flights: List<Flight>): List<Flight> {
@@ -73,6 +92,38 @@ class RecordsViewModel @Inject constructor(
             val matchesStart = startDate?.let { !localDate.isBefore(it) } ?: true
             val matchesEnd = endDate?.let { !localDate.isAfter(it) } ?: true
             matchesTag && matchesStart && matchesEnd
+        }
+    }
+}
+
+internal fun enqueuePendingDeletion(current: List<Flight>, flight: Flight): List<Flight> =
+    current.filterNot { it.id == flight.id } + flight
+
+internal fun removePendingDeletion(current: List<Flight>, flightId: Long): List<Flight> =
+    current.filterNot { it.id == flightId }
+
+internal class PendingDeletionSession {
+    private var generation = 0L
+
+    fun capture(): Long = generation
+
+    fun clear() {
+        generation++
+    }
+
+    fun isCurrent(capturedGeneration: Long): Boolean =
+        capturedGeneration == generation
+}
+
+internal class PendingDeletionOperations {
+    private val mutex = Mutex()
+
+    suspend fun <T> run(block: suspend () -> T): T {
+        mutex.lock()
+        return try {
+            block()
+        } finally {
+            mutex.unlock()
         }
     }
 }

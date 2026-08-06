@@ -44,6 +44,7 @@ import com.risediary.app.ui.achievement.AchievementWallScreen
 import com.risediary.app.ui.backup.BackupRestoreScreen
 import com.risediary.app.ui.components.LiquidGlassBottomBar
 import com.risediary.app.ui.components.LiquidDialogHost
+import com.risediary.app.ui.components.LiquidSnackbarHost
 import com.risediary.app.ui.components.ProvideLiquidDialogHost
 import com.risediary.app.ui.components.ProvidePageBackdrop
 import com.risediary.app.ui.components.SecondaryPageScaffold
@@ -164,6 +165,7 @@ private fun MainAppContent(
     val timerSession by timerCoordinator.session.collectAsStateWithLifecycle()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
+    val snackbarHostState = remember(currentRoute) { SnackbarHostState() }
     val mainTabs = remember { listOf(Screen.Home, Screen.Records, Screen.Settings) }
     val mainRoutes = remember { mainTabs.map(Screen::route).toSet() }
     val selectedTabIndex = mainTabs
@@ -257,7 +259,12 @@ private fun MainAppContent(
                 }
             ) {
                 composable(Screen.Home.route) { HomeScreen(navController) }
-                composable(Screen.Records.route) { RecordsScreen(navController) }
+                composable(Screen.Records.route) {
+                    RecordsScreen(
+                        navController = navController,
+                        snackbarHostState = snackbarHostState
+                    )
+                }
                 composable(Screen.Settings.route) { SettingsScreen(navController) }
                 composable(Screen.ModeSelect.route) { ModeSelectScreen(navController) }
                 composable(Screen.Timer.route) { TimerScreen(navController) }
@@ -300,7 +307,12 @@ private fun MainAppContent(
                 composable(Screen.AchievementWall.route) { AchievementWallScreen(navController) }
                 composable(Screen.About.route) { AboutScreen(navController) }
                 composable(Screen.CardOrder.route) { CardOrderScreen(navController) }
-                composable(Screen.BackupRestore.route) { BackupRestoreScreen(navController) }
+                composable(Screen.BackupRestore.route) {
+                    BackupRestoreScreen(
+                        navController = navController,
+                        snackbarHostState = snackbarHostState
+                    )
+                }
                 composable(Screen.LengthHistory.route) { LengthHistoryScreen(navController) }
                 composable(Screen.ReminderSettings.route) {
                     ReminderSettingsScreen(navController)
@@ -374,6 +386,18 @@ private fun MainAppContent(
                     )
                 )
             }
+            LiquidSnackbarHost(
+                hostState = snackbarHostState,
+                backdrop = backdrop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .navigationBarsPadding()
+                    .padding(
+                        start = 20.dp,
+                        end = 20.dp,
+                        bottom = if (isMainTab) 84.dp else 20.dp
+                    )
+            )
             LiquidDialogHost(
                 state = liquidDialogHostState,
                 backdrop = backdrop

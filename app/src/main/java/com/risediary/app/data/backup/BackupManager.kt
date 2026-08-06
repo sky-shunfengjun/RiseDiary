@@ -12,6 +12,7 @@ import com.risediary.app.data.BackgroundLockMode
 import com.risediary.app.data.DefaultVolumeMode
 import com.risediary.app.data.SeedData
 import com.risediary.app.data.UserPreferences
+import com.risediary.app.data.UsernamePolicy
 import com.risediary.app.data.entity.Achievement
 import com.risediary.app.data.entity.Flight
 import com.risediary.app.data.entity.LengthRecord
@@ -407,7 +408,7 @@ class BackupManager @Inject constructor(
     }
 
     private fun validateSettings(settings: SettingsSnapshot) {
-        require(settings.username.length <= 40) { "用户名过长" }
+        require(UsernamePolicy.isWithinLimit(settings.username)) { "用户名过长" }
         require(settings.mlPerSpurt in 0.1f..100f) { "每股换算值无效" }
         require(settings.dailyReminderTime.matches(Regex("""([01]\d|2[0-3]):[0-5]\d"""))) {
             "提醒时间无效"

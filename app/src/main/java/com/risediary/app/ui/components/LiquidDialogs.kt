@@ -335,8 +335,6 @@ private fun SolidDialogSurface(
                     awaitPointerEventScope {
                         while (true) {
                             awaitPointerEvent(PointerEventPass.Final)
-                                .changes
-                                .forEach { it.consume() }
                         }
                     }
                 }
@@ -392,14 +390,14 @@ private fun LiquidDialogSurface(
                     highlight = { Highlight.Plain },
                     onDrawSurface = { drawRect(containerColor) }
                 )
-                // Consume taps on empty glass space so they never fall through to
-                // the dismiss scrim. Child buttons still receive the Main pass.
+                // Keep the surface in the pointer hit path so taps on empty glass
+                // space do not fall through to the dismiss scrim. Do not consume
+                // the events here: child LazyColumn/scrollable gestures need the
+                // same pointer stream for short drags and fling hand-off.
                 .pointerInput(Unit) {
                     awaitPointerEventScope {
                         while (true) {
                             awaitPointerEvent(PointerEventPass.Final)
-                                .changes
-                                .forEach { it.consume() }
                         }
                     }
                 }

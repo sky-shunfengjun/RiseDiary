@@ -105,13 +105,15 @@
 
 调试 APK 生成在 `app/build/outputs/apk/debug/`。
 
-## 已知问题
+## 参与贡献
 
-- 部分开关状态未改变却触发回调
-- 时间选择滑块拖动响应不灵敏
-- 其他问题待发现
+欢迎参与「起飞日记」的改进与完善！你可以：
 
-欢迎通过 [Issues](https://github.com/sky-shunfengjun/RiseDiary/issues) 反馈问题，也欢迎各位大佬提交 [Pull Request](https://github.com/sky-shunfengjun/RiseDiary/pulls)，一起完善本项目。
+- 通过 [Issues](https://github.com/sky-shunfengjun/RiseDiary/issues) 反馈 Bug、提出功能建议，或分享兼容性问题；
+- 通过 [Pull Request](https://github.com/sky-shunfengjun/RiseDiary/pulls) 提交代码、文档、界面或测试改进；
+- 加入 [QQ群组](https://qm.qq.com/q/Z3XTPXXEEW) 交流想法，欢迎任何形式的建议和贡献。
+
+提交 Issue 或 Pull Request 时，尽量附上复现步骤、设备型号与 Android 版本，方便快速定位和处理。
 
 ## 未来方向
 

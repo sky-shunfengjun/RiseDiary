@@ -74,6 +74,7 @@ import com.risediary.app.R
 import com.risediary.app.RiseDiaryApp
 import com.risediary.app.data.BackgroundLockMode
 import com.risediary.app.data.DefaultVolumeMode
+import com.risediary.app.data.UsernamePolicy
 import com.risediary.app.reminder.ReminderConfiguration
 import com.risediary.app.ui.Screen
 import com.risediary.app.ui.components.LiquidSegmentOption
@@ -118,7 +119,8 @@ fun SettingsScreen(
                 subtitle = stringResource(R.string.settings_username_summary),
                 value = username,
                 onValueChange = vm::setUsername,
-                placeholder = stringResource(R.string.settings_username_placeholder)
+                placeholder = stringResource(R.string.settings_username_placeholder),
+                inputTransform = UsernamePolicy::limit
             )
             SettingsDivider()
             val defaultVolumeMode by vm.defaultVolumeMode.collectAsStateWithLifecycle()
