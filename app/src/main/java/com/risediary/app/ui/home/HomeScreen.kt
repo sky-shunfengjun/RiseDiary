@@ -23,6 +23,7 @@ import androidx.compose.material.pullrefresh.pullRefresh
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -84,7 +85,7 @@ fun HomeScreen(
     val orderedCards = remember(cardOrderJson, cardVisibilityJson) {
         parseCardOrder(cardOrderJson, cardVisibilityJson)
     }
-    var revealLowerCards by remember { mutableStateOf(false) }
+    var revealLowerCards by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(Unit) { revealLowerCards = true }
 
     val todayStatus = remember(todayCount) { vm.getTodayStatus() }

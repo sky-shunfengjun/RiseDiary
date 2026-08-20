@@ -241,14 +241,14 @@ private fun MainAppContent(
                         initialState.destination.route in mainRoutes &&
                         targetState.destination.route in mainRoutes
                     ) {
-                        fadeIn(tween(100))
+                        fadeIn(tween(180))
                     } else {
                         fadeIn(tween(220)) +
                             slideInHorizontally(tween(300)) { width -> width }
                     }
                 },
                 exitTransition = {
-                    fadeOut(tween(90))
+                    fadeOut(tween(140))
                 },
                 popEnterTransition = {
                     fadeIn(tween(220)) +
