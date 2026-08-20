@@ -36,7 +36,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.withResumed
 import com.kyant.backdrop.Backdrop
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
@@ -72,6 +74,7 @@ fun AppLockScreen(
     val biometricEnabled by vm.biometricUnlockEnabled.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val activity = context.findActivity() as? FragmentActivity
+    val lifecycleOwner = LocalLifecycleOwner.current
     var autoBiometricRequested by remember(mode) { mutableStateOf(false) }
     val lockBackground = Brush.verticalGradient(
         colors = listOf(
@@ -100,17 +103,21 @@ fun AppLockScreen(
         }
     }
 
-    LaunchedEffect(ready, biometricEnabled, mode, activity) {
+    LaunchedEffect(ready, biometricEnabled, mode, activity, lifecycleOwner) {
+        val resumedActivity = activity ?: return@LaunchedEffect
         if (
             ready &&
             biometricEnabled &&
             mode == LockMode.VERIFY &&
             vm.biometricAvailable &&
-            activity != null &&
             !autoBiometricRequested
         ) {
-            autoBiometricRequested = true
-            vm.authenticateWithBiometric(activity)
+            lifecycleOwner.lifecycle.withResumed {
+                if (!autoBiometricRequested) {
+                    autoBiometricRequested = true
+                    vm.authenticateWithBiometric(resumedActivity)
+                }
+            }
         }
     }
 
