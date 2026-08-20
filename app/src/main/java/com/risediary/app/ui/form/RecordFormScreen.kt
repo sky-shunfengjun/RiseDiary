@@ -7,15 +7,20 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -42,10 +47,12 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -69,6 +76,7 @@ import com.risediary.app.util.RecordValidation
 import java.time.Instant
 import java.time.LocalTime
 import java.time.ZoneId
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -85,6 +93,20 @@ fun RecordFormScreen(
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
     var showDurationPicker by remember { mutableStateOf(false) }
+
+    val formScope = rememberCoroutineScope()
+    val spurtFieldRequester = remember { BringIntoViewRequester() }
+    val volumeFieldRequester = remember { BringIntoViewRequester() }
+    val distanceFieldRequester = remember { BringIntoViewRequester() }
+    val noteFieldRequester = remember { BringIntoViewRequester() }
+    var focusedFieldRequester by remember { mutableStateOf<BringIntoViewRequester?>(null) }
+    val imeBottom = WindowInsets.ime.asPaddingValues().calculateBottomPadding()
+
+    LaunchedEffect(imeBottom) {
+        if (imeBottom > 0.dp) {
+            focusedFieldRequester?.let { formScope.launch { it.bringIntoView() } }
+        }
+    }
 
     LaunchedEffect(isTimer, durationMillis, timerStartTimeMillis, flightId) {
         when {
@@ -139,9 +161,9 @@ fun RecordFormScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
+                .imePadding()
                 .padding(innerPadding)
-                .verticalScroll(scrollState)
-                .imePadding(),
+                .verticalScroll(scrollState),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             RiseCard(modifier = Modifier.fillMaxWidth()) {
@@ -214,7 +236,13 @@ fun RecordFormScreen(
                                 value = vm.spurtCount,
                                 onValueChange = vm::setSpurtCountInput,
                                 label = { Text("射出股数") },
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .onFocusChanged { focusState ->
+                                        focusedFieldRequester =
+                                            if (focusState.isFocused) spurtFieldRequester else null
+                                    }
+                                    .bringIntoViewRequester(spurtFieldRequester),
                                 keyboardOptions = KeyboardOptions(
                                     keyboardType = KeyboardType.Number
                                 ),
@@ -233,7 +261,13 @@ fun RecordFormScreen(
                                 value = vm.volumeMl,
                                 onValueChange = vm::setVolumeInput,
                                 label = { Text("精液量（毫升）") },
-                                modifier = Modifier.fillMaxWidth(),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .onFocusChanged { focusState ->
+                                        focusedFieldRequester =
+                                            if (focusState.isFocused) volumeFieldRequester else null
+                                    }
+                                    .bringIntoViewRequester(volumeFieldRequester),
                                 keyboardOptions = KeyboardOptions(
                                     keyboardType = KeyboardType.Decimal
                                 ),
@@ -260,7 +294,13 @@ fun RecordFormScreen(
                             value = vm.distanceCm,
                             onValueChange = vm::setDistanceInput,
                             label = { Text("距离（厘米，可不填）") },
-                            modifier = Modifier.fillMaxWidth(),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .onFocusChanged { focusState ->
+                                    focusedFieldRequester =
+                                        if (focusState.isFocused) distanceFieldRequester else null
+                                }
+                                .bringIntoViewRequester(distanceFieldRequester),
                             keyboardOptions = KeyboardOptions(
                                 keyboardType = KeyboardType.Decimal
                             ),
@@ -335,6 +375,11 @@ fun RecordFormScreen(
                         placeholder = { Text("例如：状态、感受或需要留意的情况") },
                         modifier = Modifier
                             .fillMaxWidth()
+                            .onFocusChanged { focusState ->
+                                focusedFieldRequester =
+                                    if (focusState.isFocused) noteFieldRequester else null
+                            }
+                            .bringIntoViewRequester(noteFieldRequester)
                             .heightIn(min = 104.dp),
                         leadingIcon = { Icon(Icons.Default.Notes, null) },
                         maxLines = 5,
