@@ -135,7 +135,9 @@ fun AppLockScreen(
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
-            modifier = Modifier.padding(32.dp)
+            modifier = Modifier
+                .padding(32.dp)
+                .systemBarsPadding()
         ) {
             // Cancel button (top-right, for onboarding skip)
             if (onCancel != null) {

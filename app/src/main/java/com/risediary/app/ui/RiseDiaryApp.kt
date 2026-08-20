@@ -243,19 +243,20 @@ private fun MainAppContent(
                     ) {
                         fadeIn(tween(180))
                     } else {
-                        fadeIn(tween(180)) +
-                            slideInHorizontally(tween(280)) { width -> width / 8 }
+                        fadeIn(tween(220)) +
+                            slideInHorizontally(tween(300)) { width -> width }
                     }
                 },
                 exitTransition = {
-                    fadeOut(tween(130))
+                    fadeOut(tween(140))
                 },
                 popEnterTransition = {
-                    fadeIn(tween(180))
+                    fadeIn(tween(220)) +
+                        slideInHorizontally(tween(280)) { width -> -width / 6 }
                 },
                 popExitTransition = {
-                    fadeOut(tween(160)) +
-                        slideOutHorizontally(tween(240)) { width -> width / 10 }
+                    fadeOut(tween(220)) +
+                        slideOutHorizontally(tween(280)) { width -> width }
                 }
             ) {
                 composable(Screen.Home.route) { HomeScreen(navController) }

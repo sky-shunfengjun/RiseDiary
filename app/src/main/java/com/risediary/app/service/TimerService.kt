@@ -7,8 +7,10 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
+import androidx.core.app.ServiceCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
@@ -46,7 +48,12 @@ class TimerService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val action = intent?.action ?: ACTION_RESTORE
         if (action == ACTION_START || action == ACTION_RESUME || action == ACTION_RESTORE) {
-            startForeground(NOTIFICATION_ID, buildNotification(TimerSession()))
+            ServiceCompat.startForeground(
+                this,
+                NOTIFICATION_ID,
+                buildNotification(TimerSession()),
+                foregroundServiceTypeForSdk(Build.VERSION.SDK_INT)
+            )
         }
 
         serviceScope.launch {
@@ -350,3 +357,11 @@ class TimerService : Service() {
         }
     }
 }
+
+@Suppress("InlinedApi")
+internal fun foregroundServiceTypeForSdk(sdkInt: Int): Int =
+    if (sdkInt >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+        ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+    } else {
+        0
+    }

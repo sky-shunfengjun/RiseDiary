@@ -10,7 +10,7 @@
 
 **⬇️ [下载最新版 APK](https://github.com/sky-shunfengjun/RiseDiary/releases/latest)　|　💬 [加入QQ群组](https://qm.qq.com/q/Z3XTPXXEEW)**
 
-- 支持系统：Android 8.0（API 26）及以上；推荐 Android 13（API 33）及以上，低版本会缺失大量液态玻璃视觉特效，且兼容性较差
+- 支持系统：Android 12（API 31）及以上；推荐 Android 13（API 33）及以上，Android 12/12L 会使用部分液态玻璃实体降级效果
 
 ![起飞日记](screenshots/app.png)
 
@@ -24,7 +24,7 @@
 
 - 底栏、按钮、开关、滑杆、弹窗与分段控件均采用液态玻璃效果
 - 保留原版的折射、高光、按压与拖动形变
-- Android 8–12 自动使用实体降级样式（效果不佳）
+- Android 12/12L 自动使用部分实体降级样式；Android 13 及以上启用完整 RuntimeShader 高光效果
 
 ### 首页看板
 
@@ -80,7 +80,7 @@
 | 依赖注入 | Hilt 2.57.2                                           |
 | 数据库   | Room 2.8.4（含 KSP 编译）                             |
 | 设置存储 | DataStore Preferences 1.1.7                           |
-| 导航     | Navigation Compose 2.7.7                              |
+| 导航     | Navigation Compose 2.9.8                              |
 | 后台任务 | WorkManager 2.10.1 + 前台服务                         |
 | 生物识别 | AndroidX Biometric 1.1.0                              |
 | 图表     | Vico 3.2.1                                            |
@@ -88,7 +88,7 @@
 | 序列化   | kotlinx.serialization JSON                            |
 | 异步     | Kotlin Coroutines 1.8.1                               |
 | 构建     | Gradle 8.13 / AGP 8.13.2、KSP                         |
-| 支持版本 | 最低 Android 8.0（API 26），目标 Android 14（API 34） |
+| 支持版本 | 最低 Android 12（API 31），目标 Android 16（API 36） |
 
 ## 架构与构建
 
