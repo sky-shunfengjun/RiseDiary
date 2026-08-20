@@ -403,7 +403,11 @@ fun RecordFormScreen(
                     )
                 }
             }
-            Spacer(modifier = Modifier.height(92.dp))
+            Spacer(
+                modifier = Modifier.height(
+                    recordFormBottomSpacerDp(imeBottom > 0.dp).dp
+                )
+            )
         }
     }
 
@@ -551,3 +555,6 @@ fun RecordFormScreen(
         )
     }
 }
+
+internal fun recordFormBottomSpacerDp(imeVisible: Boolean): Int =
+    if (imeVisible) 0 else 48
