@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
@@ -127,8 +128,9 @@ fun SecondaryPageScaffold(
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    // The activity already uses adjustResize. Adding IME insets here a
-                    // second time pushed the action button into the middle of the form.
+                    // The activity no longer relies on adjustResize; IME insets are
+                    // consumed once here so the bottom action floats above the keyboard.
+                    .imePadding()
                     .padding(horizontal = 20.dp, vertical = 12.dp)
             ) {
                 bottomAction(backdrop)

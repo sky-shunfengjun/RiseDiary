@@ -6,8 +6,8 @@ import org.junit.Test
 class RecordFormLayoutPolicyTest {
 
     @Test
-    fun bottomSpacerOnlyReservesTheSaveButtonWhenImeIsHidden() {
-        assertEquals(48, recordFormBottomSpacerDp(imeVisible = false))
+    fun bottomSpacerPreservesTheExistingTailClearanceWhenImeIsHidden() {
+        assertEquals(68, recordFormBottomSpacerDp(imeVisible = false))
         assertEquals(0, recordFormBottomSpacerDp(imeVisible = true))
     }
 }

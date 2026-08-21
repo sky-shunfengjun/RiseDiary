@@ -56,6 +56,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.res.stringResource
@@ -162,7 +163,16 @@ fun RecordFormScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .imePadding()
-                .padding(innerPadding)
+                .padding(
+                    start = innerPadding.calculateLeftPadding(LayoutDirection.Ltr),
+                    top = innerPadding.calculateTopPadding(),
+                    end = innerPadding.calculateRightPadding(LayoutDirection.Ltr),
+                    bottom = if (imeBottom > 0.dp) {
+                        0.dp
+                    } else {
+                        innerPadding.calculateBottomPadding()
+                    }
+                )
                 .verticalScroll(scrollState),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
@@ -557,4 +567,4 @@ fun RecordFormScreen(
 }
 
 internal fun recordFormBottomSpacerDp(imeVisible: Boolean): Int =
-    if (imeVisible) 0 else 48
+    if (imeVisible) 0 else 68
