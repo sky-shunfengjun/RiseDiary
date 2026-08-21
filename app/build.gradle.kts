@@ -20,9 +20,7 @@ val hasReleaseSigning = listOf("storeFile", "storePassword", "keyAlias", "keyPas
 android {
     namespace = "com.risediary.app"
     compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
+        version = release(37)
     }
 
     defaultConfig {
@@ -97,6 +95,7 @@ dependencies {
     implementation(libs.compose.material.icons.extended)
     implementation(libs.backdrop)
     implementation(libs.capsule)
+    implementation(libs.miuix.ui)
     implementation(libs.activity.compose)
     implementation(libs.lifecycle.runtime.compose)
     implementation(libs.lifecycle.viewmodel.compose)
