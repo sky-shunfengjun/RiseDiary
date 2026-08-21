@@ -213,13 +213,8 @@ fun OnboardingScreen(
     // still be catching up after saving the theme, which previously caused a brief light
     // flash on the following pages.
     val previewTheme = resolveOnboardingPreviewTheme(themeDraft, persistedTheme)
-    val previewDark = when (previewTheme) {
-        "light" -> false
-        "dark" -> true
-        else -> systemDark
-    }
 
-    RiseDiaryTheme(darkTheme = previewDark) {
+    RiseDiaryTheme(themeMode = previewTheme) {
         val backdrop = rememberLayerBackdrop()
         val dialogHostState = rememberLiquidDialogHostState()
         val density = LocalDensity.current

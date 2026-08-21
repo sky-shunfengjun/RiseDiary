@@ -8,11 +8,15 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
+import top.yukonga.miuix.kmp.theme.ColorSchemeMode
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.theme.ThemeController
 
 val LocalRiseDarkTheme = staticCompositionLocalOf { false }
 
@@ -60,11 +64,24 @@ private val DarkColorScheme = darkColorScheme(
     outline = DarkSurfaceBorder,
 )
 
+internal fun themeModeToColorSchemeMode(mode: String): ColorSchemeMode = when (mode) {
+    "light" -> ColorSchemeMode.Light
+    "dark" -> ColorSchemeMode.Dark
+    else -> ColorSchemeMode.System
+}
+
 @Composable
 fun RiseDiaryTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    themeMode: String = "system",
     content: @Composable () -> Unit
 ) {
+    val colorSchemeMode = remember(themeMode) { themeModeToColorSchemeMode(themeMode) }
+    val controller = remember(colorSchemeMode) { ThemeController(colorSchemeMode = colorSchemeMode) }
+    val darkTheme = when (colorSchemeMode) {
+        ColorSchemeMode.Light -> false
+        ColorSchemeMode.Dark -> true
+        else -> isSystemInDarkTheme()
+    }
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
@@ -75,11 +92,13 @@ fun RiseDiaryTheme(
             }
         }
     }
-    CompositionLocalProvider(LocalRiseDarkTheme provides darkTheme) {
-        MaterialTheme(
-            colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme,
-            content = content
-        )
+    MiuixTheme(controller = controller) {
+        CompositionLocalProvider(LocalRiseDarkTheme provides darkTheme) {
+            MaterialTheme(
+                colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme,
+                content = content
+            )
+        }
     }
 }
 
@@ -88,10 +107,9 @@ fun backgroundBrush(
     topInsetPx: Float = 0f,
     windowHeightPx: Float = Float.NaN
 ): Brush {
-    val background = MaterialTheme.colorScheme.background
-    val backgroundEnd =
-        if (background == DarkBackgroundStart) DarkBackgroundEnd
-        else LightBackgroundEnd
+    val dark = LocalRiseDarkTheme.current
+    val background = if (dark) DarkBackgroundStart else LightBackgroundStart
+    val backgroundEnd = if (dark) DarkBackgroundEnd else LightBackgroundEnd
     val colors = listOf(background, backgroundEnd)
     if (windowHeightPx.isNaN()) {
         return Brush.verticalGradient(colors = colors)

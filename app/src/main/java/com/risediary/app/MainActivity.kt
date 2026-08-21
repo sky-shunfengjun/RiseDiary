@@ -6,8 +6,6 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.material3.Surface
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.fragment.app.FragmentActivity
@@ -20,6 +18,7 @@ import com.risediary.app.ui.theme.RiseDiaryTheme
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import top.yukonga.miuix.kmp.basic.Surface
 import javax.inject.Inject
 
 @AndroidEntryPoint
@@ -39,12 +38,7 @@ class MainActivity : FragmentActivity() {
         enableEdgeToEdge()
         setContent {
             val themeMode by preferences.themeMode.collectAsStateWithLifecycle(initialValue = "system")
-            val darkTheme = when (themeMode) {
-                "light" -> false
-                "dark" -> true
-                else -> isSystemInDarkTheme()
-            }
-            RiseDiaryTheme(darkTheme = darkTheme) {
+            RiseDiaryTheme(themeMode = themeMode) {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     RiseDiaryApp(
                         viewModel = appGateViewModel,
