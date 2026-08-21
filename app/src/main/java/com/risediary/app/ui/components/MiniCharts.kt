@@ -189,6 +189,17 @@ fun TrendColumnChart(
     isVolume: Boolean,
     modifier: Modifier = Modifier
 ) {
+    ChartTheme {
+        TrendColumnChartContent(flights, isVolume, modifier)
+    }
+}
+
+@Composable
+private fun TrendColumnChartContent(
+    flights: List<Flight>,
+    isVolume: Boolean,
+    modifier: Modifier = Modifier
+) {
     val locale = LocalConfiguration.current.locales[0]
     val points = remember(flights, isVolume, locale) {
         buildTrendChartPoints(flights, isVolume, locale)
@@ -301,6 +312,17 @@ fun TrendColumnChart(
 
 @Composable
 fun LengthTrendChart(
+    records: List<LengthRecord>,
+    compact: Boolean,
+    modifier: Modifier = Modifier
+) {
+    ChartTheme {
+        LengthTrendChartContent(records, compact, modifier)
+    }
+}
+
+@Composable
+private fun LengthTrendChartContent(
     records: List<LengthRecord>,
     compact: Boolean,
     modifier: Modifier = Modifier
