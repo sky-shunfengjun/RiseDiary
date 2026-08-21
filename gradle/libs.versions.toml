@@ -1,8 +1,8 @@
 [versions]
-agp = "8.13.2"
+agp = "9.1.0"
 kotlin = "2.4.10"
 ksp = "2.3.11"
-hilt = "2.57.2"
+hilt = "2.60.1"
 compose-bom = "2026.06.01"
 miuix = "0.9.3"
 backdrop = "1.0.0"
