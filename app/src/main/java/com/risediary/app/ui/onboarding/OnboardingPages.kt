@@ -88,7 +88,11 @@ import com.risediary.app.ui.theme.backgroundBrush
 import java.text.DecimalFormat
 
 @Composable
-internal fun CockpitBackdrop(modifier: Modifier = Modifier) {
+internal fun CockpitBackdrop(
+    topInsetPx: Float = 0f,
+    windowHeightPx: Float = Float.NaN,
+    modifier: Modifier = Modifier
+) {
     val dark = LocalRiseDarkTheme.current
     val transition = rememberInfiniteTransition(label = "cockpit_status")
     val pulse by transition.animateFloat(
@@ -106,7 +110,12 @@ internal fun CockpitBackdrop(modifier: Modifier = Modifier) {
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(backgroundBrush())
+            .background(
+                backgroundBrush(
+                    topInsetPx = topInsetPx,
+                    windowHeightPx = windowHeightPx
+                )
+            )
     ) {
         Canvas(modifier = Modifier.fillMaxSize()) {
             val grid = 48.dp.toPx()

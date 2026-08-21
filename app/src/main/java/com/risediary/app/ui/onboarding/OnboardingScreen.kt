@@ -25,6 +25,9 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -40,6 +43,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -217,9 +222,25 @@ fun OnboardingScreen(
     RiseDiaryTheme(darkTheme = previewDark) {
         val backdrop = rememberLayerBackdrop()
         val dialogHostState = rememberLiquidDialogHostState()
+        val density = LocalDensity.current
+        val cockpitTopInsetPx = with(density) {
+            if (mode == OnboardingMode.FIRST_RUN) {
+                0f
+            } else {
+                WindowInsets.statusBars
+                    .asPaddingValues()
+                    .calculateTopPadding()
+                    .toPx()
+            }
+        }
+        val cockpitWindowHeightPx = LocalView.current.height.toFloat()
         ProvideLiquidDialogHost(dialogHostState) {
             Box(modifier = Modifier.fillMaxSize()) {
-                CockpitBackdrop(modifier = Modifier.layerBackdrop(backdrop))
+                CockpitBackdrop(
+                    topInsetPx = cockpitTopInsetPx,
+                    windowHeightPx = cockpitWindowHeightPx,
+                    modifier = Modifier.layerBackdrop(backdrop)
+                )
 
             Column(
                 modifier = Modifier

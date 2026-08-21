@@ -84,16 +84,30 @@ fun RiseDiaryTheme(
 }
 
 @Composable
-fun backgroundBrush(): Brush {
+fun backgroundBrush(
+    topInsetPx: Float = 0f,
+    windowHeightPx: Float = Float.NaN
+): Brush {
     val background = MaterialTheme.colorScheme.background
     val backgroundEnd =
         if (background == DarkBackgroundStart) DarkBackgroundEnd
         else LightBackgroundEnd
-
+    val colors = listOf(background, backgroundEnd)
+    if (windowHeightPx.isNaN()) {
+        return Brush.verticalGradient(colors = colors)
+    }
+    val (startY, endY) = anchoredBackgroundEnds(topInsetPx, windowHeightPx)
     return Brush.verticalGradient(
-        colors = listOf(
-            background,
-            backgroundEnd
-        )
+        colors = colors,
+        startY = startY,
+        endY = endY
     )
+}
+
+internal fun anchoredBackgroundEnds(
+    topInsetPx: Float,
+    windowHeightPx: Float
+): Pair<Float, Float> {
+    val startY = if (topInsetPx <= 0f) 0f else -topInsetPx
+    return startY to (windowHeightPx - topInsetPx)
 }

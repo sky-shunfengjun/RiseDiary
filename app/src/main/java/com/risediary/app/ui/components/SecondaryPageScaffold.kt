@@ -6,11 +6,13 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -28,6 +30,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -58,7 +62,18 @@ fun SecondaryPageScaffold(
     reserveBottomActionSpace: Boolean = true,
     content: @Composable (PaddingValues) -> Unit
 ) {
-    val pageBackground = backgroundBrush()
+    val density = LocalDensity.current
+    val statusBarTopPx = with(density) {
+        WindowInsets.statusBars
+            .asPaddingValues()
+            .calculateTopPadding()
+            .toPx()
+    }
+    val windowHeightPx = LocalView.current.height.toFloat()
+    val pageBackground = backgroundBrush(
+        topInsetPx = statusBarTopPx,
+        windowHeightPx = windowHeightPx
+    )
     val currentBackground by rememberUpdatedState(pageBackground)
     val backdrop = rememberLayerBackdrop {
         drawRect(brush = currentBackground)
