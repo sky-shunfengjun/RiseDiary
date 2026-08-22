@@ -7,17 +7,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Backup
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.LocalOffer
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.NotificationsActive
-import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Reorder
-import androidx.compose.material.icons.filled.School
-import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -41,6 +30,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 import java.text.DecimalFormat
+import com.risediary.app.ui.icons.AppIcons
 
 @Composable
 fun SettingsScreen(
@@ -74,7 +64,7 @@ fun SettingsScreen(
                 Column {
                     val username by vm.username.collectAsStateWithLifecycle()
                     SettingsEditItem(
-                        icon = Icons.Default.Person,
+                        icon = AppIcons.Person,
                         title = stringResource(R.string.settings_username),
                         subtitle = stringResource(R.string.settings_username_summary),
                         value = username,
@@ -90,7 +80,7 @@ fun SettingsScreen(
                     val mlPerSpurt by vm.mlPerSpurt.collectAsStateWithLifecycle()
                     if (defaultVolumeMode == DefaultVolumeMode.SPURTS) {
                         SettingsSliderItem(
-                            icon = Icons.Default.WaterDrop,
+                            icon = AppIcons.WaterDrop,
                             title = stringResource(R.string.settings_ml_conversion),
                             subtitle = stringResource(
                                 R.string.settings_ml_conversion_summary,
@@ -105,7 +95,7 @@ fun SettingsScreen(
                     ArrowPreference(
                         title = stringResource(R.string.settings_manage_tags),
                         summary = stringResource(R.string.settings_manage_tags_summary),
-                        startAction = { SettingsIcon(Icons.Default.LocalOffer) },
+                        startAction = { SettingsIcon(AppIcons.LocalOffer) },
                         onClick = { navController.navigate(Screen.TagManager.route) }
                     )
                 }
@@ -118,7 +108,7 @@ fun SettingsScreen(
                 ArrowPreference(
                     title = stringResource(R.string.settings_reminder_settings),
                     summary = stringResource(R.string.settings_reminder_settings_summary),
-                    startAction = { SettingsIcon(Icons.Default.NotificationsActive) },
+                    startAction = { SettingsIcon(AppIcons.NotificationsActive) },
                     onClick = { navController.navigate(Screen.ReminderSettings.route) }
                 )
             }
@@ -133,7 +123,7 @@ fun SettingsScreen(
                     summary =
                         if (lockEnabled) stringResource(R.string.settings_app_lock_on)
                         else stringResource(R.string.settings_app_lock_off),
-                    startAction = { SettingsIcon(Icons.Default.Lock) },
+                    startAction = { SettingsIcon(AppIcons.Lock) },
                     onClick = { navController.navigate(Screen.AppLockSettings.route) }
                 )
             }
@@ -145,7 +135,7 @@ fun SettingsScreen(
                 ArrowPreference(
                     title = stringResource(R.string.settings_backup),
                     summary = stringResource(R.string.settings_backup_summary),
-                    startAction = { SettingsIcon(Icons.Default.Backup) },
+                    startAction = { SettingsIcon(AppIcons.Backup) },
                     onClick = { navController.navigate(Screen.BackupRestore.route) }
                 )
             }
@@ -163,7 +153,7 @@ fun SettingsScreen(
                     ArrowPreference(
                         title = stringResource(R.string.settings_card_order),
                         summary = stringResource(R.string.settings_card_order_summary),
-                        startAction = { SettingsIcon(Icons.Default.Reorder) },
+                        startAction = { SettingsIcon(AppIcons.Reorder) },
                         onClick = { navController.navigate(Screen.CardOrder.route) }
                     )
                 }
@@ -177,13 +167,13 @@ fun SettingsScreen(
                     ArrowPreference(
                         title = stringResource(R.string.settings_review_onboarding),
                         summary = stringResource(R.string.settings_review_onboarding_summary),
-                        startAction = { SettingsIcon(Icons.Default.School) },
+                        startAction = { SettingsIcon(AppIcons.School) },
                         onClick = { navController.navigate("onboarding_review") }
                     )
                     ArrowPreference(
                         title = stringResource(R.string.settings_about),
                         summary = stringResource(R.string.settings_version, BuildConfig.VERSION_NAME),
-                        startAction = { SettingsIcon(Icons.Default.Info) },
+                        startAction = { SettingsIcon(AppIcons.Info) },
                         onClick = { navController.navigate(Screen.About.route) }
                     )
                 }

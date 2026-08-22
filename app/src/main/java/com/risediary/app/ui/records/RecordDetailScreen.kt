@@ -14,10 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -50,6 +46,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import com.risediary.app.ui.icons.AppIcons
 
 @Composable
 fun RecordDetailScreen(
@@ -78,11 +75,11 @@ fun RecordDetailScreen(
                         }
                     }
                 ) {
-                    Icon(Icons.Default.Edit, contentDescription = "编辑")
+                    Icon(AppIcons.Edit, contentDescription = "编辑")
                 }
                 IconButton(onClick = { showDeleteConfirm = true }) {
                     Icon(
-                        Icons.Default.Delete,
+                        AppIcons.Delete,
                         contentDescription = "删除",
                         tint = MiuixTheme.colorScheme.error
                     )

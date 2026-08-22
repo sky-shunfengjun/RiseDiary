@@ -13,8 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -51,6 +49,7 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
+import com.risediary.app.ui.icons.AppIcons
 
 @Composable
 fun AboutScreen(
@@ -84,7 +83,7 @@ fun AboutScreen(
                         contentDescription = updateButtonDescription
                     }
             ) {
-                Icon(Icons.Default.Refresh, contentDescription = null)
+                Icon(AppIcons.Refresh, contentDescription = null)
                 Text(
                     if (isChecking) {
                         stringResource(R.string.update_checking)

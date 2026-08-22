@@ -13,9 +13,6 @@ import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,6 +38,7 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import com.risediary.app.ui.icons.AppIcons
 
 /**
  * Shared frame for secondary and tertiary pages.
@@ -212,7 +210,7 @@ fun LiquidAddButton(
         pressExpansion = 2.dp
     ) {
         Icon(
-            imageVector = Icons.Default.Add,
+            imageVector = AppIcons.Add,
             contentDescription = contentDescription,
             tint = MiuixTheme.colorScheme.onSurface,
             modifier = Modifier.size(28.dp)
@@ -238,7 +236,7 @@ fun LiquidBackButton(
         pressExpansion = 2.dp
     ) {
         Icon(
-            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+            imageVector = AppIcons.ArrowBack,
             contentDescription = "返回",
             tint = MiuixTheme.colorScheme.onSurface,
             modifier = Modifier.size(24.dp)

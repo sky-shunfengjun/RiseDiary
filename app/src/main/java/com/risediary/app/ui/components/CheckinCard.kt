@@ -14,11 +14,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,6 +33,10 @@ import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.kyant.capsule.ContinuousCapsule
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+import com.risediary.app.ui.icons.AppIcons
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
  * Combined check-in card: Duolingo-style week view (default) + month calendar (toggle).
@@ -77,25 +76,25 @@ fun CheckinCard(
                 modifier = Modifier
                     .size(36.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.11f)),
+                    .background(MiuixTheme.colorScheme.primary.copy(alpha = 0.11f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = Icons.Default.CalendarMonth,
+                    imageVector = AppIcons.CalendarMonth,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = MiuixTheme.colorScheme.primary,
                     modifier = Modifier.size(20.dp)
                 )
             }
             Spacer(modifier = Modifier.width(10.dp))
             Text(
                 "打卡",
-                style = MaterialTheme.typography.titleMedium,
+                fontSize = MiuixTheme.textStyles.title4.fontSize,
                 fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = MiuixTheme.colorScheme.onSurface,
                 modifier = Modifier.weight(1f)
             )
-            val trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.035f)
+            val trackColor = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.035f)
             val currentTrackColor by rememberUpdatedState(trackColor)
             val backdrop = rememberLayerBackdrop { drawContent() }
             Box(
@@ -126,8 +125,8 @@ fun CheckinCard(
                     LiquidSegmentedControl(
                         options = remember {
                             listOf(
-                                LiquidSegmentOption("本周", Icons.Default.CalendarMonth),
-                                LiquidSegmentOption("本月", Icons.Default.CalendarMonth)
+                                LiquidSegmentOption("本周", AppIcons.CalendarMonth),
+                                LiquidSegmentOption("本月", AppIcons.CalendarMonth)
                             )
                         },
                         selectedIndex = if (showMonth) 1 else 0,
@@ -189,8 +188,8 @@ fun CheckinCard(
                             ) {
                                 Text(
                                     weekdayLabels[index],
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                                    fontSize = MiuixTheme.textStyles.footnote1.fontSize,
+                                    color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.4f),
                                     textAlign = TextAlign.Center
                                 )
                                 Spacer(modifier = Modifier.height(6.dp))
@@ -212,7 +211,7 @@ fun CheckinCard(
                                                     .clip(CircleShape)
                                                     .border(
                                                         1.5.dp,
-                                                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f),
+                                                        MiuixTheme.colorScheme.onSurface.copy(alpha = 0.2f),
                                                         CircleShape
                                                     )
                                             }
@@ -245,7 +244,7 @@ fun CheckinCard(
                                                 if (isToday) FontWeight.Bold else FontWeight.Normal,
                                             color =
                                                 if (isToday) CardBlue
-                                                else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+                                                else MiuixTheme.colorScheme.onSurface.copy(alpha = 0.55f)
                                         )
                                     }
                                 }
@@ -270,8 +269,8 @@ fun CheckinCard(
                     ) {
                         Text(
                             summaryText,
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f)
+                            fontSize = MiuixTheme.textStyles.body1.fontSize,
+                            color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.65f)
                         )
                         if (lastWeekCount > 0) {
                             val change = (
@@ -283,7 +282,7 @@ fun CheckinCard(
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
                                 "较上周 $arrow ${kotlin.math.abs(change)}%",
-                                style = MaterialTheme.typography.labelSmall,
+                                fontSize = MiuixTheme.textStyles.footnote1.fontSize,
                                 color = changeColor
                             )
                         }

@@ -32,12 +32,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.EditNote
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Stop
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -77,6 +71,7 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import com.risediary.app.ui.icons.AppIcons
 
 @Composable
 fun TimerScreen(
@@ -407,7 +402,7 @@ private fun TimerActionDock(
         TimerStatus.IDLE -> {
             PrimaryTimerButton(
                 text = "开始计时",
-                icon = { Icon(Icons.Default.PlayArrow, null, Modifier.size(24.dp)) },
+                icon = { Icon(AppIcons.PlayArrow, null, Modifier.size(24.dp)) },
                 onClick = onStart,
                 backdrop = backdrop
             )
@@ -423,9 +418,9 @@ private fun TimerActionDock(
                     icon = {
                         Icon(
                             if (session.status == TimerStatus.PAUSED) {
-                                Icons.Default.PlayArrow
+                                AppIcons.PlayArrow
                             } else {
-                                Icons.Default.Pause
+                                AppIcons.Pause
                             },
                             null,
                             Modifier.size(24.dp)
@@ -447,7 +442,7 @@ private fun TimerActionDock(
                     pressExpansion = 2.dp
                 ) {
                     Icon(
-                        Icons.Default.Stop,
+                        AppIcons.Stop,
                         contentDescription = "结束计时",
                         tint = MiuixTheme.colorScheme.error,
                         modifier = Modifier.size(24.dp)
@@ -470,12 +465,12 @@ private fun TimerActionDock(
                     highlightRadiusMultiplier = 0.95f,
                     pressExpansion = 2.dp
                 ) {
-                    Icon(Icons.Default.Refresh, null, Modifier.size(22.dp))
+                    Icon(AppIcons.Refresh, null, Modifier.size(22.dp))
                     Text("重新计时", fontWeight = FontWeight.Medium)
                 }
                 PrimaryTimerButton(
                     text = "填写记录",
-                    icon = { Icon(Icons.Default.EditNote, null, Modifier.size(22.dp)) },
+                    icon = { Icon(AppIcons.EditNote, null, Modifier.size(22.dp)) },
                     onClick = onRecord,
                     backdrop = backdrop,
                     width = 176.dp
@@ -486,7 +481,7 @@ private fun TimerActionDock(
         TimerStatus.LIMIT_REACHED -> {
             PrimaryTimerButton(
                 text = "填写记录",
-                icon = { Icon(Icons.Default.EditNote, null, Modifier.size(24.dp)) },
+                icon = { Icon(AppIcons.EditNote, null, Modifier.size(24.dp)) },
                 onClick = onRecord,
                 backdrop = backdrop
             )

@@ -26,22 +26,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Backup
-import androidx.compose.material.icons.filled.CloudOff
-import androidx.compose.material.icons.filled.Dashboard
-import androidx.compose.material.icons.filled.EditNote
-import androidx.compose.material.icons.filled.EmojiEvents
-import androidx.compose.material.icons.filled.Fingerprint
-import androidx.compose.material.icons.filled.FlightTakeoff
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.NotificationsActive
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material.icons.filled.ShowChart
-import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material.icons.filled.Timer
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -85,6 +69,7 @@ import top.yukonga.miuix.kmp.basic.Surface
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.text.DecimalFormat
+import com.risediary.app.ui.icons.AppIcons
 
 @Composable
 internal fun CockpitBackdrop(
@@ -385,7 +370,7 @@ internal fun WelcomeAction(backdrop: Backdrop, onClick: () -> Unit) {
                 }
         ) {
             Icon(
-                Icons.Default.FlightTakeoff,
+                AppIcons.FlightTakeoff,
                 contentDescription = null,
                 tint = MiuixTheme.colorScheme.onPrimary
             )

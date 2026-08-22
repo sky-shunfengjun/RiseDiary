@@ -10,11 +10,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.DragHandle
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,6 +33,7 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
+import com.risediary.app.ui.icons.AppIcons
 
 @Composable
 fun CardOrderScreen(
@@ -177,7 +173,7 @@ private fun CardOrderList(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            Icons.Default.DragHandle,
+                            AppIcons.DragHandle,
                             contentDescription = "按住并上下拖动排序",
                             tint = MiuixTheme.colorScheme.primary
                         )
@@ -216,7 +212,7 @@ private fun CardOrderList(
 
                     IconButton(onClick = { vm.toggleVisible(cardId) }) {
                         Icon(
-                            if (isVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                            if (isVisible) AppIcons.Visibility else AppIcons.VisibilityOff,
                             contentDescription = if (isVisible) "显示" else "隐藏",
                             tint = if (isVisible) {
                                 MiuixTheme.colorScheme.primary

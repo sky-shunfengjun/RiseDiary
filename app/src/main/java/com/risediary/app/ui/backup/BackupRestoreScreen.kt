@@ -15,8 +15,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -45,6 +43,7 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import com.risediary.app.ui.icons.AppIcons
 
 @Composable
 fun BackupRestoreScreen(
@@ -135,7 +134,7 @@ fun BackupRestoreScreen(
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("导出中...")
                         } else {
-                            Icon(Icons.Default.Upload, null, modifier = Modifier.size(18.dp))
+                            Icon(AppIcons.Upload, null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("导出备份")
                         }
@@ -205,7 +204,7 @@ title = { Text("确认导出") },
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("恢复中...")
                         } else {
-                            Icon(Icons.Default.Download, null, modifier = Modifier.size(18.dp))
+                            Icon(AppIcons.Download, null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
                             Text("选择备份文件")
                         }
@@ -265,7 +264,7 @@ title = { Text("确认恢复") },
                             contentColor = Color.White
                         )
                     ) {
-                        Icon(Icons.Default.DeleteForever, null, modifier = Modifier.size(18.dp))
+                        Icon(AppIcons.DeleteForever, null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
                         Text("清除所有数据")
                     }

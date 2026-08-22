@@ -9,12 +9,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Backup
-import androidx.compose.material.icons.filled.Dashboard
-import androidx.compose.material.icons.filled.FlightTakeoff
-import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Storage
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,10 +27,11 @@ import top.yukonga.miuix.kmp.basic.Surface
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import com.risediary.app.ui.icons.AppIcons
 
 @Composable
 internal fun ProfileOnboardingPage(username: String, onUsernameChange: (String) -> Unit) {
-    SetupPage(Icons.Default.Person, stringResource(R.string.onboarding_profile_title), stringResource(R.string.onboarding_profile_subtitle)) {
+    SetupPage(AppIcons.Person, stringResource(R.string.onboarding_profile_title), stringResource(R.string.onboarding_profile_subtitle)) {
         RiseCard(modifier = Modifier.fillMaxWidth()) {
             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
                 TextField(
@@ -52,8 +47,8 @@ internal fun ProfileOnboardingPage(username: String, onUsernameChange: (String) 
                     fontSize = MiuixTheme.textStyles.footnote1.fontSize,
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                 )
-                InfoRow(Icons.Default.Storage, stringResource(R.string.onboarding_local_data_title), stringResource(R.string.onboarding_local_data_summary), CardGreen)
-                InfoRow(Icons.Default.Backup, stringResource(R.string.onboarding_backup_title), stringResource(R.string.onboarding_backup_summary), CardBlue)
+                InfoRow(AppIcons.Storage, stringResource(R.string.onboarding_local_data_title), stringResource(R.string.onboarding_local_data_summary), CardGreen)
+                InfoRow(AppIcons.Backup, stringResource(R.string.onboarding_backup_title), stringResource(R.string.onboarding_backup_summary), CardBlue)
             }
         }
     }
@@ -61,9 +56,9 @@ internal fun ProfileOnboardingPage(username: String, onUsernameChange: (String) 
 
 @Composable
 internal fun ThemeOnboardingPage(themeMode: String, backdrop: Backdrop, onThemeSelected: (String) -> Unit) {
-    SetupPage(Icons.Default.Dashboard, stringResource(R.string.onboarding_theme_title), stringResource(R.string.onboarding_theme_subtitle)) {
+    SetupPage(AppIcons.Dashboard, stringResource(R.string.onboarding_theme_title), stringResource(R.string.onboarding_theme_subtitle)) {
         RiseCard(modifier = Modifier.fillMaxWidth()) {
-            SettingsThemeItem(Icons.Default.Dashboard, stringResource(R.string.settings_theme), themeMode, onThemeSelected)
+            SettingsThemeItem(AppIcons.Dashboard, stringResource(R.string.settings_theme), themeMode, onThemeSelected)
         }
         MiniDashboardPreview()
         Text(
@@ -100,7 +95,7 @@ private fun MiniDashboardPreview() {
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
-                            Icons.Default.FlightTakeoff,
+                            AppIcons.FlightTakeoff,
                             null,
                             tint = MiuixTheme.colorScheme.primary
                         )

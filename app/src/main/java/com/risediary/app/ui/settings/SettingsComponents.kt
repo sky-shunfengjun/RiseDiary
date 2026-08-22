@@ -20,12 +20,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.EventRepeat
-import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -61,6 +55,7 @@ import top.yukonga.miuix.kmp.basic.Surface
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import com.risediary.app.ui.icons.AppIcons
 
 @Composable
 internal fun SettingsGroupHeader(title: String) {
@@ -135,7 +130,7 @@ internal fun SettingsNavItem(
             )
         }
         Icon(
-            imageVector = Icons.Default.ChevronRight,
+            imageVector = AppIcons.ChevronRight,
             contentDescription = null,
             tint = MiuixTheme.colorScheme.onSurfaceVariantActions,
             modifier = Modifier.size(20.dp)
@@ -192,7 +187,7 @@ internal fun SettingsEditItem(
                                 }
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Check,
+                                    imageVector = AppIcons.Check,
                                     contentDescription = "保存"
                                 )
                             }
@@ -211,7 +206,7 @@ internal fun SettingsEditItem(
         if (!editing) {
             IconButton(onClick = { editing = true }) {
                 Icon(
-                    imageVector = Icons.Default.Edit,
+                    imageVector = AppIcons.Edit,
                     contentDescription = "编辑",
                     tint = MiuixTheme.colorScheme.primary,
                     modifier = Modifier.size(19.dp)
@@ -341,7 +336,7 @@ internal fun SettingsReminderDaysItem(
         stringResource(R.string.settings_inactive_day_option, day)
     }
     val options = remember(labels) {
-        labels.map { label -> LiquidSegmentOption(label, Icons.Default.EventRepeat) }
+        labels.map { label -> LiquidSegmentOption(label, AppIcons.EventRepeat) }
     }
     val rowSurface by rememberUpdatedState(
         if (LocalRiseDarkTheme.current) Color(0xFF20242B) else Color(0xF7FFFFFF)
@@ -358,7 +353,7 @@ internal fun SettingsReminderDaysItem(
                 .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                SettingsIcon(Icons.Default.EventRepeat)
+                SettingsIcon(AppIcons.EventRepeat)
                 Spacer(modifier = Modifier.width(12.dp))
                 Text(
                     text = stringResource(R.string.settings_inactive_interval),
@@ -396,7 +391,7 @@ internal fun SettingsNotificationWarning(onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         SettingsIcon(
-            icon = Icons.Default.NotificationsActive,
+            icon = AppIcons.NotificationsActive,
             tint = MiuixTheme.colorScheme.error
         )
         Spacer(modifier = Modifier.width(12.dp))
@@ -415,7 +410,7 @@ internal fun SettingsNotificationWarning(onClick: () -> Unit) {
             )
         }
         Icon(
-            imageVector = Icons.Default.ChevronRight,
+            imageVector = AppIcons.ChevronRight,
             contentDescription = null,
             tint = MiuixTheme.colorScheme.onSurfaceVariantActions
         )

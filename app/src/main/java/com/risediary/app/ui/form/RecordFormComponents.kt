@@ -16,11 +16,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Numbers
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -45,6 +40,7 @@ import top.yukonga.miuix.kmp.basic.RadioButton
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.PressFeedbackType
+import com.risediary.app.ui.icons.AppIcons
 
 @Composable
 internal fun FormSectionTitle(icon: ImageVector, title: String, subtitle: String) {
@@ -125,7 +121,7 @@ internal fun DurationValueButton(
                 modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Icon(Icons.Default.Schedule, null, tint = MiuixTheme.colorScheme.primary)
+                Icon(AppIcons.Schedule, null, tint = MiuixTheme.colorScheme.primary)
                 Column(modifier = Modifier.weight(1f).padding(horizontal = 12.dp)) {
                     Text(
                         "用时",
@@ -139,7 +135,7 @@ internal fun DurationValueButton(
                     )
                 }
                 Icon(
-                    Icons.Default.ChevronRight,
+                    AppIcons.ChevronRight,
                     contentDescription = "修改用时",
                     tint = MiuixTheme.colorScheme.onSurfaceVariantSummary
                 )
@@ -174,8 +170,8 @@ internal fun VolumeModeSelector(
         LiquidSegmentedControl(
             options = remember {
                 listOf(
-                    LiquidSegmentOption("按毫升", Icons.Default.WaterDrop),
-                    LiquidSegmentOption("按股数", Icons.Default.Numbers)
+                    LiquidSegmentOption("按毫升", AppIcons.WaterDrop),
+                    LiquidSegmentOption("按股数", AppIcons.Numbers)
                 )
             },
             selectedIndex = if (useSpurtMode) 1 else 0,

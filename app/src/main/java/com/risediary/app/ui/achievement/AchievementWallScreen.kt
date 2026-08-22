@@ -11,8 +11,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Lock
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -45,6 +43,7 @@ import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import com.risediary.app.ui.icons.AppIcons
 
 @Composable
 fun AchievementWallScreen(
@@ -129,7 +128,7 @@ private fun AchievementCard(
                 )
             } else {
                 Icon(
-                    imageVector = Icons.Default.Lock,
+                    imageVector = AppIcons.Lock,
                     contentDescription = "尚未解锁",
                     tint = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.35f),
                     modifier = Modifier.size(32.dp)

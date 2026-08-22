@@ -20,15 +20,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
-import androidx.compose.material.icons.filled.BatteryAlert
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.CleaningServices
-import androidx.compose.material.icons.filled.EventRepeat
-import androidx.compose.material.icons.filled.NotificationsActive
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material.icons.filled.Timer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -57,6 +48,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.time.LocalTime
 import java.util.Locale
 import kotlinx.coroutines.delay
+import com.risediary.app.ui.icons.AppIcons
 
 @Composable
 fun ReminderSettingsScreen(
@@ -234,7 +226,7 @@ fun ReminderSettingsScreen(
                     SettingsDivider()
                 }
                 SettingsToggleItem(
-                    icon = Icons.Default.NotificationsActive,
+                    icon = AppIcons.NotificationsActive,
                     title = stringResource(R.string.settings_daily_reminder),
                     subtitle = stringResource(
                         R.string.settings_daily_reminder_summary,
@@ -248,7 +240,7 @@ fun ReminderSettingsScreen(
                 if (dailyEnabled) {
                     SettingsDivider()
                     SettingsNavItem(
-                        icon = Icons.Default.Schedule,
+                        icon = AppIcons.Schedule,
                         title = stringResource(R.string.settings_reminder_time),
                         subtitle = dailyTime,
                         onClick = { editingReminderTime = ReminderType.DAILY }
@@ -256,7 +248,7 @@ fun ReminderSettingsScreen(
                 }
                 SettingsDivider()
                 SettingsToggleItem(
-                    icon = Icons.Default.EventRepeat,
+                    icon = AppIcons.EventRepeat,
                     title = stringResource(R.string.settings_inactive_reminder),
                     subtitle = stringResource(
                         R.string.settings_inactive_reminder_summary,
@@ -276,7 +268,7 @@ fun ReminderSettingsScreen(
                     )
                     SettingsDivider()
                     SettingsNavItem(
-                        icon = Icons.Default.Schedule,
+                        icon = AppIcons.Schedule,
                         title = stringResource(R.string.settings_reminder_time),
                         subtitle = inactiveTime,
                         onClick = { editingReminderTime = ReminderType.INACTIVE }
@@ -284,7 +276,7 @@ fun ReminderSettingsScreen(
                 }
                 SettingsDivider()
                 SettingsToggleItem(
-                    icon = Icons.Default.CalendarMonth,
+                    icon = AppIcons.CalendarMonth,
                     title = stringResource(R.string.settings_monthly_length_reminder),
                     subtitle = stringResource(
                         R.string.settings_monthly_length_reminder_summary,
@@ -299,7 +291,7 @@ fun ReminderSettingsScreen(
                 if (monthlyEnabled) {
                     SettingsDivider()
                     SettingsNavItem(
-                        icon = Icons.Default.CalendarMonth,
+                        icon = AppIcons.CalendarMonth,
                         title = stringResource(R.string.settings_monthly_reminder_day),
                         subtitle = stringResource(
                             R.string.settings_monthly_reminder_day_value,
@@ -309,7 +301,7 @@ fun ReminderSettingsScreen(
                     )
                     SettingsDivider()
                     SettingsNavItem(
-                        icon = Icons.Default.Schedule,
+                        icon = AppIcons.Schedule,
                         title = stringResource(R.string.settings_reminder_time),
                         subtitle = monthlyTime,
                         onClick = {
@@ -324,7 +316,7 @@ fun ReminderSettingsScreen(
             SettingsGroupHeader(stringResource(R.string.settings_group_notification_delivery))
             RiseCard(modifier = Modifier.fillMaxWidth()) {
                 SettingsNavItem(
-                    icon = Icons.Default.Schedule,
+                    icon = AppIcons.Schedule,
                     title = stringResource(
                         if (exactAlarmsAllowed) {
                             R.string.settings_exact_alarm_allowed
@@ -355,7 +347,7 @@ fun ReminderSettingsScreen(
                 )
                 SettingsDivider()
                 SettingsNavItem(
-                    icon = Icons.Default.NotificationsActive,
+                    icon = AppIcons.NotificationsActive,
                     title = stringResource(R.string.settings_notification_test),
                     subtitle = stringResource(
                         if (testSent) {
@@ -368,7 +360,7 @@ fun ReminderSettingsScreen(
                 )
                 SettingsDivider()
                 SettingsNavItem(
-                    icon = Icons.Default.Timer,
+                    icon = AppIcons.Timer,
                     title = stringResource(
                         if (backgroundTestScheduled) {
                             R.string.settings_background_test_cancel
@@ -387,7 +379,7 @@ fun ReminderSettingsScreen(
                 )
                 SettingsDivider()
                 SettingsNavItem(
-                    icon = Icons.AutoMirrored.Filled.VolumeUp,
+                    icon = AppIcons.VolumeUp,
                     title = stringResource(R.string.settings_reminder_sound_vibration),
                     subtitle =
                         stringResource(R.string.settings_reminder_sound_vibration_summary),
@@ -395,7 +387,7 @@ fun ReminderSettingsScreen(
                 )
                 SettingsDivider()
                 SettingsNavItem(
-                    icon = Icons.Default.BatteryAlert,
+                    icon = AppIcons.BatteryAlert,
                     title = stringResource(
                         if (backgroundRestricted) {
                             R.string.settings_background_restricted

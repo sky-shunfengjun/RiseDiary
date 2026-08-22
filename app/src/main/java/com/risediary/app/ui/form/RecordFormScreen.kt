@@ -26,17 +26,6 @@ import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.EditNote
-import androidx.compose.material.icons.filled.Notes
-import androidx.compose.material.icons.filled.Numbers
-import androidx.compose.material.icons.filled.Save
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material.icons.filled.Straighten
-import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -84,6 +73,7 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import com.risediary.app.ui.icons.AppIcons
 
 @Composable
 fun RecordFormScreen(
@@ -155,7 +145,7 @@ fun RecordFormScreen(
                 highlightRadiusMultiplier = 1f,
                 pressExpansion = 2.dp
             ) {
-                Icon(Icons.Default.Save, null, Modifier.size(22.dp))
+                Icon(AppIcons.Save, null, Modifier.size(22.dp))
                 Text(
                     if (vm.isSaving) "正在保存" else "保存记录",
                     style = MiuixTheme.textStyles.title4,
@@ -187,7 +177,7 @@ fun RecordFormScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     FormSectionTitle(
-                        icon = Icons.Default.Tune,
+                        icon = AppIcons.Tune,
                         title = "时间与用时",
                         subtitle = "确认开始时间和本次用时"
                     )
@@ -197,13 +187,13 @@ fun RecordFormScreen(
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         CompactValueButton(
-                            icon = Icons.Default.CalendarMonth,
+                            icon = AppIcons.CalendarMonth,
                             text = formatDateOnly(vm.startTime),
                             onClick = { showDatePicker = true },
                             modifier = Modifier.weight(1f)
                         )
                         CompactValueButton(
-                            icon = Icons.Default.Schedule,
+                            icon = AppIcons.Schedule,
                             text = formatTimeOnly(vm.startTime),
                             onClick = { showTimePicker = true },
                             modifier = Modifier.weight(1f)
@@ -224,7 +214,7 @@ fun RecordFormScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     FormSectionTitle(
-                        icon = Icons.Default.WaterDrop,
+                        icon = AppIcons.WaterDrop,
                         title = "记录数据",
                         subtitle = stringResource(R.string.form_data_subtitle)
                     )
@@ -336,7 +326,7 @@ fun RecordFormScreen(
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     FormSectionTitle(
-                        icon = Icons.Default.EditNote,
+                        icon = AppIcons.EditNote,
                         title = "补充信息",
                         subtitle = "标签和备注可按需填写"
                     )

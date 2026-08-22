@@ -18,13 +18,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.FlightTakeoff
-import androidx.compose.material.icons.filled.Straighten
-import androidx.compose.material.icons.filled.Timer
-import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
@@ -70,6 +63,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import com.risediary.app.ui.icons.AppIcons
 
 @Composable
 fun RecordsScreen(
@@ -156,7 +150,7 @@ fun RecordsScreen(
                 selected = viewModel.startDate != null,
                 leadingIcon = {
                     Icon(
-                        Icons.Default.CalendarMonth,
+                        AppIcons.CalendarMonth,
                         contentDescription = null,
                         modifier = Modifier.size(16.dp),
                         tint = MiuixTheme.colorScheme.onSurfaceVariantActions
@@ -185,7 +179,7 @@ fun RecordsScreen(
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(
-                        Icons.Default.FlightTakeoff,
+                        AppIcons.FlightTakeoff,
                         contentDescription = null,
                         modifier = Modifier.size(64.dp),
                         tint = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.2f)
@@ -315,7 +309,7 @@ private fun FlightCard(
                 contentAlignment = Alignment.CenterEnd
             ) {
                 Icon(
-                    Icons.Default.Delete,
+                    AppIcons.Delete,
                     contentDescription = "删除",
                     tint = MiuixTheme.colorScheme.error
                 )
@@ -340,9 +334,9 @@ private fun FlightCard(
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        StatItem(Icons.Default.Timer, formatDuration(flight.durationSeconds))
+                        StatItem(AppIcons.Timer, formatDuration(flight.durationSeconds))
                         StatItem(
-                            Icons.Default.WaterDrop,
+                            AppIcons.WaterDrop,
                             if (
                                 RecordVolumeMode.fromStoredValue(flight.volumeInputMode) ==
                                 RecordVolumeMode.SPURTS
@@ -353,7 +347,7 @@ private fun FlightCard(
                             }
                         )
                         flight.ejaculationDistanceCm?.let {
-                            StatItem(Icons.Default.Straighten, "${it}cm")
+                            StatItem(AppIcons.Straighten, "${it}cm")
                         }
                     }
                     val tags = TagJson.decode(flight.methodTags)
@@ -371,7 +365,7 @@ private fun FlightCard(
                 }
                 IconButton(onClick = { showDeleteConfirm = true }) {
                     Icon(
-                        Icons.Default.Delete,
+                        AppIcons.Delete,
                         contentDescription = "删除",
                         tint = MiuixTheme.colorScheme.error
                     )

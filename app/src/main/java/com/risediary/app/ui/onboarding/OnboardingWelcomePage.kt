@@ -15,11 +15,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CloudOff
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material.icons.filled.Tune
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,6 +35,7 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Surface
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import com.risediary.app.ui.icons.AppIcons
 
 @Composable
 internal fun WelcomeOnboardingPage() {
@@ -81,7 +77,7 @@ internal fun WelcomeOnboardingPage() {
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Icon(
-                    Icons.Default.Info,
+                    AppIcons.Info,
                     contentDescription = stringResource(R.string.onboarding_usage_disclaimer_title),
                     tint = MiuixTheme.colorScheme.primary,
                     modifier = Modifier.size(18.dp)
@@ -98,9 +94,9 @@ internal fun WelcomeOnboardingPage() {
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            WelcomeStatus(Icons.Default.Storage, stringResource(R.string.onboarding_status_local), Modifier.weight(1f))
-            WelcomeStatus(Icons.Default.CloudOff, stringResource(R.string.onboarding_status_no_account), Modifier.weight(1f))
-            WelcomeStatus(Icons.Default.Tune, stringResource(R.string.onboarding_status_editable), Modifier.weight(1f))
+            WelcomeStatus(AppIcons.Storage, stringResource(R.string.onboarding_status_local), Modifier.weight(1f))
+            WelcomeStatus(AppIcons.CloudOff, stringResource(R.string.onboarding_status_no_account), Modifier.weight(1f))
+            WelcomeStatus(AppIcons.Tune, stringResource(R.string.onboarding_status_editable), Modifier.weight(1f))
         }
     }
 }

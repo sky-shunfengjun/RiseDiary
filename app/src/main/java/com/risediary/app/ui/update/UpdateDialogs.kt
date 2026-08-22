@@ -1,8 +1,5 @@
 package com.risediary.app.ui.update
 
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import com.risediary.app.R
@@ -14,6 +11,7 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import com.risediary.app.ui.icons.AppIcons
 
 @Composable
 internal fun UpdateAvailableDialog(
@@ -26,7 +24,7 @@ internal fun UpdateAvailableDialog(
         onDismissRequest = onDismiss,
         icon = {
             Icon(
-                imageVector = Icons.Default.SystemUpdate,
+                imageVector = AppIcons.SystemUpdate,
                 contentDescription = null,
                 tint = MiuixTheme.colorScheme.primary
             )
@@ -68,12 +66,12 @@ internal fun UpdateStatusDialog(
         UpdateStatusDialogState.UP_TO_DATE -> Triple(
             R.string.update_latest_title,
             R.string.update_latest_message,
-            Icons.Default.SystemUpdate
+            AppIcons.SystemUpdate
         )
         UpdateStatusDialogState.FAILED -> Triple(
             R.string.update_failed_title,
             R.string.update_failed_message,
-            Icons.Default.Info
+            AppIcons.Info
         )
     }
     LiquidAlertDialog(

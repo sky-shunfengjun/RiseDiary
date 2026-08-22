@@ -11,11 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.text.BasicText
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.List
-import androidx.compose.material.icons.filled.FlightTakeoff
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -61,6 +56,7 @@ import kotlin.math.atan2
 import kotlin.math.cos
 import kotlin.math.sin
 import kotlin.math.tanh
+import com.risediary.app.ui.icons.AppIcons
 
 private data class BottomTab(val label: String, val icon: ImageVector)
 
@@ -76,9 +72,9 @@ fun LiquidGlassBottomBar(
 ) {
     val tabs = remember {
         listOf(
-            BottomTab("首页", Icons.Default.Home),
-            BottomTab("记录", Icons.AutoMirrored.Filled.List),
-            BottomTab("设置", Icons.Default.Settings)
+            BottomTab("首页", AppIcons.Home),
+            BottomTab("记录", AppIcons.List),
+            BottomTab("设置", AppIcons.Settings)
         )
     }
     var visualSelectedTabIndex by rememberSaveable { mutableIntStateOf(selectedTabIndex) }
@@ -129,7 +125,7 @@ fun LiquidGlassBottomBar(
             highlightRadiusMultiplier = 0.98f,
             pressExpansion = 2.dp
         ) {
-            Icon(Icons.Default.FlightTakeoff, "开始起飞", tint = contentColor, modifier = Modifier.size(28.dp))
+            Icon(AppIcons.FlightTakeoff, "开始起飞", tint = contentColor, modifier = Modifier.size(28.dp))
         }
     }
 }

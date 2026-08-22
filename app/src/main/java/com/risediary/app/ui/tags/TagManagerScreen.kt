@@ -20,11 +20,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.DragHandle
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -67,6 +62,7 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import com.risediary.app.ui.icons.AppIcons
 
 @Composable
 fun TagManagerScreen(
@@ -208,7 +204,7 @@ fun TagManagerScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                Icons.Default.DragHandle,
+                                AppIcons.DragHandle,
                                 contentDescription = "按住并上下拖动排序",
                                 tint = MiuixTheme.colorScheme.primary
                             )
@@ -238,11 +234,11 @@ fun TagManagerScreen(
                                 showEditor = true
                             }
                         ) {
-                            Icon(Icons.Default.Edit, contentDescription = "编辑")
+                            Icon(AppIcons.Edit, contentDescription = "编辑")
                         }
                         IconButton(onClick = { deleteTarget = tag }) {
                             Icon(
-                                Icons.Default.Delete,
+                                AppIcons.Delete,
                                 contentDescription = "删除",
                                 tint = MiuixTheme.colorScheme.error
                             )

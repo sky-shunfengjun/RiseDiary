@@ -18,9 +18,6 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Backspace
-import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -51,6 +48,7 @@ import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import com.risediary.app.ui.icons.AppIcons
 
 private fun Context.findActivity(): Activity? {
     var context = this
@@ -243,7 +241,7 @@ fun AppLockScreen(
                     modifier = Modifier.size(56.dp)
                 ) {
                     Icon(
-                        Icons.Default.Fingerprint,
+                        AppIcons.Fingerprint,
                         contentDescription = "指纹验证",
                         modifier = Modifier.size(40.dp),
                         tint = Color.White
@@ -338,7 +336,7 @@ private fun NumericKeypad(
                                 label = "",
                                 icon = {
                                     Icon(
-                                        Icons.AutoMirrored.Filled.Backspace,
+                                        AppIcons.Backspace,
                                         contentDescription = "删除",
                                         modifier = Modifier.size(26.dp),
                                         tint = Color.White

@@ -13,15 +13,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -78,6 +70,10 @@ import com.risediary.app.ui.theme.backgroundBrush
 import kotlinx.coroutines.flow.StateFlow
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.basic.Scaffold
+import com.risediary.app.ui.icons.AppIcons
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 sealed class Screen(val route: String, val label: String) {
     data object Home : Screen("home", "首页")
@@ -447,8 +443,8 @@ fun PlaceholderScreen(title: String, navController: NavController) {
                 .padding(innerPadding),
             contentAlignment = Alignment.Center
         ) {
-            Text(title, style = MaterialTheme.typography.headlineMedium,
-                color = MaterialTheme.colorScheme.onSurface)
+            Text(title, fontSize = MiuixTheme.textStyles.title3.fontSize,
+                color = MiuixTheme.colorScheme.onSurface)
         }
     }
 }
@@ -480,23 +476,23 @@ fun ModeSelectScreen(navController: NavController) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
-                        Icons.Default.Schedule, null,
+                        AppIcons.Schedule, null,
                         modifier = Modifier.size(40.dp),
-                        tint = MaterialTheme.colorScheme.primary
+                        tint = MiuixTheme.colorScheme.primary
                     )
                     Spacer(modifier = Modifier.width(16.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text("开始计时",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface)
+                            fontSize = MiuixTheme.textStyles.title4.fontSize,
+                            color = MiuixTheme.colorScheme.onSurface)
                         Spacer(modifier = Modifier.height(4.dp))
                         Text("实时计时，自动记录用时",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
+                            fontSize = MiuixTheme.textStyles.body2.fontSize,
+                            color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.5f))
                     }
                     Icon(
-                        Icons.Default.ChevronRight, contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                        AppIcons.ChevronRight, contentDescription = null,
+                        tint = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.3f)
                     )
                 }
             }
@@ -516,23 +512,23 @@ fun ModeSelectScreen(navController: NavController) {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
-                        Icons.Default.Edit, null,
+                        AppIcons.Edit, null,
                         modifier = Modifier.size(40.dp),
-                        tint = MaterialTheme.colorScheme.primary
+                        tint = MiuixTheme.colorScheme.primary
                     )
                     Spacer(modifier = Modifier.width(16.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text("我已起飞",
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.onSurface)
+                            fontSize = MiuixTheme.textStyles.title4.fontSize,
+                            color = MiuixTheme.colorScheme.onSurface)
                         Spacer(modifier = Modifier.height(4.dp))
                         Text("跳过计时，直接填写记录",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
+                            fontSize = MiuixTheme.textStyles.body2.fontSize,
+                            color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.5f))
                     }
                     Icon(
-                        Icons.Default.ChevronRight, contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                        AppIcons.ChevronRight, contentDescription = null,
+                        tint = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.3f)
                     )
                 }
             }

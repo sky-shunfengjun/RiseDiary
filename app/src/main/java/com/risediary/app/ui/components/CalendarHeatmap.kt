@@ -5,8 +5,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -20,6 +18,8 @@ import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
  * Single-month paginated calendar showing flight counts with blue circles.
@@ -55,7 +55,7 @@ fun CalendarHeatmap(
             Text(
                 text = "〈",
                 fontSize = 22.sp,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
+                color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.55f),
                 modifier = Modifier
                     .clickable { displayedMonth = displayedMonth.minusMonths(1) }
                     .padding(horizontal = 10.dp, vertical = 2.dp)
@@ -63,9 +63,9 @@ fun CalendarHeatmap(
 
             Text(
                 text = "${displayedMonth.year}年${displayedMonth.monthValue}月",
-                style = MaterialTheme.typography.titleSmall,
+                fontSize = MiuixTheme.textStyles.body2.fontSize,
                 fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = MiuixTheme.colorScheme.onSurface,
                 modifier = Modifier.padding(horizontal = 20.dp)
             )
 
@@ -73,9 +73,9 @@ fun CalendarHeatmap(
                 text = "〉",
                 fontSize = 22.sp,
                 color = if (isCurrentMonth)
-                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                    MiuixTheme.colorScheme.onSurface.copy(alpha = 0.12f)
                 else
-                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
+                    MiuixTheme.colorScheme.onSurface.copy(alpha = 0.55f),
                 modifier = Modifier
                     .then(
                         if (!isCurrentMonth) Modifier.clickable {
@@ -120,7 +120,7 @@ private fun MonthGrid(
                     Text(
                         text = label,
                         fontSize = 11.sp,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
+                        color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.35f),
                         textAlign = TextAlign.Center
                     )
                 }
@@ -205,7 +205,7 @@ private fun CalendarCell(
             fontSize = 13.sp,
             fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal,
             color = if (isToday) CardBlue
-                    else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.65f),
+                    else MiuixTheme.colorScheme.onSurface.copy(alpha = 0.65f),
             textAlign = TextAlign.Center
         )
     }
@@ -219,7 +219,7 @@ private fun CalendarLegend() {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text("0", fontSize = 10.sp,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f))
+            color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.35f))
         Spacer(modifier = Modifier.width(6.dp))
         listOf(0.2f, 0.35f, 0.5f, 0.7f).forEach { alpha ->
             Box(
@@ -231,6 +231,6 @@ private fun CalendarLegend() {
             Spacer(modifier = Modifier.width(4.dp))
         }
         Text("4+", fontSize = 10.sp,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f))
+            color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.35f))
     }
 }

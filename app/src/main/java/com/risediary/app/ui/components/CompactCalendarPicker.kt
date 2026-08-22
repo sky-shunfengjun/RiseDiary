@@ -16,9 +16,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronLeft
-import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -38,6 +35,7 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import com.risediary.app.ui.icons.AppIcons
 
 @Composable
 fun LiquidSingleDatePickerDialog(
@@ -184,14 +182,14 @@ private fun CompactCalendar(
                 contentDescription = "上个月",
                 onClick = { onVisibleMonthChange(visibleMonth.minusMonths(1)) }
             ) {
-                Icon(Icons.Default.ChevronLeft, "上个月")
+                Icon(AppIcons.ChevronLeft, "上个月")
             }
             Spacer(Modifier.width(6.dp))
             CalendarNavButton(
                 contentDescription = "下个月",
                 onClick = { onVisibleMonthChange(visibleMonth.plusMonths(1)) }
             ) {
-                Icon(Icons.Default.ChevronRight, "下个月")
+                Icon(AppIcons.ChevronRight, "下个月")
             }
         }
         Row(Modifier.fillMaxWidth()) {

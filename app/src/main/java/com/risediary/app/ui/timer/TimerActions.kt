@@ -4,8 +4,6 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import androidx.compose.foundation.layout.width
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -13,6 +11,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.kyant.backdrop.Backdrop
 import com.risediary.app.ui.components.LiquidGlassButton
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
 internal fun PrimaryTimerButton(
@@ -26,7 +26,7 @@ internal fun PrimaryTimerButton(
         onClick = onClick,
         backdrop = backdrop,
         modifier = Modifier.width(width),
-        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.075f),
+        tint = MiuixTheme.colorScheme.primary.copy(alpha = 0.075f),
         height = 58.dp,
         highlightIntensity = 0.38f,
         highlightRadiusMultiplier = 1f,
@@ -35,7 +35,7 @@ internal fun PrimaryTimerButton(
         icon()
         Text(
             text = text,
-            style = MaterialTheme.typography.titleMedium,
+            fontSize = MiuixTheme.textStyles.title4.fontSize,
             fontWeight = FontWeight.SemiBold
         )
     }

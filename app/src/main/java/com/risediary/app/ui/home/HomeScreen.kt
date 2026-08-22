@@ -15,8 +15,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -53,6 +51,7 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.PullToRefresh
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import com.risediary.app.ui.icons.AppIcons
 
 @Composable
 fun HomeScreen(
@@ -151,9 +150,9 @@ fun HomeScreen(
                         ) {
                             Icon(
                                 if (todayStatus.hasRecords) {
-                                    Icons.Default.CheckCircle
+                                    AppIcons.CheckCircle
                                 } else {
-                                    Icons.Default.Info
+                                    AppIcons.Info
                                 },
                                 contentDescription = null,
                                 modifier = Modifier.size(25.dp),
@@ -200,7 +199,7 @@ fun HomeScreen(
                     Spacer(modifier = Modifier.height(14.dp))
                     Row(verticalAlignment = Alignment.Top) {
                         Icon(
-                            imageVector = Icons.Default.Lightbulb,
+                            imageVector = AppIcons.Lightbulb,
                             contentDescription = null,
                             modifier = Modifier
                                 .padding(top = 1.dp)
@@ -306,7 +305,7 @@ fun HomeScreen(
                         ) {
                             Column(modifier = Modifier.padding(18.dp)) {
                                 HomeCardHeader(
-                                    icon = Icons.Default.Straighten,
+                                    icon = AppIcons.Straighten,
                                     title = stringResource(R.string.home_length_title),
                                     actionLabel = stringResource(R.string.home_view_all)
                                 )
@@ -345,7 +344,7 @@ fun HomeScreen(
                         RiseCard(modifier = Modifier.fillMaxWidth()) {
                             Column(modifier = Modifier.padding(18.dp)) {
                                 HomeCardHeader(
-                                    icon = Icons.Default.Insights,
+                                    icon = AppIcons.Insights,
                                     title = stringResource(R.string.home_trend_title),
                                     trailing = {
                                         TrendSelector(
@@ -389,7 +388,7 @@ fun HomeScreen(
                         ) {
                             Column(modifier = Modifier.padding(18.dp)) {
                                 HomeCardHeader(
-                                    icon = Icons.Default.EmojiEvents,
+                                    icon = AppIcons.EmojiEvents,
                                     title = stringResource(R.string.home_achievement_title),
                                     actionLabel =
                                         if (recentAchievements.isNotEmpty()) {

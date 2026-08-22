@@ -16,10 +16,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -67,6 +63,7 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import com.risediary.app.ui.icons.AppIcons
 
 @Composable
 fun LengthHistoryScreen(
@@ -255,9 +252,9 @@ private fun PeriodSegmentedControl(
         LiquidSegmentedControl(
             options = remember {
                 listOf(
-                    LiquidSegmentOption("30天", Icons.Default.DateRange),
-                    LiquidSegmentOption("90天", Icons.Default.DateRange),
-                    LiquidSegmentOption("全年", Icons.Default.DateRange)
+                    LiquidSegmentOption("30天", AppIcons.DateRange),
+                    LiquidSegmentOption("90天", AppIcons.DateRange),
+                    LiquidSegmentOption("全年", AppIcons.DateRange)
                 )
             },
             selectedIndex = selectedIndex,
@@ -393,11 +390,11 @@ private fun LengthRecordCard(
                 )
             }
             IconButton(onClick = onEdit) {
-                Icon(Icons.Default.Edit, contentDescription = "编辑")
+                Icon(AppIcons.Edit, contentDescription = "编辑")
             }
             IconButton(onClick = onDelete) {
                 Icon(
-                    Icons.Default.Delete,
+                    AppIcons.Delete,
                     contentDescription = "删除",
                     tint = MiuixTheme.colorScheme.error
                 )

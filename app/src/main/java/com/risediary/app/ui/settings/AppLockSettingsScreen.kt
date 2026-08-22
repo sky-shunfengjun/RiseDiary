@@ -9,11 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Fingerprint
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.LockReset
-import androidx.compose.material.icons.filled.Timer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -36,6 +31,7 @@ import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import com.risediary.app.ui.icons.AppIcons
 
 private tailrec fun Context.findFragmentActivity(): FragmentActivity? = when (this) {
     is FragmentActivity -> this
@@ -71,7 +67,7 @@ fun AppLockSettingsScreen(
             SettingsGroupHeader(stringResource(R.string.settings_app_lock_access_group))
             RiseCard(modifier = Modifier.fillMaxWidth()) {
                 SettingsToggleItem(
-                    icon = Icons.Default.Lock,
+                    icon = AppIcons.Lock,
                     title = stringResource(R.string.settings_app_lock),
                     subtitle =
                         if (lockEnabled) stringResource(R.string.settings_app_lock_on)
@@ -90,7 +86,7 @@ fun AppLockSettingsScreen(
                 if (lockEnabled) {
                     SettingsDivider()
                     SettingsNavItem(
-                        icon = Icons.Default.LockReset,
+                        icon = AppIcons.LockReset,
                         title = stringResource(R.string.settings_change_pin),
                         subtitle = stringResource(R.string.settings_change_pin_summary),
                         onClick = { navController.navigate("lock_change") }
@@ -98,7 +94,7 @@ fun AppLockSettingsScreen(
                     SettingsDivider()
                     val biometricAvailable = vm.biometricAvailable
                     SettingsToggleItem(
-                        icon = Icons.Default.Fingerprint,
+                        icon = AppIcons.Fingerprint,
                         title = stringResource(R.string.settings_biometric_unlock),
                         subtitle = when {
                             !biometricAvailable ->
@@ -121,7 +117,7 @@ fun AppLockSettingsScreen(
                 SettingsGroupHeader(stringResource(R.string.settings_app_lock_background_group))
                 RiseCard(modifier = Modifier.fillMaxWidth()) {
                     SettingsToggleItem(
-                        icon = Icons.Default.Timer,
+                        icon = AppIcons.Timer,
                         title = stringResource(R.string.settings_background_auto_lock),
                         subtitle =
                             if (backgroundAutoLockEnabled) {

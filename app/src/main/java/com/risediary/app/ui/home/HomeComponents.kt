@@ -21,10 +21,6 @@ import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.TrackChanges
-import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -49,6 +45,7 @@ import org.json.JSONObject
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import com.risediary.app.ui.icons.AppIcons
 
 @Composable
 internal fun MiniStat(label: String, value: String, accent: Color, modifier: Modifier) {
@@ -117,7 +114,7 @@ internal fun HomeCardHeader(
             )
             Spacer(modifier = Modifier.width(2.dp))
             Icon(
-                Icons.Default.ChevronRight,
+                AppIcons.ChevronRight,
                 null,
                 Modifier.size(17.dp),
                 tint = MiuixTheme.colorScheme.primary
@@ -136,8 +133,8 @@ internal fun TrendSelector(
     val distanceLabel = stringResource(R.string.home_distance)
     val options = remember(volumeLabel, distanceLabel) {
         listOf(
-            LiquidSegmentOption(volumeLabel, Icons.Default.WaterDrop),
-            LiquidSegmentOption(distanceLabel, Icons.Default.TrackChanges)
+            LiquidSegmentOption(volumeLabel, AppIcons.WaterDrop),
+            LiquidSegmentOption(distanceLabel, AppIcons.TrackChanges)
         )
     }
     val currentTrackColor by rememberUpdatedState(
