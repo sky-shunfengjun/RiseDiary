@@ -1,6 +1,7 @@
 package com.risediary.app.ui.form
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.relocation.BringIntoViewRequester
@@ -35,13 +37,6 @@ import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Straighten
 import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.WaterDrop
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -63,6 +58,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
+import com.kyant.capsule.ContinuousCapsule
 import com.risediary.app.R
 import com.risediary.app.ui.Screen
 import com.risediary.app.ui.achievement.AchievementCatalog
@@ -78,8 +74,12 @@ import java.time.Instant
 import java.time.LocalTime
 import java.time.ZoneId
 import kotlinx.coroutines.launch
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.basic.TextField
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecordFormScreen(
     navController: NavController,
@@ -144,7 +144,7 @@ fun RecordFormScreen(
                 modifier = Modifier.widthIn(min = 184.dp, max = 224.dp),
                 isInteractive = !vm.isSaving && !vm.isLoading,
                 enabled = !vm.isSaving && !vm.isLoading,
-                tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.075f),
+                tint = MiuixTheme.colorScheme.primary.copy(alpha = 0.075f),
                 height = 56.dp,
                 highlightIntensity = 0.38f,
                 highlightRadiusMultiplier = 1f,
@@ -153,7 +153,7 @@ fun RecordFormScreen(
                 Icon(Icons.Default.Save, null, Modifier.size(22.dp))
                 Text(
                     if (vm.isSaving) "正在保存" else "保存记录",
-                    style = MaterialTheme.typography.titleMedium,
+                    style = MiuixTheme.textStyles.title4,
                     fontWeight = FontWeight.SemiBold
                 )
             }
@@ -225,13 +225,13 @@ fun RecordFormScreen(
                     )
                     Text(
                         text = stringResource(R.string.form_quick_input_note),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                        style = MiuixTheme.textStyles.body2,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                     )
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(
                             "精液量",
-                            style = MaterialTheme.typography.titleSmall,
+                            style = MiuixTheme.textStyles.subtitle,
                             fontWeight = FontWeight.SemiBold
                         )
                         VolumeModeSelector(
@@ -242,10 +242,10 @@ fun RecordFormScreen(
                         )
 
                         if (vm.useSpurtMode) {
-                            OutlinedTextField(
+                            TextField(
                                 value = vm.spurtCount,
                                 onValueChange = vm::setSpurtCountInput,
-                                label = { Text("射出股数") },
+                                label = "射出股数",
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .onFocusChanged { focusState ->
@@ -257,7 +257,7 @@ fun RecordFormScreen(
                                     keyboardType = KeyboardType.Number
                                 ),
                                 leadingIcon = { Icon(Icons.Default.Numbers, null) },
-                                shape = RoundedCornerShape(16.dp),
+                                cornerRadius = 16.dp,
                                 singleLine = true
                             )
                             QuickChoices(
@@ -267,10 +267,10 @@ fun RecordFormScreen(
                                 onClick = vm::quickSpurt
                             )
                         } else {
-                            OutlinedTextField(
+                            TextField(
                                 value = vm.volumeMl,
                                 onValueChange = vm::setVolumeInput,
-                                label = { Text("精液量（毫升）") },
+                                label = "精液量（毫升）",
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .onFocusChanged { focusState ->
@@ -282,7 +282,7 @@ fun RecordFormScreen(
                                     keyboardType = KeyboardType.Decimal
                                 ),
                                 leadingIcon = { Icon(Icons.Default.WaterDrop, null) },
-                                shape = RoundedCornerShape(16.dp),
+                                cornerRadius = 16.dp,
                                 singleLine = true
                             )
                             QuickChoices(
@@ -297,13 +297,13 @@ fun RecordFormScreen(
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(
                             "最远射出距离",
-                            style = MaterialTheme.typography.titleSmall,
+                            style = MiuixTheme.textStyles.subtitle,
                             fontWeight = FontWeight.SemiBold
                         )
-                        OutlinedTextField(
+                        TextField(
                             value = vm.distanceCm,
                             onValueChange = vm::setDistanceInput,
-                            label = { Text("距离（厘米，可不填）") },
+                            label = "距离（厘米，可不填）",
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .onFocusChanged { focusState ->
@@ -315,7 +315,7 @@ fun RecordFormScreen(
                                 keyboardType = KeyboardType.Decimal
                             ),
                             leadingIcon = { Icon(Icons.Default.Straighten, null) },
-                            shape = RoundedCornerShape(16.dp),
+                            cornerRadius = 16.dp,
                             singleLine = true
                         )
                         QuickChoices(
@@ -342,14 +342,14 @@ fun RecordFormScreen(
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
                             "方式标签（可选）",
-                            style = MaterialTheme.typography.titleSmall,
+                            style = MiuixTheme.textStyles.subtitle,
                             fontWeight = FontWeight.SemiBold
                         )
                         if (tags.isEmpty()) {
                             Text(
                                 "暂无标签，可在设置中添加",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                style = MiuixTheme.textStyles.body2,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                             )
                         } else {
                             Row(
@@ -357,32 +357,54 @@ fun RecordFormScreen(
                                 modifier = Modifier.horizontalScroll(rememberScrollState())
                             ) {
                                 tags.forEach { tag ->
-                                    FilterChip(
-                                        onClick = { vm.toggleTag(tag.name) },
-                                        label = { Text(tag.name) },
-                                        selected = tag.name in vm.selectedTags,
-                                        leadingIcon = if (tag.name in vm.selectedTags) {
-                                            {
-                                                Icon(
-                                                    Icons.Default.Check,
-                                                    null,
-                                                    Modifier.size(16.dp)
-                                                )
-                                            }
-                                        } else {
-                                            null
+                                    val tagSelected = tag.name in vm.selectedTags
+                                    val tagBackground = if (tagSelected) {
+                                        MiuixTheme.colorScheme.primary.copy(alpha = 0.16f)
+                                    } else {
+                                        MiuixTheme.colorScheme.onSurface.copy(alpha = 0.045f)
+                                    }
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        modifier = Modifier
+                                            .clip(ContinuousCapsule)
+                                            .background(tagBackground)
+                                            .clickable { vm.toggleTag(tag.name) }
+                                            .padding(horizontal = 14.dp, vertical = 8.dp)
+                                    ) {
+                                        if (tagSelected) {
+                                            Icon(
+                                                Icons.Default.Check,
+                                                null,
+                                                Modifier.size(16.dp),
+                                                tint = MiuixTheme.colorScheme.primary
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
                                         }
-                                    )
+                                        Text(
+                                            tag.name,
+                                            style = MiuixTheme.textStyles.body2.copy(
+                                                fontWeight = if (tagSelected) {
+                                                    FontWeight.SemiBold
+                                                } else {
+                                                    FontWeight.Normal
+                                                }
+                                            ),
+                                            color = if (tagSelected) {
+                                                MiuixTheme.colorScheme.primary
+                                            } else {
+                                                MiuixTheme.colorScheme.onSurface
+                                            }
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
 
-                    OutlinedTextField(
+                    TextField(
                         value = vm.moodNote,
                         onValueChange = { vm.moodNote = it },
-                        label = { Text("备注与心情") },
-                        placeholder = { Text("例如：状态、感受或需要留意的情况") },
+                        label = "备注与心情",
                         modifier = Modifier
                             .fillMaxWidth()
                             .onFocusChanged { focusState ->
@@ -393,7 +415,7 @@ fun RecordFormScreen(
                             .heightIn(min = 104.dp),
                         leadingIcon = { Icon(Icons.Default.Notes, null) },
                         maxLines = 5,
-                        shape = RoundedCornerShape(16.dp)
+                        cornerRadius = 16.dp
                     )
                 }
             }
@@ -403,13 +425,13 @@ fun RecordFormScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(16.dp))
-                        .background(MaterialTheme.colorScheme.errorContainer)
+                        .background(MiuixTheme.colorScheme.errorContainer)
                         .padding(16.dp)
                 ) {
                     Text(
                         error,
-                        color = MaterialTheme.colorScheme.onErrorContainer,
-                        style = MaterialTheme.typography.bodyMedium
+                        color = MiuixTheme.colorScheme.onErrorContainer,
+                        style = MiuixTheme.textStyles.body1
                     )
                 }
             }
@@ -467,6 +489,7 @@ fun RecordFormScreen(
             onDismissRequest = { showTimePicker = false },
             confirmButton = {
                 TextButton(
+                    text = "确定",
                     onClick = {
                         val currentDate = Instant.ofEpochMilli(vm.startTime)
                             .atZone(ZoneId.systemDefault())
@@ -479,14 +502,10 @@ fun RecordFormScreen(
                         )
                         showTimePicker = false
                     }
-                ) {
-                    Text("确定")
-                }
+                )
             },
             dismissButton = {
-                TextButton(onClick = { showTimePicker = false }) {
-                    Text("取消")
-                }
+                TextButton(text = "取消", onClick = { showTimePicker = false })
             },
             title = {
                 Text(
@@ -534,16 +553,14 @@ fun RecordFormScreen(
         LiquidAlertDialog(
             onDismissRequest = vm::consumeAchievement,
             confirmButton = {
-                TextButton(onClick = vm::consumeAchievement) {
-                    Text("知道了")
-                }
+                TextButton(text = "知道了", onClick = vm::consumeAchievement)
             },
             title = {
                 Text(
                     "成就解锁",
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth(),
-                    style = MaterialTheme.typography.headlineSmall,
+                    style = MiuixTheme.textStyles.title2,
                     fontWeight = FontWeight.Bold
                 )
             },
@@ -556,7 +573,7 @@ fun RecordFormScreen(
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
                         name,
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MiuixTheme.textStyles.title3,
                         fontWeight = FontWeight.SemiBold,
                         textAlign = TextAlign.Center
                     )

@@ -18,10 +18,6 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Numbers
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.WaterDrop
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -39,6 +35,9 @@ import com.risediary.app.ui.components.LiquidSegmentedControl
 import com.risediary.app.util.formatFormDuration
 import java.time.Instant
 import java.time.ZoneId
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
 internal fun FormSectionTitle(icon: ImageVector, title: String, subtitle: String) {
@@ -50,17 +49,17 @@ internal fun FormSectionTitle(icon: ImageVector, title: String, subtitle: String
             modifier = Modifier
                 .size(44.dp)
                 .clip(RoundedCornerShape(14.dp))
-                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.09f)),
+                .background(MiuixTheme.colorScheme.primary.copy(alpha = 0.09f)),
             contentAlignment = Alignment.Center
         ) {
-            Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
+            Icon(icon, null, tint = MiuixTheme.colorScheme.primary, modifier = Modifier.size(22.dp))
         }
         Column {
-            Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+            Text(title, style = MiuixTheme.textStyles.title4, fontWeight = FontWeight.SemiBold)
             Text(
                 subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                style = MiuixTheme.textStyles.body2,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary
             )
         }
     }
@@ -76,14 +75,14 @@ internal fun CompactValueButton(
     Row(
         modifier = modifier
             .clip(RoundedCornerShape(14.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f))
+            .background(MiuixTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f))
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 13.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Icon(icon, null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-        Text(text, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium, maxLines = 1)
+        Icon(icon, null, tint = MiuixTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+        Text(text, style = MiuixTheme.textStyles.body1, fontWeight = FontWeight.Medium, maxLines = 1)
     }
 }
 
@@ -98,35 +97,35 @@ internal fun DurationValueButton(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(16.dp))
-                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.075f))
+                .background(MiuixTheme.colorScheme.primary.copy(alpha = 0.075f))
                 .clickable(onClick = onClick)
                 .padding(horizontal = 14.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(Icons.Default.Schedule, null, tint = MaterialTheme.colorScheme.primary)
+            Icon(Icons.Default.Schedule, null, tint = MiuixTheme.colorScheme.primary)
             Column(modifier = Modifier.weight(1f).padding(horizontal = 12.dp)) {
                 Text(
                     "用时",
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = MiuixTheme.textStyles.footnote2,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                 )
                 Text(
                     formatFormDuration(durationSeconds),
-                    style = MaterialTheme.typography.titleLarge,
+                    style = MiuixTheme.textStyles.title3,
                     fontWeight = FontWeight.SemiBold
                 )
             }
             Icon(
                 Icons.Default.ChevronRight,
                 contentDescription = "修改用时",
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                tint = MiuixTheme.colorScheme.onSurfaceVariantSummary
             )
         }
         if (hasLegacyDuration) {
             Text(
                 "这是旧记录的原始用时；调整后最长可选 120 分钟。",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.tertiary
+                style = MiuixTheme.textStyles.body2,
+                color = MiuixTheme.colorScheme.secondary
             )
         }
     }
@@ -145,7 +144,7 @@ internal fun VolumeModeSelector(
                 .fillMaxWidth()
                 .height(40.dp)
                 .clip(ContinuousCapsule)
-                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.035f))
+                .background(MiuixTheme.colorScheme.onSurface.copy(alpha = 0.035f))
                 .layerBackdrop(backdrop)
         )
         LiquidSegmentedControl(
@@ -180,10 +179,28 @@ internal fun QuickChoices(
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         values.forEach { value ->
-            FilterChip(
-                onClick = { onClick(value) },
-                label = { Text("$value$suffix") },
-                selected = selected == "$value"
+            val isSelected = selected == "$value"
+            val chipBackground = if (isSelected) {
+                MiuixTheme.colorScheme.primary.copy(alpha = 0.16f)
+            } else {
+                MiuixTheme.colorScheme.onSurface.copy(alpha = 0.045f)
+            }
+            val chipTextColor = if (isSelected) {
+                MiuixTheme.colorScheme.primary
+            } else {
+                MiuixTheme.colorScheme.onSurface
+            }
+            Text(
+                text = "$value$suffix",
+                style = MiuixTheme.textStyles.body2.copy(
+                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                ),
+                color = chipTextColor,
+                modifier = Modifier
+                    .clip(ContinuousCapsule)
+                    .background(chipBackground)
+                    .clickable { onClick(value) }
+                    .padding(horizontal = 14.dp, vertical = 8.dp)
             )
         }
     }

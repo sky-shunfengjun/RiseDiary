@@ -25,14 +25,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -66,8 +58,14 @@ import com.risediary.app.ui.theme.RiseCard
 import com.risediary.app.ui.theme.backgroundBrush
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.basic.TextField
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TagManagerScreen(
     navController: NavController,
@@ -142,8 +140,8 @@ fun TagManagerScreen(
         ) {
             Text(
                 "长按左侧拖动柄调整顺序，松手后自动保存。",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MiuixTheme.textStyles.body1,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 modifier = Modifier.padding(horizontal = 4.dp)
             )
             Spacer(modifier = Modifier.height(16.dp))
@@ -182,7 +180,7 @@ fun TagManagerScreen(
                             modifier = Modifier
                                 .size(44.dp)
                                 .background(
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.09f),
+                                    MiuixTheme.colorScheme.primary.copy(alpha = 0.09f),
                                     CircleShape
                                 )
                                 .pointerInput(tag.id) {
@@ -210,7 +208,7 @@ fun TagManagerScreen(
                             Icon(
                                 Icons.Default.DragHandle,
                                 contentDescription = "按住并上下拖动排序",
-                                tint = MaterialTheme.colorScheme.primary
+                                tint = MiuixTheme.colorScheme.primary
                             )
                         }
                         Spacer(modifier = Modifier.width(12.dp))
@@ -223,13 +221,13 @@ fun TagManagerScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 tag.name,
-                                style = MaterialTheme.typography.titleMedium,
+                                style = MiuixTheme.textStyles.title4,
                                 fontWeight = FontWeight.SemiBold
                             )
                             Text(
                                 "排序 ${index + 1}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                style = MiuixTheme.textStyles.body2,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                             )
                         }
                         IconButton(
@@ -244,7 +242,7 @@ fun TagManagerScreen(
                             Icon(
                                 Icons.Default.Delete,
                                 contentDescription = "删除",
-                                tint = MaterialTheme.colorScheme.error
+                                tint = MiuixTheme.colorScheme.error
                             )
                         }
                         }
@@ -273,14 +271,21 @@ fun TagManagerScreen(
             text = { Text("历史记录会保留“${target.name}”，它只会从以后可选标签中移除。") },
             confirmButton = {
                 TextButton(
+                    text = "删除",
                     onClick = {
                         viewModel.delete(target)
                         deleteTarget = null
-                    }
-                ) { Text("删除", color = MaterialTheme.colorScheme.error) }
+                    },
+                    colors = ButtonDefaults.textButtonColors(
+                        color = Color.Transparent,
+                        textColor = MiuixTheme.colorScheme.error,
+                        disabledColor = Color.Transparent,
+                        disabledTextColor = MiuixTheme.colorScheme.error
+                    )
+                )
             },
             dismissButton = {
-                TextButton(onClick = { deleteTarget = null }) { Text("取消") }
+                TextButton(text = "取消", onClick = { deleteTarget = null })
             }
         )
     }
@@ -301,10 +306,10 @@ private fun TagEditorDialog(
         title = { Text(if (tag == null) "添加标签" else "编辑标签") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
+                TextField(
                     value = name,
                     onValueChange = { name = it.take(20) },
-                    label = { Text("标签名称") },
+                    label = "标签名称",
                     singleLine = true
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -325,15 +330,15 @@ private fun TagEditorDialog(
                     }
                 }
                 if (error != null) {
-                    Text(error, color = MaterialTheme.colorScheme.error)
+                    Text(error, color = MiuixTheme.colorScheme.error)
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = { onSave(name, color) }) { Text("保存") }
+            TextButton(text = "保存", onClick = { onSave(name, color) })
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("取消") }
+            TextButton(text = "取消", onClick = onDismiss)
         }
     )
 }

@@ -9,11 +9,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Button
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,6 +22,10 @@ import com.kyant.capsule.ContinuousRoundedRectangle
 import kotlin.math.abs
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.collectLatest
+import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
  * Two-column scroll wheel picker for selecting minutes and seconds.
@@ -68,7 +67,6 @@ fun DurationWheelPicker(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DurationPickerBottomSheet(
     totalSeconds: Int,
@@ -92,14 +90,14 @@ fun DurationPickerBottomSheet(
         ) {
             Text(
                 text = "选择用时",
-                style = MaterialTheme.typography.titleLarge,
+                style = MiuixTheme.textStyles.title3,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
             Text(
                 text = "表单按分钟和秒记录，最长 120 分钟",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                style = MiuixTheme.textStyles.body1,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary
             )
             Spacer(modifier = Modifier.height(12.dp))
             DurationWheelPicker(
@@ -118,22 +116,21 @@ fun DurationPickerBottomSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 TextButton(
+                    text = "取消",
                     onClick = onDismiss,
                     modifier = Modifier
                         .weight(1f)
                         .height(48.dp)
                         .clip(RoundedCornerShape(24.dp))
-                        .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.045f))
-                ) {
-                    Text("取消")
-                }
+                        .background(MiuixTheme.colorScheme.onSurface.copy(alpha = 0.045f))
+                )
                 Button(
                     onClick = { onConfirm(minutes * 60 + seconds) },
                     enabled = minutes > 0 || seconds > 0,
                     modifier = Modifier
                         .weight(1f)
                         .height(48.dp),
-                    shape = RoundedCornerShape(24.dp)
+                    cornerRadius = 24.dp
                 ) {
                     Text("确定")
                 }
@@ -210,7 +207,7 @@ fun WheelColumn(
         Text(
             text = label,
             fontSize = 11.sp,
-            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+            color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.4f),
             modifier = Modifier.padding(bottom = 4.dp)
         )
 
@@ -219,7 +216,7 @@ fun WheelColumn(
                 .fillMaxWidth()
                 .height(itemHeightDp * 5)
                 .clip(RoundedCornerShape(20.dp))
-                .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.025f)),
+                .background(MiuixTheme.colorScheme.onSurface.copy(alpha = 0.025f)),
             contentAlignment = Alignment.Center
         ) {
             // A compact selected capsule replaces the old full-width flat stripe.
@@ -229,10 +226,10 @@ fun WheelColumn(
                     .padding(horizontal = 8.dp)
                     .height(itemHeightDp)
                     .clip(RoundedCornerShape(18.dp))
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.08f))
+                    .background(MiuixTheme.colorScheme.primary.copy(alpha = 0.08f))
                     .border(
                         1.dp,
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.16f),
+                        MiuixTheme.colorScheme.primary.copy(alpha = 0.16f),
                         RoundedCornerShape(18.dp)
                     )
             )
@@ -258,8 +255,8 @@ fun WheelColumn(
                             text = if (padToTwoDigits) "%02d".format(value) else "$value",
                             fontSize = if (isSelected) 22.sp else 14.sp,
                             fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                            color = if (isSelected) MaterialTheme.colorScheme.primary
-                                    else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
+                            color = if (isSelected) MiuixTheme.colorScheme.primary
+                                    else MiuixTheme.colorScheme.onSurface.copy(alpha = 0.35f),
                             textAlign = TextAlign.Center
                         )
                     }

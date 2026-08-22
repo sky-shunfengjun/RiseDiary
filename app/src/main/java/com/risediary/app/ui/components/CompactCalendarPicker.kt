@@ -19,10 +19,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -37,6 +33,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import java.time.LocalDate
 import java.time.YearMonth
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
 fun LiquidSingleDatePickerDialog(
@@ -52,10 +52,10 @@ fun LiquidSingleDatePickerDialog(
     LiquidDatePickerDialog(
         onDismissRequest = onDismissRequest,
         dismissButton = {
-            TextButton(onClick = onDismissRequest) { Text("取消") }
+            TextButton(text = "取消", onClick = onDismissRequest)
         },
         confirmButton = {
-            TextButton(onClick = { onConfirm(selectedDate) }) { Text("确定") }
+            TextButton(text = "确定", onClick = { onConfirm(selectedDate) })
         }
     ) {
         CompactCalendar(
@@ -82,18 +82,19 @@ fun LiquidDateRangePickerDialog(
     LiquidDatePickerDialog(
         onDismissRequest = onDismissRequest,
         dismissButton = {
-            TextButton(onClick = onDismissRequest) { Text("取消") }
+            TextButton(text = "取消", onClick = onDismissRequest)
         },
         confirmButton = {
             TextButton(
+                text = "确定",
                 enabled = selectedStart != null,
                 onClick = {
-                    val start = selectedStart ?: return@TextButton
-                    onConfirm(start, selectedEnd ?: start)
+                    val start = selectedStart
+                    if (start != null) {
+                        onConfirm(start, selectedEnd ?: start)
+                    }
                 }
-            ) {
-                Text("确定")
-            }
+            )
         }
     ) {
         CompactCalendar(
@@ -149,9 +150,9 @@ private fun CompactCalendar(
     ) {
         Text(
             text = title,
-            style = MaterialTheme.typography.titleLarge,
+            style = MiuixTheme.textStyles.title3,
             fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = MiuixTheme.colorScheme.onSurface,
             modifier = Modifier.padding(horizontal = 6.dp)
         )
         Row(
@@ -160,9 +161,9 @@ private fun CompactCalendar(
         ) {
             Text(
                 text = "${visibleMonth.year}年${visibleMonth.monthValue}月",
-                style = MaterialTheme.typography.titleMedium,
+                style = MiuixTheme.textStyles.title4,
                 fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = MiuixTheme.colorScheme.onSurface,
                 modifier = Modifier.weight(1f)
             )
             CalendarNavButton(
@@ -183,8 +184,8 @@ private fun CompactCalendar(
             weekdays.forEach { weekday ->
                 Text(
                     text = weekday,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MiuixTheme.textStyles.footnote2,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.weight(1f)
                 )
@@ -239,13 +240,13 @@ private fun CalendarDay(
             .clip(shape)
             .then(
                 when {
-                    isSelected -> Modifier.background(MaterialTheme.colorScheme.primary)
+                    isSelected -> Modifier.background(MiuixTheme.colorScheme.primary)
                     isInRange -> Modifier.background(
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.13f)
+                        MiuixTheme.colorScheme.primary.copy(alpha = 0.13f)
                     )
                     isToday -> Modifier.border(
                         1.dp,
-                        MaterialTheme.colorScheme.primary,
+                        MiuixTheme.colorScheme.primary,
                         CircleShape
                     )
                     else -> Modifier
@@ -260,9 +261,9 @@ private fun CalendarDay(
     ) {
         Text(
             text = date.dayOfMonth.toString(),
-            style = MaterialTheme.typography.bodyMedium,
+            style = MiuixTheme.textStyles.body1,
             fontWeight = if (isSelected || isToday) FontWeight.SemiBold else FontWeight.Normal,
-            color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface
+            color = if (isSelected) Color.White else MiuixTheme.colorScheme.onSurface
         )
     }
 }
@@ -277,7 +278,7 @@ private fun CalendarNavButton(
         modifier = Modifier
             .size(38.dp)
             .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.055f))
+            .background(MiuixTheme.colorScheme.onSurface.copy(alpha = 0.055f))
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {

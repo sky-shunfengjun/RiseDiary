@@ -20,13 +20,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -65,8 +58,14 @@ import java.time.ZoneId
 import java.util.Date
 import java.text.SimpleDateFormat
 import java.util.Locale
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.basic.TextField
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LengthHistoryScreen(
     navController: NavController,
@@ -118,14 +117,15 @@ fun LengthHistoryScreen(
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
                                 "暂无长度记录",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                             )
                             TextButton(
+                                text = "添加第一条记录",
                                 onClick = {
                                     editorRecord = null
                                     showEditor = true
                                 }
-                            ) { Text("添加第一条记录") }
+                            )
                         }
                     }
                 }
@@ -153,9 +153,9 @@ fun LengthHistoryScreen(
                 item {
                     Text(
                         "测量记录",
-                        style = MaterialTheme.typography.titleLarge,
+                        style = MiuixTheme.textStyles.title3,
                         fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MiuixTheme.colorScheme.onSurface
                     )
                 }
                 items(records.reversed(), key = LengthRecord::id) { record ->
@@ -196,14 +196,21 @@ fun LengthHistoryScreen(
             text = { Text("确认删除这次测量吗？") },
             confirmButton = {
                 TextButton(
+                    text = "删除",
                     onClick = {
                         viewModel.delete(target)
                         deleteTarget = null
-                    }
-                ) { Text("删除", color = MaterialTheme.colorScheme.error) }
+                    },
+                    colors = ButtonDefaults.textButtonColors(
+                        color = androidx.compose.ui.graphics.Color.Transparent,
+                        textColor = MiuixTheme.colorScheme.error,
+                        disabledColor = androidx.compose.ui.graphics.Color.Transparent,
+                        disabledTextColor = MiuixTheme.colorScheme.error
+                    )
+                )
             },
             dismissButton = {
-                TextButton(onClick = { deleteTarget = null }) { Text("取消") }
+                TextButton(text = "取消", onClick = { deleteTarget = null })
             }
         )
     }
@@ -214,7 +221,7 @@ private fun PeriodSegmentedControl(
     selectedIndex: Int,
     onSelected: (Int) -> Unit
 ) {
-    val trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.035f)
+    val trackColor = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.035f)
     val currentTrackColor by rememberUpdatedState(trackColor)
     val backdrop = rememberLayerBackdrop { drawContent() }
     Box(
@@ -272,8 +279,8 @@ private fun ChartLegend() {
                 Spacer(Modifier.width(4.dp))
                 Text(
                     label,
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    style = MiuixTheme.textStyles.footnote2,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                 )
             }
             Spacer(Modifier.width(20.dp))
@@ -301,31 +308,32 @@ private fun LengthRecordDialog(
         title = { Text(if (record == null) "新增长度记录" else "编辑长度记录") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                OutlinedTextField(
+                TextField(
                     value = flaccid,
                     onValueChange = { if (it.isValidDecimal()) flaccid = it.take(6) },
-                    label = { Text("疲软长度（cm）") },
+                    label = "疲软长度（cm）",
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true
                 )
-                OutlinedTextField(
+                TextField(
                     value = erect,
                     onValueChange = { if (it.isValidDecimal()) erect = it.take(6) },
-                    label = { Text("勃起长度（cm）") },
+                    label = "勃起长度（cm）",
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true
                 )
-                OutlinedTextField(
+                TextField(
                     value = note,
                     onValueChange = { note = it.take(200) },
-                    label = { Text("备注（可选）") },
+                    label = "备注（可选）",
                     maxLines = 3
                 )
-                if (error != null) Text(error, color = MaterialTheme.colorScheme.error)
+                if (error != null) Text(error, color = MiuixTheme.colorScheme.error)
             }
         },
         confirmButton = {
             TextButton(
+                text = "保存",
                 onClick = {
                     val todayStart = LocalDate.now()
                         .atStartOfDay(ZoneId.systemDefault())
@@ -341,10 +349,10 @@ private fun LengthRecordDialog(
                         )
                     )
                 }
-            ) { Text("保存") }
+            )
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("取消") }
+            TextButton(text = "取消", onClick = onDismiss)
         }
     )
 }
@@ -369,7 +377,7 @@ private fun LengthRecordCard(
                 Text(dateFormat.format(Date(record.recordDate)))
                 Text(
                     "勃起 ${record.erectLengthCm}cm · 疲软 ${record.flaccidLengthCm}cm",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                 )
             }
             IconButton(onClick = onEdit) {
@@ -379,7 +387,7 @@ private fun LengthRecordCard(
                 Icon(
                     Icons.Default.Delete,
                     contentDescription = "删除",
-                    tint = MaterialTheme.colorScheme.error
+                    tint = MiuixTheme.colorScheme.error
                 )
             }
         }
