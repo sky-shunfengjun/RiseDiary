@@ -18,7 +18,10 @@ import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material3.*
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -73,6 +76,8 @@ import com.risediary.app.reminder.NotificationDestination
 import com.risediary.app.ui.theme.RiseCard
 import com.risediary.app.ui.theme.backgroundBrush
 import kotlinx.coroutines.flow.StateFlow
+import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
+import top.yukonga.miuix.kmp.basic.Scaffold
 
 sealed class Screen(val route: String, val label: String) {
     data object Home : Screen("home", "首页")
@@ -104,7 +109,6 @@ sealed class Screen(val route: String, val label: String) {
     data object AppLockSettings : Screen("app_lock_settings", "应用锁")
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RiseDiaryApp(
     viewModel: AppGateViewModel = hiltViewModel(),
@@ -152,7 +156,6 @@ fun RiseDiaryApp(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun MainAppContent(
     interactionsBlocked: Boolean,
@@ -432,7 +435,6 @@ private fun Modifier.blockInteractionsAndAccessibility(blocked: Boolean): Modifi
     }.clearAndSetSemantics { }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PlaceholderScreen(title: String, navController: NavController) {
     SecondaryPageScaffold(
@@ -451,7 +453,6 @@ fun PlaceholderScreen(title: String, navController: NavController) {
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ModeSelectScreen(navController: NavController) {
     SecondaryPageScaffold(

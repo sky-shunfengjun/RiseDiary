@@ -3,20 +3,23 @@ package com.risediary.app.ui.theme
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.ColumnScope
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.unit.dp
+import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.CardDefaults
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 enum class RiseCardStyle {
     Standard,
@@ -43,8 +46,8 @@ fun RiseCard(
         RiseCardStyle.Standard ->
             if (isDark) Color(0xFF20242B) else Color(0xF7FFFFFF)
         RiseCardStyle.Emphasis ->
-            if (isDark) MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
-            else MaterialTheme.colorScheme.primary.copy(alpha = 0.10f)
+            if (isDark) MiuixTheme.colorScheme.primary.copy(alpha = 0.16f)
+            else MiuixTheme.colorScheme.primary.copy(alpha = 0.10f)
         RiseCardStyle.Metric ->
             if (isDark) Color.White.copy(alpha = 0.055f)
             else Color(0xFFF4F7FB)
@@ -61,36 +64,30 @@ fun RiseCard(
         animationSpec = spring(dampingRatio = 0.78f, stiffness = 520f),
         label = "riseCardScale"
     )
-    val cardModifier = modifier.graphicsLayer {
-        scaleX = scale
-        scaleY = scale
-    }
-    val colors = CardDefaults.cardColors(containerColor = containerColor)
-    val elevation = CardDefaults.cardElevation(
-        defaultElevation = if (isDark || style == RiseCardStyle.Metric) 0.dp else 1.dp
+    val cornerRadius = 24.dp
+    val shape = RoundedCornerShape(cornerRadius)
+    val cardModifier = modifier
+        .graphicsLayer {
+            scaleX = scale
+            scaleY = scale
+        }
+        .then(if (border != null) Modifier.border(border, shape) else Modifier)
+        .clip(shape)
+        .then(
+            if (onClick != null) {
+                Modifier.clickable(
+                    enabled = enabled,
+                    interactionSource = interactionSource,
+                    onClick = onClick
+                )
+            } else {
+                Modifier
+            }
+        )
+    Card(
+        modifier = cardModifier,
+        cornerRadius = cornerRadius,
+        colors = CardDefaults.defaultColors(color = containerColor),
+        content = content
     )
-    val shape = RoundedCornerShape(24.dp)
-
-    if (onClick == null) {
-        Card(
-            modifier = cardModifier,
-            shape = shape,
-            colors = colors,
-            border = border,
-            elevation = elevation,
-            content = content
-        )
-    } else {
-        Card(
-            onClick = onClick,
-            modifier = cardModifier,
-            enabled = enabled,
-            shape = shape,
-            colors = colors,
-            border = border,
-            elevation = elevation,
-            interactionSource = interactionSource,
-            content = content
-        )
-    }
 }

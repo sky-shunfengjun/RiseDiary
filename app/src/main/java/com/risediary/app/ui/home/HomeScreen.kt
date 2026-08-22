@@ -15,13 +15,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.pullrefresh.PullRefreshIndicator
-import androidx.compose.material.pullrefresh.pullRefresh
-import androidx.compose.material.pullrefresh.rememberPullRefreshState
-import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -54,8 +49,11 @@ import java.text.SimpleDateFormat
 import java.util.*
 import org.json.JSONArray
 import org.json.JSONObject
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.PullToRefresh
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
-@OptIn(ExperimentalMaterialApi::class)
 @Composable
 fun HomeScreen(
     navController: NavController,
@@ -97,17 +95,11 @@ fun HomeScreen(
     val dateStr = SimpleDateFormat("yyyy年M月d日  EEEE", Locale.CHINESE).format(Date())
 
     val isRefreshing by vm.isRefreshing.collectAsStateWithLifecycle()
-    val pullRefreshState = rememberPullRefreshState(
-        refreshing = isRefreshing,
-        onRefresh = {
-            vm.refresh()
-        }
-    )
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .pullRefresh(pullRefreshState)
+    PullToRefresh(
+        isRefreshing = isRefreshing,
+        onRefresh = { vm.refresh() },
+        modifier = Modifier.fillMaxSize()
     ) {
         Column(
             modifier = Modifier
@@ -118,16 +110,16 @@ fun HomeScreen(
         ) {
             Text(
                 text = dateStr,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                style = MiuixTheme.textStyles.footnote1,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary
             )
             Text(
                 "${vm.getGreeting()}，$username",
-                style = MaterialTheme.typography.headlineLarge.copy(
+                style = MiuixTheme.textStyles.headline1.copy(
                     fontSize = 30.sp,
                     fontWeight = FontWeight.SemiBold
                 ),
-                color = MaterialTheme.colorScheme.onSurface,
+                color = MiuixTheme.colorScheme.onSurface,
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
@@ -177,15 +169,15 @@ fun HomeScreen(
                                     } else {
                                         stringResource(R.string.home_status_ready)
                                     },
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                style = MiuixTheme.textStyles.footnote2,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                             )
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 todayStatusText,
-                                style = MaterialTheme.typography.titleLarge,
+                                style = MiuixTheme.textStyles.title3,
                                 fontWeight = FontWeight.SemiBold,
-                                color = MaterialTheme.colorScheme.onSurface
+                                color = MiuixTheme.colorScheme.onSurface
                             )
                         }
                     }
@@ -201,8 +193,8 @@ fun HomeScreen(
                                     daysAgo
                                 )
                             },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            style = MiuixTheme.textStyles.body2,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                         )
                     }
                     Spacer(modifier = Modifier.height(14.dp))
@@ -213,20 +205,20 @@ fun HomeScreen(
                             modifier = Modifier
                                 .padding(top = 1.dp)
                                 .size(17.dp),
-                            tint = MaterialTheme.colorScheme.primary
+                            tint = MiuixTheme.colorScheme.primary
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 stringResource(R.string.home_tip_label),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.primary,
+                                style = MiuixTheme.textStyles.footnote2,
+                                color = MiuixTheme.colorScheme.primary,
                                 fontWeight = FontWeight.SemiBold
                             )
                             Text(
                                 stringResource(dailyTipResId),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MiuixTheme.textStyles.body2,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                                 maxLines = 3
                             )
                         }
@@ -235,9 +227,9 @@ fun HomeScreen(
 
             Text(
                 stringResource(R.string.home_overview_title),
-                style = MaterialTheme.typography.titleLarge,
+                style = MiuixTheme.textStyles.title3,
                 fontWeight = FontWeight.SemiBold,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = MiuixTheme.colorScheme.onSurface,
                 modifier = Modifier.padding(top = 4.dp, start = 2.dp)
             )
 
@@ -330,8 +322,8 @@ fun HomeScreen(
                                 } else {
                                     Text(
                                         stringResource(R.string.home_length_empty),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        style = MiuixTheme.textStyles.body2,
+                                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                                     )
                                 }
                             }
@@ -382,8 +374,8 @@ fun HomeScreen(
                                         } else {
                                             stringResource(R.string.home_distance_empty)
                                         },
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        style = MiuixTheme.textStyles.body2,
+                                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                                     )
                                 }
                             }
@@ -409,8 +401,8 @@ fun HomeScreen(
                                 if (recentAchievements.isEmpty()) {
                                     Text(
                                         stringResource(R.string.home_achievement_empty),
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        style = MiuixTheme.textStyles.body2,
+                                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                                     )
                                 } else {
                                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -421,8 +413,8 @@ fun HomeScreen(
                                                 Spacer(modifier = Modifier.height(2.dp))
                                                 Text(
                                                     ACHIEVEMENT_ICONS[achievement.achievementKey]?.second ?: achievement.achievementKey,
-                                                    style = MaterialTheme.typography.labelSmall,
-                                                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
+                                                    style = MiuixTheme.textStyles.footnote2,
+                                                    color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                                                     maxLines = 1
                                                 )
                                             }
@@ -438,10 +430,5 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(80.dp))
         }
-        PullRefreshIndicator(
-            refreshing = isRefreshing,
-            state = pullRefreshState,
-            modifier = Modifier.align(Alignment.TopCenter)
-        )
     }
 }
