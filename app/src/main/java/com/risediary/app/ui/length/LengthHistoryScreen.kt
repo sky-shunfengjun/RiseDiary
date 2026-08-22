@@ -348,7 +348,8 @@ private fun LengthRecordDialog(
                             note = note.trim()
                         )
                     )
-                }
+                },
+                colors = ButtonDefaults.textButtonColorsPrimary()
             )
         },
         dismissButton = {

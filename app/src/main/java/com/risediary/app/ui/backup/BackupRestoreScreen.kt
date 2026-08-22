@@ -154,7 +154,8 @@ title = { Text("确认导出") },
                                         } else {
                                             vm.exportBackup()
                                         }
-                                    }
+                                    },
+                                    colors = ButtonDefaults.textButtonColorsPrimary()
                                 )
                             },
                             dismissButton = {

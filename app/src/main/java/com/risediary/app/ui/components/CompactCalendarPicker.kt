@@ -33,6 +33,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import java.time.LocalDate
 import java.time.YearMonth
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
@@ -55,7 +56,11 @@ fun LiquidSingleDatePickerDialog(
             TextButton(text = "取消", onClick = onDismissRequest)
         },
         confirmButton = {
-            TextButton(text = "确定", onClick = { onConfirm(selectedDate) })
+            TextButton(
+                text = "确定",
+                onClick = { onConfirm(selectedDate) },
+                colors = ButtonDefaults.textButtonColorsPrimary()
+            )
         }
     ) {
         CompactCalendar(
@@ -93,7 +98,8 @@ fun LiquidDateRangePickerDialog(
                     if (start != null) {
                         onConfirm(start, selectedEnd ?: start)
                     }
-                }
+                },
+                colors = ButtonDefaults.textButtonColorsPrimary()
             )
         }
     ) {

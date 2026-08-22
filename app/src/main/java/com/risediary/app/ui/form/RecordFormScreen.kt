@@ -48,6 +48,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -74,6 +75,8 @@ import java.time.Instant
 import java.time.LocalTime
 import java.time.ZoneId
 import kotlinx.coroutines.launch
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.Checkbox
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
@@ -256,7 +259,6 @@ fun RecordFormScreen(
                                 keyboardOptions = KeyboardOptions(
                                     keyboardType = KeyboardType.Number
                                 ),
-                                leadingIcon = { Icon(Icons.Default.Numbers, null) },
                                 cornerRadius = 16.dp,
                                 singleLine = true
                             )
@@ -281,7 +283,6 @@ fun RecordFormScreen(
                                 keyboardOptions = KeyboardOptions(
                                     keyboardType = KeyboardType.Decimal
                                 ),
-                                leadingIcon = { Icon(Icons.Default.WaterDrop, null) },
                                 cornerRadius = 16.dp,
                                 singleLine = true
                             )
@@ -314,7 +315,6 @@ fun RecordFormScreen(
                             keyboardOptions = KeyboardOptions(
                                 keyboardType = KeyboardType.Decimal
                             ),
-                            leadingIcon = { Icon(Icons.Default.Straighten, null) },
                             cornerRadius = 16.dp,
                             singleLine = true
                         )
@@ -358,28 +358,22 @@ fun RecordFormScreen(
                             ) {
                                 tags.forEach { tag ->
                                     val tagSelected = tag.name in vm.selectedTags
-                                    val tagBackground = if (tagSelected) {
-                                        MiuixTheme.colorScheme.primary.copy(alpha = 0.16f)
-                                    } else {
-                                        MiuixTheme.colorScheme.onSurface.copy(alpha = 0.045f)
-                                    }
                                     Row(
                                         verticalAlignment = Alignment.CenterVertically,
                                         modifier = Modifier
-                                            .clip(ContinuousCapsule)
-                                            .background(tagBackground)
+                                            .clip(RoundedCornerShape(10.dp))
                                             .clickable { vm.toggleTag(tag.name) }
-                                            .padding(horizontal = 14.dp, vertical = 8.dp)
+                                            .padding(end = 10.dp)
                                     ) {
-                                        if (tagSelected) {
-                                            Icon(
-                                                Icons.Default.Check,
-                                                null,
-                                                Modifier.size(16.dp),
-                                                tint = MiuixTheme.colorScheme.primary
-                                            )
-                                            Spacer(modifier = Modifier.width(6.dp))
-                                        }
+                                        Checkbox(
+                                            state = if (tagSelected) {
+                                                ToggleableState.On
+                                            } else {
+                                                ToggleableState.Off
+                                            },
+                                            onClick = { vm.toggleTag(tag.name) }
+                                        )
+                                        Spacer(modifier = Modifier.width(2.dp))
                                         Text(
                                             tag.name,
                                             style = MiuixTheme.textStyles.body2.copy(
@@ -413,7 +407,6 @@ fun RecordFormScreen(
                             }
                             .bringIntoViewRequester(noteFieldRequester)
                             .heightIn(min = 104.dp),
-                        leadingIcon = { Icon(Icons.Default.Notes, null) },
                         maxLines = 5,
                         cornerRadius = 16.dp
                     )
@@ -501,7 +494,8 @@ fun RecordFormScreen(
                                 .toEpochMilli()
                         )
                         showTimePicker = false
-                    }
+                    },
+                    colors = ButtonDefaults.textButtonColorsPrimary()
                 )
             },
             dismissButton = {
@@ -553,7 +547,11 @@ fun RecordFormScreen(
         LiquidAlertDialog(
             onDismissRequest = vm::consumeAchievement,
             confirmButton = {
-                TextButton(text = "知道了", onClick = vm::consumeAchievement)
+                TextButton(
+                    text = "知道了",
+                    onClick = vm::consumeAchievement,
+                    colors = ButtonDefaults.textButtonColorsPrimary()
+                )
             },
             title = {
                 Text(

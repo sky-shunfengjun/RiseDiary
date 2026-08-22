@@ -335,7 +335,11 @@ private fun TagEditorDialog(
             }
         },
         confirmButton = {
-            TextButton(text = "保存", onClick = { onSave(name, color) })
+            TextButton(
+                text = "保存",
+                onClick = { onSave(name, color) },
+                colors = ButtonDefaults.textButtonColorsPrimary()
+            )
         },
         dismissButton = {
             TextButton(text = "取消", onClick = onDismiss)

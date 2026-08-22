@@ -4,7 +4,6 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.ColumnScope
@@ -13,13 +12,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.utils.PressFeedbackType
 
 enum class RiseCardStyle {
     Standard,
@@ -72,22 +71,13 @@ fun RiseCard(
             scaleY = scale
         }
         .then(if (border != null) Modifier.border(border, shape) else Modifier)
-        .clip(shape)
-        .then(
-            if (onClick != null) {
-                Modifier.clickable(
-                    enabled = enabled,
-                    interactionSource = interactionSource,
-                    onClick = onClick
-                )
-            } else {
-                Modifier
-            }
-        )
     Card(
         modifier = cardModifier,
         cornerRadius = cornerRadius,
         colors = CardDefaults.defaultColors(color = containerColor),
+        pressFeedbackType = PressFeedbackType.Sink,
+        showIndication = true,
+        onClick = if (enabled) onClick else null,
         content = content
     )
 }

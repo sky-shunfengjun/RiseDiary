@@ -1,6 +1,7 @@
 package com.risediary.app.ui.form
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -8,10 +9,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronRight
@@ -35,9 +38,13 @@ import com.risediary.app.ui.components.LiquidSegmentedControl
 import com.risediary.app.util.formatFormDuration
 import java.time.Instant
 import java.time.ZoneId
+import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.RadioButton
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.utils.PressFeedbackType
 
 @Composable
 internal fun FormSectionTitle(icon: ImageVector, title: String, subtitle: String) {
@@ -72,17 +79,25 @@ internal fun CompactValueButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Row(
-        modifier = modifier
-            .clip(RoundedCornerShape(14.dp))
-            .background(MiuixTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 13.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    val borderColor = MiuixTheme.colorScheme.outline.copy(alpha = 0.35f)
+    Card(
+        modifier = modifier.border(1.dp, borderColor, RoundedCornerShape(14.dp)),
+        cornerRadius = 14.dp,
+        colors = CardDefaults.defaultColors(
+            color = MiuixTheme.colorScheme.surfaceVariant.copy(alpha = 0.52f)
+        ),
+        pressFeedbackType = PressFeedbackType.Sink,
+        showIndication = true,
+        onClick = onClick
     ) {
-        Icon(icon, null, tint = MiuixTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
-        Text(text, style = MiuixTheme.textStyles.body1, fontWeight = FontWeight.Medium, maxLines = 1)
+        Row(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 13.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(icon, null, tint = MiuixTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+            Text(text, style = MiuixTheme.textStyles.body1, fontWeight = FontWeight.Medium, maxLines = 1)
+        }
     }
 }
 
@@ -92,34 +107,43 @@ internal fun DurationValueButton(
     hasLegacyDuration: Boolean,
     onClick: () -> Unit
 ) {
+    val borderColor = MiuixTheme.colorScheme.primary.copy(alpha = 0.22f)
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Row(
+        Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .clip(RoundedCornerShape(16.dp))
-                .background(MiuixTheme.colorScheme.primary.copy(alpha = 0.075f))
-                .clickable(onClick = onClick)
-                .padding(horizontal = 14.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .border(1.dp, borderColor, RoundedCornerShape(16.dp)),
+            cornerRadius = 16.dp,
+            colors = CardDefaults.defaultColors(
+                color = MiuixTheme.colorScheme.primary.copy(alpha = 0.075f)
+            ),
+            pressFeedbackType = PressFeedbackType.Sink,
+            showIndication = true,
+            onClick = onClick
         ) {
-            Icon(Icons.Default.Schedule, null, tint = MiuixTheme.colorScheme.primary)
-            Column(modifier = Modifier.weight(1f).padding(horizontal = 12.dp)) {
-                Text(
-                    "用时",
-                    style = MiuixTheme.textStyles.footnote2,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                )
-                Text(
-                    formatFormDuration(durationSeconds),
-                    style = MiuixTheme.textStyles.title3,
-                    fontWeight = FontWeight.SemiBold
+            Row(
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(Icons.Default.Schedule, null, tint = MiuixTheme.colorScheme.primary)
+                Column(modifier = Modifier.weight(1f).padding(horizontal = 12.dp)) {
+                    Text(
+                        "用时",
+                        style = MiuixTheme.textStyles.footnote2,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                    )
+                    Text(
+                        formatFormDuration(durationSeconds),
+                        style = MiuixTheme.textStyles.title3,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+                Icon(
+                    Icons.Default.ChevronRight,
+                    contentDescription = "修改用时",
+                    tint = MiuixTheme.colorScheme.onSurfaceVariantSummary
                 )
             }
-            Icon(
-                Icons.Default.ChevronRight,
-                contentDescription = "修改用时",
-                tint = MiuixTheme.colorScheme.onSurfaceVariantSummary
-            )
         }
         if (hasLegacyDuration) {
             Text(
@@ -180,28 +204,27 @@ internal fun QuickChoices(
     ) {
         values.forEach { value ->
             val isSelected = selected == "$value"
-            val chipBackground = if (isSelected) {
-                MiuixTheme.colorScheme.primary.copy(alpha = 0.16f)
-            } else {
-                MiuixTheme.colorScheme.onSurface.copy(alpha = 0.045f)
-            }
-            val chipTextColor = if (isSelected) {
-                MiuixTheme.colorScheme.primary
-            } else {
-                MiuixTheme.colorScheme.onSurface
-            }
-            Text(
-                text = "$value$suffix",
-                style = MiuixTheme.textStyles.body2.copy(
-                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
-                ),
-                color = chipTextColor,
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
-                    .clip(ContinuousCapsule)
-                    .background(chipBackground)
+                    .clip(RoundedCornerShape(10.dp))
                     .clickable { onClick(value) }
-                    .padding(horizontal = 14.dp, vertical = 8.dp)
-            )
+                    .padding(end = 10.dp)
+            ) {
+                RadioButton(selected = isSelected, onClick = { onClick(value) })
+                Spacer(modifier = Modifier.width(2.dp))
+                Text(
+                    text = "$value$suffix",
+                    style = MiuixTheme.textStyles.body2.copy(
+                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                    ),
+                    color = if (isSelected) {
+                        MiuixTheme.colorScheme.primary
+                    } else {
+                        MiuixTheme.colorScheme.onSurface
+                    }
+                )
+            }
         }
     }
 }

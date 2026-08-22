@@ -40,6 +40,7 @@ import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
@@ -104,15 +105,28 @@ fun SecondaryPageScaffold(
                 .layerBackdrop(backdrop),
             containerColor = Color.Transparent,
             contentWindowInsets = WindowInsets(0, 0, 0, 0),
-            snackbarHost = snackbarHost
+            snackbarHost = snackbarHost,
+            topBar = {
+                TopAppBar(
+                    title = title,
+                    color = Color.Transparent,
+                    titleColor = MiuixTheme.colorScheme.onSurface,
+                    navigationIcon = {
+                        LiquidBackButton(
+                            onClick = guardedBack,
+                            backdrop = backdrop,
+                            modifier = Modifier.padding(start = 12.dp)
+                        )
+                    },
+                    actions = { actions() },
+                    defaultWindowInsetsPadding = false
+                )
+            }
         ) { scaffoldPadding ->
             content(
                 PaddingValues(
                     start = 20.dp,
-                    // The main scaffold already applies status-bar insets to the
-                    // NavHost. The top bar here is 60dp; keep a small 16dp breathing
-                    // room before the page content starts.
-                    top = scaffoldPadding.calculateTopPadding() + 76.dp,
+                    top = scaffoldPadding.calculateTopPadding() + 16.dp,
                     end = 20.dp,
                     bottom = scaffoldPadding.calculateBottomPadding() +
                         if (
@@ -151,13 +165,6 @@ fun SecondaryPageScaffold(
                 bottomAction(backdrop)
             }
         }
-
-        SecondaryPageTopBar(
-            title = title,
-            onBack = guardedBack,
-            backdrop = backdrop,
-            actions = actions
-        )
         }
     }
 }
@@ -186,39 +193,6 @@ fun LiquidAddButton(
             tint = MiuixTheme.colorScheme.onSurface,
             modifier = Modifier.size(28.dp)
         )
-    }
-}
-
-@Composable
-private fun SecondaryPageTopBar(
-    title: String,
-    onBack: () -> Unit,
-    backdrop: Backdrop,
-    actions: @Composable RowScope.() -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .padding(start = 20.dp, end = 12.dp)
-            .height(60.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        LiquidBackButton(
-            onClick = onBack,
-            backdrop = backdrop
-        )
-        Text(
-            text = title,
-            modifier = Modifier
-                .weight(1f)
-                .padding(start = 14.dp),
-            style = MiuixTheme.textStyles.headline1.copy(
-                fontSize = 30.sp,
-                fontWeight = FontWeight.SemiBold
-            ),
-            color = MiuixTheme.colorScheme.onSurface,
-            maxLines = 1
-        )
-        actions()
     }
 }
 
