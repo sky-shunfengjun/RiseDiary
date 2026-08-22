@@ -23,7 +23,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
@@ -48,7 +47,6 @@ import com.risediary.app.update.UpdateViewModel
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
@@ -65,7 +63,6 @@ fun AboutScreen(
     val availableRelease = (updateState as? UpdateCheckState.Available)?.release
     val isChecking = updateState is UpdateCheckState.Checking
     val updateButtonDescription = stringResource(R.string.update_button_content_description)
-    val scrollBehavior = MiuixScrollBehavior()
 
     SecondaryPageScaffold(
         title = "关于",
@@ -104,8 +101,7 @@ fun AboutScreen(
                 .fillMaxSize()
                 .padding(padding)
                 .scrollEndHaptic()
-                .overScrollVertical()
-                .nestedScroll(scrollBehavior.nestedScrollConnection),
+                .overScrollVertical(),
             contentPadding = PaddingValues(bottom = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
             overscrollEffect = null

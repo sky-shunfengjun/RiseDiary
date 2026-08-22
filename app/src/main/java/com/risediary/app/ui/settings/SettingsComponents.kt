@@ -20,8 +20,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.ChevronRight
@@ -30,18 +28,17 @@ import androidx.compose.material.icons.filled.EventRepeat
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationManagerCompat
@@ -59,8 +56,10 @@ import com.risediary.app.ui.theme.CardOrange
 import com.risediary.app.ui.theme.LocalRiseDarkTheme
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Surface
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
@@ -145,18 +144,21 @@ internal fun SettingsNavItem(
 }
 
 /**
- * KernelSU 风格「左标题右输入」设置行：标题与摘要居左，输入框右对齐。
+ * 设置编辑行：默认展示标题与摘要，点击右侧铅笔后在行内展开输入框，点勾保存。
  */
 @Composable
-internal fun SettingsInputRow(
+internal fun SettingsEditItem(
     icon: ImageVector,
     title: String,
-    subtitle: String?,
+    subtitle: String,
     value: String,
     onValueChange: (String) -> Unit,
     placeholder: String,
     inputTransform: (String) -> String = { it }
 ) {
+    var editing by remember { mutableStateOf(false) }
+    var text by remember(value) { mutableStateOf(value) }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -172,7 +174,32 @@ internal fun SettingsInputRow(
                 fontWeight = FontWeight.Medium,
                 color = MiuixTheme.colorScheme.onSurface
             )
-            if (subtitle != null) {
+            if (editing) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    TextField(
+                        value = text,
+                        onValueChange = { text = inputTransform(it) },
+                        modifier = Modifier.weight(1f),
+                        label = placeholder,
+                        useLabelAsPlaceholder = true,
+                        singleLine = true,
+                        trailingIcon = {
+                            IconButton(
+                                onClick = {
+                                    onValueChange(text)
+                                    editing = false
+                                }
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = "保存"
+                                )
+                            }
+                        }
+                    )
+                }
+            } else {
                 Spacer(modifier = Modifier.height(2.dp))
                 Text(
                     text = subtitle,
@@ -181,32 +208,16 @@ internal fun SettingsInputRow(
                 )
             }
         }
-        Spacer(modifier = Modifier.width(12.dp))
-        BasicTextField(
-            value = value,
-            onValueChange = { onValueChange(inputTransform(it)) },
-            modifier = Modifier.weight(1f),
-            singleLine = true,
-            textStyle = MiuixTheme.textStyles.main.copy(
-                textAlign = TextAlign.End,
-                color = MiuixTheme.colorScheme.onSurfaceVariantActions
-            ),
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-            cursorBrush = SolidColor(MiuixTheme.colorScheme.primary),
-            decorationBox = { innerTextField ->
-                Box(contentAlignment = Alignment.CenterEnd) {
-                    if (value.isEmpty()) {
-                        Text(
-                            text = placeholder,
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                            maxLines = 1,
-                            softWrap = false
-                        )
-                    }
-                    innerTextField()
-                }
+        if (!editing) {
+            IconButton(onClick = { editing = true }) {
+                Icon(
+                    imageVector = Icons.Default.Edit,
+                    contentDescription = "编辑",
+                    tint = MiuixTheme.colorScheme.primary,
+                    modifier = Modifier.size(19.dp)
+                )
             }
-        )
+        }
     }
 }
 
