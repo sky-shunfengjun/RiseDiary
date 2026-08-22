@@ -16,10 +16,6 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,6 +37,10 @@ import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.risediary.app.ui.theme.backgroundBrush
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
  * Shared frame for secondary and tertiary pages.
@@ -173,7 +173,7 @@ fun LiquidAddButton(
         onClick = onClick,
         backdrop = backdrop,
         modifier = modifier.size(64.dp),
-        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.035f),
+        tint = MiuixTheme.colorScheme.primary.copy(alpha = 0.035f),
         height = 64.dp,
         horizontalPadding = 0.dp,
         highlightIntensity = 0.36f,
@@ -183,7 +183,7 @@ fun LiquidAddButton(
         Icon(
             imageVector = Icons.Default.Add,
             contentDescription = contentDescription,
-            tint = MaterialTheme.colorScheme.onSurface,
+            tint = MiuixTheme.colorScheme.onSurface,
             modifier = Modifier.size(28.dp)
         )
     }
@@ -211,11 +211,11 @@ private fun SecondaryPageTopBar(
             modifier = Modifier
                 .weight(1f)
                 .padding(start = 14.dp),
-            style = MaterialTheme.typography.headlineLarge.copy(
+            style = MiuixTheme.textStyles.headline1.copy(
                 fontSize = 30.sp,
                 fontWeight = FontWeight.SemiBold
             ),
-            color = MaterialTheme.colorScheme.onSurface,
+            color = MiuixTheme.colorScheme.onSurface,
             maxLines = 1
         )
         actions()
@@ -232,7 +232,7 @@ fun LiquidBackButton(
         onClick = onClick,
         backdrop = backdrop,
         modifier = modifier.size(48.dp),
-        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.035f),
+        tint = MiuixTheme.colorScheme.primary.copy(alpha = 0.035f),
         height = 48.dp,
         horizontalPadding = 0.dp,
         highlightIntensity = 0.34f,
@@ -242,7 +242,7 @@ fun LiquidBackButton(
         Icon(
             imageVector = Icons.AutoMirrored.Filled.ArrowBack,
             contentDescription = "返回",
-            tint = MaterialTheme.colorScheme.onSurface,
+            tint = MiuixTheme.colorScheme.onSurface,
             modifier = Modifier.size(24.dp)
         )
     }
