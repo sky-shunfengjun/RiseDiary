@@ -3,15 +3,17 @@ package com.risediary.app.ui.update
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.SystemUpdate
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import com.risediary.app.R
 import com.risediary.app.update.GitHubRelease
 import com.risediary.app.ui.components.LiquidAlertDialog
+import com.risediary.app.ui.components.liquidDialogCancelButtonColors
+import com.risediary.app.ui.components.liquidDialogConfirmButtonColors
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
 internal fun UpdateAvailableDialog(
@@ -26,7 +28,7 @@ internal fun UpdateAvailableDialog(
             Icon(
                 imageVector = Icons.Default.SystemUpdate,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary
+                tint = MiuixTheme.colorScheme.primary
             )
         },
         title = { Text(stringResource(R.string.update_available_title)) },
@@ -40,14 +42,18 @@ internal fun UpdateAvailableDialog(
             )
         },
         confirmButton = {
-            TextButton(onClick = { onOpenRelease(release.releaseUrl) }) {
-                Text(stringResource(R.string.update_open_release))
-            }
+            TextButton(
+                text = stringResource(R.string.update_open_release),
+                onClick = { onOpenRelease(release.releaseUrl) },
+                colors = liquidDialogConfirmButtonColors()
+            )
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.update_later))
-            }
+            TextButton(
+                text = stringResource(R.string.update_later),
+                onClick = onDismiss,
+                colors = liquidDialogCancelButtonColors()
+            )
         }
     )
 }
@@ -76,7 +82,7 @@ internal fun UpdateStatusDialog(
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary
+                tint = MiuixTheme.colorScheme.primary
             )
         },
         title = { Text(stringResource(title)) },
@@ -90,14 +96,16 @@ internal fun UpdateStatusDialog(
             )
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.action_confirm))
-            }
+            TextButton(
+                text = stringResource(R.string.action_confirm),
+                onClick = onDismiss,
+                colors = liquidDialogConfirmButtonColors()
+            )
         }
     )
 }
 
 internal enum class UpdateStatusDialogState {
     UP_TO_DATE,
-    FAILED
+    FAILED,
 }

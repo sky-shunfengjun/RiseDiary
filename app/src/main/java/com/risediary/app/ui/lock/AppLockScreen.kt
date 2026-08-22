@@ -21,7 +21,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Backspace
 import androidx.compose.material.icons.filled.Fingerprint
-import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,6 +44,13 @@ import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.risediary.app.R
 import com.risediary.app.ui.components.LiquidGlassButton
 import com.risediary.app.ui.theme.CardBlue
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 private fun Context.findActivity(): Activity? {
     var context = this
@@ -78,7 +84,7 @@ fun AppLockScreen(
     var autoBiometricRequested by remember(mode) { mutableStateOf(false) }
     val lockBackground = Brush.verticalGradient(
         colors = listOf(
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.98f),
+            MiuixTheme.colorScheme.primary.copy(alpha = 0.98f),
             Color(0xFF315B91),
             Color(0xFF14223E)
         )
@@ -145,9 +151,16 @@ fun AppLockScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End
                 ) {
-                    TextButton(onClick = onCancel) {
-                        Text("取消", color = Color.White.copy(alpha = 0.78f))
-                    }
+                    TextButton(
+                        text = "取消",
+                        onClick = onCancel,
+                        colors = ButtonDefaults.textButtonColors(
+                            color = Color.Transparent,
+                            disabledColor = Color.Transparent,
+                            textColor = Color.White.copy(alpha = 0.78f),
+                            disabledTextColor = Color.White.copy(alpha = 0.4f)
+                        )
+                    )
                 }
             }
 
@@ -167,7 +180,7 @@ fun AppLockScreen(
             // Title
             Text(
                 text = title,
-                style = MaterialTheme.typography.headlineSmall,
+                fontSize = MiuixTheme.textStyles.title2.fontSize,
                 fontWeight = FontWeight.SemiBold,
                 color = Color.White
             )
@@ -179,8 +192,8 @@ fun AppLockScreen(
                 // Lockout countdown
                 Text(
                     text = "请等待 ${lockout} 秒",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.error
+                    fontSize = MiuixTheme.textStyles.title4.fontSize,
+                    color = MiuixTheme.colorScheme.error
                 )
             } else {
                 PinDots(
@@ -195,8 +208,8 @@ fun AppLockScreen(
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
                     text = error.orEmpty(),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error
+                    fontSize = MiuixTheme.textStyles.body2.fontSize,
+                    color = MiuixTheme.colorScheme.error
                 )
             }
 
@@ -239,7 +252,7 @@ fun AppLockScreen(
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     "指纹验证",
-                    style = MaterialTheme.typography.labelSmall,
+                    fontSize = MiuixTheme.textStyles.footnote1.fontSize,
                     color = Color.White.copy(alpha = 0.72f)
                 )
             }
@@ -259,7 +272,7 @@ private fun PinDots(count: Int, filled: Int, isError: Boolean) {
         repeat(count) { i ->
             val filledState = i < filled
             val dotColor = when {
-                isError -> MaterialTheme.colorScheme.error
+                isError -> MiuixTheme.colorScheme.error
                 filledState -> Color.White
                 else -> Color.White.copy(alpha = 0.28f)
             }
@@ -286,7 +299,7 @@ private fun PinDots(count: Int, filled: Int, isError: Boolean) {
                         modifier = Modifier
                             .size(8.dp)
                             .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primary)
+                            .background(MiuixTheme.colorScheme.primary)
                     )
                 }
             }
@@ -350,7 +363,6 @@ private fun NumericKeypad(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun KeyButton(
     label: String,

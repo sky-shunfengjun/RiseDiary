@@ -52,6 +52,8 @@ import androidx.navigation.NavController
 import com.risediary.app.data.entity.Tag
 import com.risediary.app.ui.components.LiquidAddButton
 import com.risediary.app.ui.components.LiquidAlertDialog
+import com.risediary.app.ui.components.liquidDialogCancelButtonColors
+import com.risediary.app.ui.components.liquidDialogConfirmButtonColors
 import com.risediary.app.ui.components.SecondaryPageScaffold
 import com.risediary.app.ui.components.reorderByDragOffset
 import com.risediary.app.ui.theme.RiseCard
@@ -285,7 +287,11 @@ fun TagManagerScreen(
                 )
             },
             dismissButton = {
-                TextButton(text = "取消", onClick = { deleteTarget = null })
+                TextButton(
+                    text = "取消",
+                    onClick = { deleteTarget = null },
+                    colors = liquidDialogCancelButtonColors()
+                )
             }
         )
     }
@@ -338,11 +344,15 @@ private fun TagEditorDialog(
             TextButton(
                 text = "保存",
                 onClick = { onSave(name, color) },
-                colors = ButtonDefaults.textButtonColorsPrimary()
+                colors = liquidDialogConfirmButtonColors()
             )
         },
         dismissButton = {
-            TextButton(text = "取消", onClick = onDismiss)
+            TextButton(
+                text = "取消",
+                onClick = onDismiss,
+                colors = liquidDialogCancelButtonColors()
+            )
         }
     )
 }

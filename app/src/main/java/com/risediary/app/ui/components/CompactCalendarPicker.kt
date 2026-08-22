@@ -53,13 +53,17 @@ fun LiquidSingleDatePickerDialog(
     LiquidDatePickerDialog(
         onDismissRequest = onDismissRequest,
         dismissButton = {
-            TextButton(text = "取消", onClick = onDismissRequest)
+            TextButton(
+                text = "取消",
+                onClick = onDismissRequest,
+                colors = liquidDialogCancelButtonColors()
+            )
         },
         confirmButton = {
             TextButton(
                 text = "确定",
                 onClick = { onConfirm(selectedDate) },
-                colors = ButtonDefaults.textButtonColorsPrimary()
+                colors = liquidDialogConfirmButtonColors()
             )
         }
     ) {
@@ -87,7 +91,11 @@ fun LiquidDateRangePickerDialog(
     LiquidDatePickerDialog(
         onDismissRequest = onDismissRequest,
         dismissButton = {
-            TextButton(text = "取消", onClick = onDismissRequest)
+            TextButton(
+                text = "取消",
+                onClick = onDismissRequest,
+                colors = liquidDialogCancelButtonColors()
+            )
         },
         confirmButton = {
             TextButton(
@@ -99,7 +107,7 @@ fun LiquidDateRangePickerDialog(
                         onConfirm(start, selectedEnd ?: start)
                     }
                 },
-                colors = ButtonDefaults.textButtonColorsPrimary()
+                colors = liquidDialogConfirmButtonColors()
             )
         }
     ) {

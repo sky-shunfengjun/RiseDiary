@@ -30,6 +30,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavController
 import com.risediary.app.ui.components.SecondaryPageScaffold
 import com.risediary.app.ui.components.LiquidAlertDialog
+import com.risediary.app.ui.components.liquidDialogCancelButtonColors
+import com.risediary.app.ui.components.liquidDialogConfirmButtonColors
 import com.risediary.app.ui.components.LiquidSnackbarTone
 import com.risediary.app.ui.components.showLiquidSnackbar
 import com.risediary.app.ui.theme.CardRed
@@ -155,13 +157,14 @@ title = { Text("确认导出") },
                                             vm.exportBackup()
                                         }
                                     },
-                                    colors = ButtonDefaults.textButtonColorsPrimary()
+                                    colors = liquidDialogConfirmButtonColors()
                                 )
                             },
                             dismissButton = {
                                 TextButton(
                                     text = "取消",
-                                    onClick = { showExportConfirm = false }
+                                    onClick = { showExportConfirm = false },
+                                    colors = liquidDialogCancelButtonColors()
                                 )
                             }
                         )
@@ -231,7 +234,8 @@ title = { Text("确认恢复") },
                             dismissButton = {
                                 TextButton(
                                     text = "取消",
-                                    onClick = { showRestoreConfirm = false }
+                                    onClick = { showRestoreConfirm = false },
+                                    colors = liquidDialogCancelButtonColors()
                                 )
                             }
                         )
@@ -321,7 +325,8 @@ title = { Text("确认恢复") },
                             onClick = {
                                 vm.dismissClearDialog()
                                 inputText = ""
-                            }
+                            },
+                            colors = liquidDialogCancelButtonColors()
                         )
                     }
                 )

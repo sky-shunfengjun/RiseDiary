@@ -16,7 +16,6 @@ import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.FlightTakeoff
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -56,6 +55,7 @@ import com.kyant.backdrop.effects.vibrancy
 import com.kyant.capsule.ContinuousCapsule
 import com.risediary.app.ui.components.liquidglass.InteractiveHighlight
 import com.risediary.app.ui.theme.LocalRiseDarkTheme
+import top.yukonga.miuix.kmp.basic.Icon
 import kotlin.math.abs
 import kotlin.math.atan2
 import kotlin.math.cos

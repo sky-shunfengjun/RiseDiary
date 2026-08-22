@@ -14,9 +14,6 @@ import androidx.compose.material.icons.filled.Fingerprint
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockReset
 import androidx.compose.material.icons.filled.Timer
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -33,7 +30,12 @@ import androidx.navigation.NavController
 import com.risediary.app.R
 import com.risediary.app.ui.components.LiquidAlertDialog
 import com.risediary.app.ui.components.SecondaryPageScaffold
+import com.risediary.app.ui.components.liquidDialogCancelButtonColors
 import com.risediary.app.ui.theme.RiseCard
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 private tailrec fun Context.findFragmentActivity(): FragmentActivity? = when (this) {
     is FragmentActivity -> this
@@ -149,21 +151,25 @@ fun AppLockSettingsScreen(
             text = { Text(stringResource(R.string.settings_app_lock_disable_message)) },
             confirmButton = {
                 TextButton(
+                    text = stringResource(R.string.settings_app_lock_continue_verify),
                     onClick = {
                         showDisableDialog = false
                         navController.navigate("lock_disable")
-                    }
-                ) {
-                    Text(
-                        stringResource(R.string.settings_app_lock_continue_verify),
-                        color = MaterialTheme.colorScheme.error
+                    },
+                    colors = ButtonDefaults.textButtonColors(
+                        color = androidx.compose.ui.graphics.Color.Transparent,
+                        disabledColor = androidx.compose.ui.graphics.Color.Transparent,
+                        textColor = MiuixTheme.colorScheme.error,
+                        disabledTextColor = MiuixTheme.colorScheme.error
                     )
-                }
+                )
             },
             dismissButton = {
-                TextButton(onClick = { showDisableDialog = false }) {
-                    Text(stringResource(R.string.action_cancel))
-                }
+                TextButton(
+                    text = stringResource(R.string.action_cancel),
+                    onClick = { showDisableDialog = false },
+                    colors = liquidDialogCancelButtonColors()
+                )
             }
         )
     }

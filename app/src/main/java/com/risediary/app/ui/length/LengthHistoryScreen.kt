@@ -43,6 +43,8 @@ import androidx.navigation.NavController
 import com.risediary.app.data.entity.LengthRecord
 import com.risediary.app.ui.components.LiquidAddButton
 import com.risediary.app.ui.components.LiquidAlertDialog
+import com.risediary.app.ui.components.liquidDialogCancelButtonColors
+import com.risediary.app.ui.components.liquidDialogConfirmButtonColors
 import com.risediary.app.ui.components.LiquidSegmentOption
 import com.risediary.app.ui.components.LiquidSegmentedControl
 import com.risediary.app.ui.components.LengthTrendChart
@@ -124,7 +126,8 @@ fun LengthHistoryScreen(
                                 onClick = {
                                     editorRecord = null
                                     showEditor = true
-                                }
+                                },
+                                colors = liquidDialogConfirmButtonColors()
                             )
                         }
                     }
@@ -210,7 +213,11 @@ fun LengthHistoryScreen(
                 )
             },
             dismissButton = {
-                TextButton(text = "取消", onClick = { deleteTarget = null })
+                TextButton(
+                    text = "取消",
+                    onClick = { deleteTarget = null },
+                    colors = liquidDialogCancelButtonColors()
+                )
             }
         )
     }
@@ -349,11 +356,15 @@ private fun LengthRecordDialog(
                         )
                     )
                 },
-                colors = ButtonDefaults.textButtonColorsPrimary()
+                colors = liquidDialogConfirmButtonColors()
             )
         },
         dismissButton = {
-            TextButton(text = "取消", onClick = onDismiss)
+            TextButton(
+                text = "取消",
+                onClick = onDismiss,
+                colors = liquidDialogCancelButtonColors()
+            )
         }
     )
 }

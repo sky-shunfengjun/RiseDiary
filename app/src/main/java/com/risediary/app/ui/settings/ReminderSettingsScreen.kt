@@ -29,10 +29,6 @@ import androidx.compose.material.icons.filled.EventRepeat
 import androidx.compose.material.icons.filled.NotificationsActive
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.Timer
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -44,8 +40,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
@@ -59,6 +53,7 @@ import com.risediary.app.ui.components.LiquidAlertDialog
 import com.risediary.app.ui.components.SecondaryPageScaffold
 import com.risediary.app.ui.components.WheelColumn
 import com.risediary.app.ui.theme.RiseCard
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.time.LocalTime
 import java.util.Locale
 import kotlinx.coroutines.delay
@@ -348,9 +343,9 @@ fun ReminderSettingsScreen(
                         }
                     ),
                     titleColor = if (exactAlarmsAllowed) {
-                        MaterialTheme.colorScheme.onSurface
+                        MiuixTheme.colorScheme.onSurface
                     } else {
-                        MaterialTheme.colorScheme.error
+                        MiuixTheme.colorScheme.error
                     },
                     onClick = {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -416,9 +411,9 @@ fun ReminderSettingsScreen(
                         }
                     ),
                     titleColor = if (backgroundRestricted) {
-                        MaterialTheme.colorScheme.error
+                        MiuixTheme.colorScheme.error
                     } else {
-                        MaterialTheme.colorScheme.onSurface
+                        MiuixTheme.colorScheme.onSurface
                     },
                     onClick = { openApplicationSettings(context) }
                 )

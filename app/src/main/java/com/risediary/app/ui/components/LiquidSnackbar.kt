@@ -7,16 +7,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.SnackbarData
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SnackbarVisuals
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
@@ -32,6 +28,10 @@ import com.kyant.backdrop.effects.vibrancy
 import com.kyant.capsule.ContinuousCapsule
 import com.risediary.app.ui.theme.LocalRiseDarkTheme
 import com.risediary.app.ui.theme.StatusSuccess
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import kotlinx.coroutines.delay
 
 private const val LIQUID_SNACKBAR_TIMEOUT_MILLIS = 5_000L
@@ -101,9 +101,9 @@ private fun LiquidSnackbar(
     val visuals = data.visuals as? LiquidSnackbarVisuals
     val tone = visuals?.tone ?: LiquidSnackbarTone.UNDO
     val accent = when (tone) {
-        LiquidSnackbarTone.UNDO -> MaterialTheme.colorScheme.primary
+        LiquidSnackbarTone.UNDO -> MiuixTheme.colorScheme.primary
         LiquidSnackbarTone.SUCCESS -> StatusSuccess
-        LiquidSnackbarTone.ERROR -> MaterialTheme.colorScheme.error
+        LiquidSnackbarTone.ERROR -> MiuixTheme.colorScheme.error
     }
     val surfaceAlpha = if (LocalRiseDarkTheme.current) 0.16f else 0.09f
 
@@ -131,22 +131,29 @@ private fun LiquidSnackbar(
         Text(
             text = visuals?.message ?: data.visuals.message,
             modifier = Modifier.weight(1f),
-            color = MaterialTheme.colorScheme.onSurface,
-            style = MaterialTheme.typography.bodyMedium,
+            color = MiuixTheme.colorScheme.onSurface,
+            fontSize = MiuixTheme.textStyles.body1.fontSize,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
         )
         data.visuals.actionLabel?.let { actionLabel ->
             TextButton(
+                text = actionLabel,
                 onClick = data::performAction,
                 modifier = Modifier.heightIn(min = 48.dp),
-                colors = ButtonDefaults.textButtonColors(contentColor = accent),
-                contentPadding = androidx.compose.foundation.layout.PaddingValues(
+                colors = ButtonDefaults.textButtonColors(
+                    color = androidx.compose.ui.graphics.Color.Transparent,
+                    disabledColor = androidx.compose.ui.graphics.Color.Transparent,
+                    textColor = accent,
+                    disabledTextColor = accent
+                ),
+                insideMargin = androidx.compose.foundation.layout.PaddingValues(
                     horizontal = 12.dp
+                ),
+                textStyle = MiuixTheme.textStyles.button.copy(
+                    fontWeight = FontWeight.SemiBold
                 )
-            ) {
-                Text(actionLabel, fontWeight = FontWeight.SemiBold)
-            }
+            )
         }
     }
 }

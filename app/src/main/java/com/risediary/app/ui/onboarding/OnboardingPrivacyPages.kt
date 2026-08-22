@@ -17,9 +17,6 @@ import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -39,6 +36,9 @@ import com.risediary.app.ui.theme.CardGreen
 import com.risediary.app.ui.theme.CardOrange
 import com.risediary.app.ui.theme.CardPurple
 import com.risediary.app.ui.theme.RiseCard
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.text.DecimalFormat
 
 @Composable
@@ -135,13 +135,13 @@ internal fun PrivacyOnboardingPage(
                             tint = CardPurple,
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Icon(Icons.Default.Lock, null, tint = MaterialTheme.colorScheme.onPrimary)
+                            Icon(Icons.Default.Lock, null, tint = MiuixTheme.colorScheme.onPrimary)
                             Text(
                                 stringResource(
                                     if (appLockEnabled) R.string.onboarding_manage_app_lock
                                     else R.string.onboarding_enable_app_lock
                                 ),
-                                color = MaterialTheme.colorScheme.onPrimary,
+                                color = MiuixTheme.colorScheme.onPrimary,
                                 fontWeight = FontWeight.SemiBold
                             )
                         }
@@ -152,7 +152,7 @@ internal fun PrivacyOnboardingPage(
                         LiquidGlassButton(
                             onClick = onEnableBiometric,
                             backdrop = backdrop,
-                            surfaceColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.48f),
+                            surfaceColor = MiuixTheme.colorScheme.surface.copy(alpha = 0.48f),
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Icon(Icons.Default.Fingerprint, null)
@@ -178,7 +178,7 @@ internal fun PrivacyOnboardingPage(
                 LiquidGlassButton(
                     onClick = onEditReminderTime,
                     backdrop = backdrop,
-                    surfaceColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.48f),
+                    surfaceColor = MiuixTheme.colorScheme.surface.copy(alpha = 0.48f),
                     modifier = Modifier.fillMaxWidth()
                 ) {
                     Icon(Icons.Default.Schedule, null)

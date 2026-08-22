@@ -38,10 +38,6 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Stop
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
@@ -73,7 +69,14 @@ import com.risediary.app.ui.Screen
 import com.risediary.app.ui.components.LiquidGlassButton
 import com.risediary.app.ui.components.LiquidAlertDialog
 import com.risediary.app.ui.components.SecondaryPageScaffold
+import com.risediary.app.ui.components.liquidDialogCancelButtonColors
+import com.risediary.app.ui.components.liquidDialogConfirmButtonColors
 import com.risediary.app.util.formatTimerClock
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
 fun TimerScreen(
@@ -152,7 +155,7 @@ fun TimerScreen(
                 .coerceIn(0f, 1f)
         val ambientColor by animateColorAsState(
             targetValue = lerp(
-                MaterialTheme.colorScheme.primary,
+                MiuixTheme.colorScheme.primary,
                 Color(0xFFF0A05A),
                 ambientProgress * 0.45f
             ),
@@ -189,18 +192,25 @@ fun TimerScreen(
             text = { Text("结束后可以继续填写本次记录。") },
             confirmButton = {
                 TextButton(
+                    text = "确认结束",
                     onClick = {
                         showFinishConfirm = false
                         viewModel.finish()
-                    }
-                ) {
-                    Text("确认结束", color = MaterialTheme.colorScheme.error)
-                }
+                    },
+                    colors = ButtonDefaults.textButtonColors(
+                        color = Color.Transparent,
+                        disabledColor = Color.Transparent,
+                        textColor = MiuixTheme.colorScheme.error,
+                        disabledTextColor = MiuixTheme.colorScheme.error
+                    )
+                )
             },
             dismissButton = {
-                TextButton(onClick = { showFinishConfirm = false }) {
-                    Text("继续计时")
-                }
+                TextButton(
+                    text = "继续计时",
+                    onClick = { showFinishConfirm = false },
+                    colors = liquidDialogCancelButtonColors()
+                )
             }
         )
     }
@@ -212,18 +222,20 @@ fun TimerScreen(
             text = { Text("计时会在后台继续，你可以从应用或通知栏返回。") },
             confirmButton = {
                 TextButton(
+                    text = "后台继续",
                     onClick = {
                         showLeaveConfirm = false
                         navController.popBackStack()
-                    }
-                ) {
-                    Text("后台继续")
-                }
+                    },
+                    colors = liquidDialogConfirmButtonColors()
+                )
             },
             dismissButton = {
-                TextButton(onClick = { showLeaveConfirm = false }) {
-                    Text("留在这里")
-                }
+                TextButton(
+                    text = "留在这里",
+                    onClick = { showLeaveConfirm = false },
+                    colors = liquidDialogCancelButtonColors()
+                )
             }
         )
     }
@@ -242,9 +254,9 @@ private fun TimerInstrument(
         TimerStatus.LIMIT_REACHED -> "已达到 120 分钟上限"
     }
     val statusColor = when (session.status) {
-        TimerStatus.RUNNING -> MaterialTheme.colorScheme.primary
-        TimerStatus.LIMIT_REACHED -> MaterialTheme.colorScheme.error
-        else -> MaterialTheme.colorScheme.onSurfaceVariant
+        TimerStatus.RUNNING -> MiuixTheme.colorScheme.primary
+        TimerStatus.LIMIT_REACHED -> MiuixTheme.colorScheme.error
+        else -> MiuixTheme.colorScheme.onSurfaceVariantSummary
     }
 
     Column(
@@ -258,7 +270,7 @@ private fun TimerInstrument(
                 .background(statusColor.copy(alpha = 0.09f))
                 .padding(horizontal = 14.dp, vertical = 7.dp),
             color = statusColor,
-            style = MaterialTheme.typography.labelLarge,
+            fontSize = MiuixTheme.textStyles.headline2.fontSize,
             fontWeight = FontWeight.Medium
         )
         Spacer(modifier = Modifier.height(26.dp))
@@ -271,8 +283,8 @@ private fun TimerInstrument(
         Spacer(modifier = Modifier.height(10.dp))
         Text(
             text = "当前分钟 · 最长 120 分钟",
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
+            fontSize = MiuixTheme.textStyles.footnote1.fontSize,
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.72f)
         )
     }
 }
@@ -290,7 +302,7 @@ private fun RollingTimerDigits(value: String) {
                     modifier = Modifier.width(15.dp),
                     style = timerDigitStyle(),
                     textAlign = TextAlign.Center,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                 )
             } else {
                 AnimatedContent(
@@ -311,7 +323,7 @@ private fun RollingTimerDigits(value: String) {
                     Text(
                         text = digit.toString(),
                         style = timerDigitStyle(),
-                        color = MaterialTheme.colorScheme.onSurface,
+                        color = MiuixTheme.colorScheme.onSurface,
                         textAlign = TextAlign.Center,
                         maxLines = 1
                     )
@@ -323,7 +335,7 @@ private fun RollingTimerDigits(value: String) {
 
 @Composable
 private fun timerDigitStyle(): TextStyle =
-    MaterialTheme.typography.displayLarge.copy(
+    MiuixTheme.textStyles.title1.copy(
         fontSize = 52.sp,
         lineHeight = 60.sp,
         fontFamily = FontFamily.SansSerif,
@@ -341,9 +353,9 @@ private fun MinuteSecondTrack(
         animationSpec = if (second == 0) snap() else tween(180),
         label = "second_track"
     )
-    val primary = MaterialTheme.colorScheme.primary
-    val track = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
-    val minor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
+    val primary = MiuixTheme.colorScheme.primary
+    val track = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+    val minor = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.2f)
 
     Canvas(modifier = modifier.height(48.dp)) {
         val inset = 8.dp.toPx()
@@ -427,7 +439,7 @@ private fun TimerActionDock(
                     onClick = onFinish,
                     backdrop = backdrop,
                     modifier = Modifier.size(60.dp),
-                    tint = MaterialTheme.colorScheme.error.copy(alpha = 0.06f),
+                    tint = MiuixTheme.colorScheme.error.copy(alpha = 0.06f),
                     height = 60.dp,
                     horizontalPadding = 0.dp,
                     highlightIntensity = 0.35f,
@@ -437,7 +449,7 @@ private fun TimerActionDock(
                     Icon(
                         Icons.Default.Stop,
                         contentDescription = "结束计时",
-                        tint = MaterialTheme.colorScheme.error,
+                        tint = MiuixTheme.colorScheme.error,
                         modifier = Modifier.size(24.dp)
                     )
                 }

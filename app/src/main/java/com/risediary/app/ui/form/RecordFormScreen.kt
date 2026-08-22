@@ -66,6 +66,8 @@ import com.risediary.app.ui.achievement.AchievementCatalog
 import com.risediary.app.ui.components.DurationPickerBottomSheet
 import com.risediary.app.ui.components.LiquidGlassButton
 import com.risediary.app.ui.components.LiquidAlertDialog
+import com.risediary.app.ui.components.liquidDialogCancelButtonColors
+import com.risediary.app.ui.components.liquidDialogConfirmButtonColors
 import com.risediary.app.ui.components.LiquidSingleDatePickerDialog
 import com.risediary.app.ui.components.SecondaryPageScaffold
 import com.risediary.app.ui.components.WheelColumn
@@ -495,11 +497,15 @@ fun RecordFormScreen(
                         )
                         showTimePicker = false
                     },
-                    colors = ButtonDefaults.textButtonColorsPrimary()
+                    colors = liquidDialogConfirmButtonColors()
                 )
             },
             dismissButton = {
-                TextButton(text = "取消", onClick = { showTimePicker = false })
+                TextButton(
+                    text = "取消",
+                    onClick = { showTimePicker = false },
+                    colors = liquidDialogCancelButtonColors()
+                )
             },
             title = {
                 Text(
@@ -550,7 +556,7 @@ fun RecordFormScreen(
                 TextButton(
                     text = "知道了",
                     onClick = vm::consumeAchievement,
-                    colors = ButtonDefaults.textButtonColorsPrimary()
+                    colors = liquidDialogConfirmButtonColors()
                 )
             },
             title = {

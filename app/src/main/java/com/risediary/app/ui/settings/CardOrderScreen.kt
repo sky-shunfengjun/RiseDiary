@@ -15,7 +15,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
-import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,10 +32,13 @@ import com.risediary.app.ui.components.SecondaryPageScaffold
 import com.risediary.app.ui.components.reorderByDragOffset
 import com.risediary.app.ui.theme.RiseCard
 import com.risediary.app.ui.theme.backgroundBrush
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CardOrderScreen(
     navController: NavController,
@@ -67,8 +69,8 @@ fun CardOrderScreen(
         ) {
             Text(
                 "长按左侧拖动柄调整顺序，右侧按钮控制首页显示。",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = MiuixTheme.textStyles.body1.fontSize,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 modifier = Modifier.padding(horizontal = 4.dp)
             )
             Spacer(modifier = Modifier.height(16.dp))
@@ -149,7 +151,7 @@ private fun CardOrderList(
                         modifier = Modifier
                             .size(44.dp)
                             .background(
-                                MaterialTheme.colorScheme.primary.copy(alpha = 0.09f),
+                                MiuixTheme.colorScheme.primary.copy(alpha = 0.09f),
                                 CircleShape
                             )
                             .pointerInput(cardId) {
@@ -177,7 +179,7 @@ private fun CardOrderList(
                         Icon(
                             Icons.Default.DragHandle,
                             contentDescription = "按住并上下拖动排序",
-                            tint = MaterialTheme.colorScheme.primary
+                            tint = MiuixTheme.colorScheme.primary
                         )
                     }
 
@@ -187,28 +189,28 @@ private fun CardOrderList(
                         modifier = Modifier
                             .size(34.dp)
                             .background(
-                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.055f),
+                                MiuixTheme.colorScheme.onSurface.copy(alpha = 0.055f),
                                 CircleShape
                             ),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
                             "${index + 1}",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            fontSize = MiuixTheme.textStyles.headline2.fontSize,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                         )
                     }
                     Spacer(modifier = Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
                             vm.getLabel(cardId),
-                            style = MaterialTheme.typography.titleMedium,
+                            fontSize = MiuixTheme.textStyles.title4.fontSize,
                             fontWeight = FontWeight.SemiBold
                         )
                         Text(
                             if (isVisible) "显示在首页" else "已隐藏",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            fontSize = MiuixTheme.textStyles.body2.fontSize,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                         )
                     }
 
@@ -217,9 +219,9 @@ private fun CardOrderList(
                             if (isVisible) Icons.Default.Visibility else Icons.Default.VisibilityOff,
                             contentDescription = if (isVisible) "显示" else "隐藏",
                             tint = if (isVisible) {
-                                MaterialTheme.colorScheme.primary
+                                MiuixTheme.colorScheme.primary
                             } else {
-                                MaterialTheme.colorScheme.onSurface.copy(alpha = 0.32f)
+                                MiuixTheme.colorScheme.onSurface.copy(alpha = 0.32f)
                             },
                             modifier = Modifier.size(24.dp)
                         )

@@ -28,8 +28,8 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -60,6 +60,8 @@ import com.risediary.app.ui.components.LiquidAlertDialog
 import com.risediary.app.ui.components.LiquidDialogHost
 import com.risediary.app.ui.components.ProvideLiquidDialogHost
 import com.risediary.app.ui.components.WheelColumn
+import com.risediary.app.ui.components.liquidDialogCancelButtonColors
+import com.risediary.app.ui.components.liquidDialogConfirmButtonColors
 import com.risediary.app.ui.components.rememberLiquidDialogHostState
 import com.risediary.app.ui.lock.AppLockScreen
 import com.risediary.app.ui.lock.LockMode
@@ -442,6 +444,7 @@ fun OnboardingScreen(
                 },
                 confirmButton = {
                     TextButton(
+                        text = stringResource(R.string.action_confirm),
                         onClick = {
                             reminderTimeDirty = true
                             reminderTimeDraft = String.format(
@@ -457,13 +460,16 @@ fun OnboardingScreen(
                                 )
                             }
                             showTimePicker = false
-                        }
-                    ) { Text(stringResource(R.string.action_confirm)) }
+                        },
+                        colors = liquidDialogConfirmButtonColors()
+                    )
                 },
                 dismissButton = {
-                    TextButton(onClick = { showTimePicker = false }) {
-                        Text(stringResource(R.string.action_cancel))
-                    }
+                    TextButton(
+                        text = stringResource(R.string.action_cancel),
+                        onClick = { showTimePicker = false },
+                        colors = liquidDialogCancelButtonColors()
+                    )
                 }
             )
                 }
@@ -475,16 +481,20 @@ fun OnboardingScreen(
                 text = { Text(stringResource(R.string.settings_notification_blocked_message)) },
                 confirmButton = {
                     TextButton(
+                        text = stringResource(R.string.settings_open_system_settings),
                         onClick = {
                             showNotificationBlockedDialog = false
                             openReminderNotificationSettings(context)
-                        }
-                    ) { Text(stringResource(R.string.settings_open_system_settings)) }
+                        },
+                        colors = liquidDialogConfirmButtonColors()
+                    )
                 },
                 dismissButton = {
-                    TextButton(onClick = { showNotificationBlockedDialog = false }) {
-                        Text(stringResource(R.string.action_cancel))
-                    }
+                    TextButton(
+                        text = stringResource(R.string.action_cancel),
+                        onClick = { showNotificationBlockedDialog = false },
+                        colors = liquidDialogCancelButtonColors()
+                    )
                 }
             )
                 }
@@ -496,16 +506,20 @@ fun OnboardingScreen(
                 text = { Text(stringResource(R.string.settings_exact_alarm_dialog_message)) },
                 confirmButton = {
                     TextButton(
+                        text = stringResource(R.string.settings_open_system_settings),
                         onClick = {
                             showExactAlarmDialog = false
                             openExactAlarmSettings(context)
-                        }
-                    ) { Text(stringResource(R.string.settings_open_system_settings)) }
+                        },
+                        colors = liquidDialogConfirmButtonColors()
+                    )
                 },
                 dismissButton = {
-                    TextButton(onClick = { showExactAlarmDialog = false }) {
-                        Text(stringResource(R.string.action_cancel))
-                    }
+                    TextButton(
+                        text = stringResource(R.string.action_cancel),
+                        onClick = { showExactAlarmDialog = false },
+                        colors = liquidDialogCancelButtonColors()
+                    )
                 }
             )
                 }

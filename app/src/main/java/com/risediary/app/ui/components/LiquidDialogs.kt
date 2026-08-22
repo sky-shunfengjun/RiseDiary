@@ -63,6 +63,31 @@ import com.kyant.backdrop.highlight.Highlight
 import com.kyant.capsule.ContinuousCapsule
 import com.kyant.capsule.ContinuousRoundedRectangle
 import com.risediary.app.ui.theme.LocalRiseDarkTheme
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.TextButtonColors
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+
+/**
+ * 玻璃弹窗内按钮统一使用「透明底 + 文字色」的原始风格：
+ * 确认钮主色文字、取消钮中性文字，避免 miuix 默认实底配色在玻璃上取色异常。
+ */
+@Composable
+fun liquidDialogConfirmButtonColors(): TextButtonColors =
+    ButtonDefaults.textButtonColors(
+        color = Color.Transparent,
+        disabledColor = Color.Transparent,
+        textColor = MiuixTheme.colorScheme.primary,
+        disabledTextColor = MiuixTheme.colorScheme.disabledOnSecondaryVariant
+    )
+
+@Composable
+fun liquidDialogCancelButtonColors(): TextButtonColors =
+    ButtonDefaults.textButtonColors(
+        color = Color.Transparent,
+        disabledColor = Color.Transparent,
+        textColor = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+        disabledTextColor = MiuixTheme.colorScheme.disabledOnSecondaryVariant
+    )
 
 /**
  * Backdrop shared by the page and its glass controls.

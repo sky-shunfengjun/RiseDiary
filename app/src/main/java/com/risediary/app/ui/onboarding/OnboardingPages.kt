@@ -42,11 +42,6 @@ import androidx.compose.material.icons.filled.ShowChart
 import androidx.compose.material.icons.filled.Storage
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -85,6 +80,10 @@ import com.risediary.app.ui.theme.CardPurple
 import com.risediary.app.ui.theme.LocalRiseDarkTheme
 import com.risediary.app.ui.theme.RiseCard
 import com.risediary.app.ui.theme.backgroundBrush
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.Surface
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.text.DecimalFormat
 
 @Composable
@@ -202,14 +201,14 @@ internal fun SetupProgressHeader(
             ) {
                 Text(
                     text = stringResource(R.string.onboarding_setup_progress, step, 4),
-                    style = MaterialTheme.typography.labelLarge,
+                    fontSize = MiuixTheme.textStyles.headline2.fontSize,
                     fontWeight = FontWeight.SemiBold,
-                    color = MaterialTheme.colorScheme.primary
+                    color = MiuixTheme.colorScheme.primary
                 )
                 Text(
                     text = stringResource(R.string.onboarding_setup_label),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    fontSize = MiuixTheme.textStyles.footnote1.fontSize,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                 )
             }
             Spacer(modifier = Modifier.height(8.dp))
@@ -224,9 +223,9 @@ internal fun SetupProgressHeader(
                             .height(3.dp)
                             .background(
                                 color = if (index < step) {
-                                    MaterialTheme.colorScheme.primary
+                                    MiuixTheme.colorScheme.primary
                                 } else {
-                                    MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                                    MiuixTheme.colorScheme.onSurface.copy(alpha = 0.12f)
                                 },
                                 shape = CircleShape
                             )
@@ -254,28 +253,28 @@ internal fun SetupPage(
     ) {
         Surface(
             shape = CircleShape,
-            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+            color = MiuixTheme.colorScheme.primary.copy(alpha = 0.12f),
             modifier = Modifier.size(58.dp)
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Icon(
                     icon,
                     contentDescription = null,
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = MiuixTheme.colorScheme.primary,
                     modifier = Modifier.size(28.dp)
                 )
             }
         }
         Text(
             text = title,
-            style = MaterialTheme.typography.headlineSmall,
+            fontSize = MiuixTheme.textStyles.title2.fontSize,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center
         )
         Text(
             text = subtitle,
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = MiuixTheme.textStyles.body1.fontSize,
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             textAlign = TextAlign.Center,
             modifier = Modifier.padding(horizontal = 16.dp)
         )
@@ -302,11 +301,15 @@ internal fun InfoRow(icon: ImageVector, title: String, subtitle: String, color: 
             }
         }
         Column(modifier = Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
+            Text(
+                title,
+                fontSize = MiuixTheme.textStyles.headline1.fontSize,
+                fontWeight = FontWeight.Medium
+            )
             Text(
                 subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                fontSize = MiuixTheme.textStyles.body2.fontSize,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary
             )
         }
     }
@@ -323,8 +326,7 @@ internal fun FeatureCard(
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(18.dp),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.78f),
-        tonalElevation = 2.dp
+        color = MiuixTheme.colorScheme.surface.copy(alpha = 0.78f)
     ) {
         Column(
             modifier = Modifier.padding(14.dp),
@@ -334,8 +336,8 @@ internal fun FeatureCard(
             Text(title, fontWeight = FontWeight.SemiBold)
             Text(
                 subtitle,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
+                fontSize = MiuixTheme.textStyles.body2.fontSize,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary
             )
         }
     }
@@ -346,7 +348,7 @@ internal fun SmallFeature(icon: ImageVector, label: String, color: Color, modifi
     Surface(
         modifier = modifier,
         shape = RoundedCornerShape(14.dp),
-        color = MaterialTheme.colorScheme.surface.copy(alpha = 0.72f)
+        color = MiuixTheme.colorScheme.surface.copy(alpha = 0.72f)
     ) {
         Column(
             modifier = Modifier.padding(vertical = 10.dp, horizontal = 4.dp),
@@ -354,7 +356,11 @@ internal fun SmallFeature(icon: ImageVector, label: String, color: Color, modifi
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Icon(icon, contentDescription = null, tint = color, modifier = Modifier.size(20.dp))
-            Text(label, style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.Center)
+            Text(
+                label,
+                fontSize = MiuixTheme.textStyles.footnote1.fontSize,
+                textAlign = TextAlign.Center
+            )
         }
     }
 }
@@ -381,11 +387,11 @@ internal fun WelcomeAction(backdrop: Backdrop, onClick: () -> Unit) {
             Icon(
                 Icons.Default.FlightTakeoff,
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onPrimary
+                tint = MiuixTheme.colorScheme.onPrimary
             )
             Text(
                 stringResource(R.string.onboarding_begin_setup),
-                color = MaterialTheme.colorScheme.onPrimary,
+                color = MiuixTheme.colorScheme.onPrimary,
                 fontSize = 16.sp,
                 fontWeight = FontWeight.SemiBold
             )
@@ -393,9 +399,9 @@ internal fun WelcomeAction(backdrop: Backdrop, onClick: () -> Unit) {
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = stringResource(R.string.onboarding_age_notice),
-            style = MaterialTheme.typography.bodySmall,
+            fontSize = MiuixTheme.textStyles.body2.fontSize,
             textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
         )
     }
 }
@@ -418,10 +424,10 @@ internal fun SetupBottomActions(
             LiquidGlassButton(
                 onClick = onLater,
                 backdrop = backdrop,
-                surfaceColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.48f),
+                surfaceColor = MiuixTheme.colorScheme.surface.copy(alpha = 0.48f),
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Text(laterLabel, color = MaterialTheme.colorScheme.onSurface)
+                Text(laterLabel, color = MiuixTheme.colorScheme.onSurface)
             }
         }
         Box(modifier = Modifier.weight(1.35f).padding(4.dp)) {
@@ -433,7 +439,7 @@ internal fun SetupBottomActions(
             ) {
                 Text(
                     continueLabel,
-                    color = MaterialTheme.colorScheme.onPrimary,
+                    color = MiuixTheme.colorScheme.onPrimary,
                     fontWeight = FontWeight.SemiBold
                 )
             }
