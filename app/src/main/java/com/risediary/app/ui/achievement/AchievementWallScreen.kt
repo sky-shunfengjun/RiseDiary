@@ -1,17 +1,26 @@
 package com.risediary.app.ui.achievement
 
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -25,10 +34,20 @@ import com.risediary.app.ui.theme.CardBlue
 import com.risediary.app.ui.theme.CardGreen
 import com.risediary.app.ui.theme.CardOrange
 import com.risediary.app.ui.theme.CardPurple
+import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.CardDefaults
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
+import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
+import top.yukonga.miuix.kmp.basic.ProgressIndicatorDefaults
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.utils.overScrollVertical
+import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Date
+import java.util.Locale
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AchievementWallScreen(
     navController: NavController,
@@ -36,6 +55,7 @@ fun AchievementWallScreen(
 ) {
     val unlocked by vm.unlockedAchievements.collectAsStateWithLifecycle()
     val progress by vm.progressMap.collectAsStateWithLifecycle()
+    val scrollBehavior = MiuixScrollBehavior()
 
     LaunchedEffect(Unit) { vm.refresh() }
 
@@ -50,9 +70,13 @@ fun AchievementWallScreen(
             columns = GridCells.Fixed(2),
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding),
+                .padding(innerPadding)
+                .scrollEndHaptic()
+                .overScrollVertical()
+                .nestedScroll(scrollBehavior.nestedScrollConnection),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            overscrollEffect = null
         ) {
             items(vm.allDefinitions) { def ->
                 val isUnlocked = def.key in unlockedKeys
@@ -83,15 +107,16 @@ private fun AchievementCard(
     isUnlocked: Boolean,
     unlockedDate: Long?,
     progress: Float,
-    accentColor: androidx.compose.ui.graphics.Color
+    accentColor: Color
 ) {
     val locale = LocalConfiguration.current.locales[0]
     val dateFormat = remember(locale) { SimpleDateFormat("yyyy/MM/dd", locale) }
     Card(
-        shape = RoundedCornerShape(24.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isUnlocked) accentColor.copy(alpha = 0.12f)
-            else MaterialTheme.colorScheme.surface.copy(alpha = 0.08f)
+        modifier = Modifier.fillMaxWidth(),
+        cornerRadius = 24.dp,
+        colors = CardDefaults.defaultColors(
+            color = if (isUnlocked) accentColor.copy(alpha = 0.12f)
+            else MiuixTheme.colorScheme.surface.copy(alpha = 0.08f)
         )
     ) {
         Column(
@@ -110,7 +135,7 @@ private fun AchievementCard(
                 Icon(
                     imageVector = Icons.Default.Lock,
                     contentDescription = "尚未解锁",
-                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f),
+                    tint = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.35f),
                     modifier = Modifier.size(32.dp)
                 )
             }
@@ -120,10 +145,10 @@ private fun AchievementCard(
             // Name
             Text(
                 text = def.name,
-                style = MaterialTheme.typography.titleSmall,
+                fontSize = MiuixTheme.textStyles.body1.fontSize,
                 fontWeight = FontWeight.SemiBold,
-                color = if (isUnlocked) MaterialTheme.colorScheme.onSurface
-                else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                color = if (isUnlocked) MiuixTheme.colorScheme.onSurface
+                else MiuixTheme.colorScheme.onSurface.copy(alpha = 0.4f),
                 textAlign = TextAlign.Center
             )
 
@@ -132,8 +157,8 @@ private fun AchievementCard(
             // Description
             Text(
                 text = def.description,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
+                fontSize = MiuixTheme.textStyles.footnote1.fontSize,
+                color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.45f),
                 textAlign = TextAlign.Center,
                 maxLines = 2
             )
@@ -145,23 +170,25 @@ private fun AchievementCard(
                 val dateStr = dateFormat.format(Date(unlockedDate))
                 Text(
                     text = "已解锁 · $dateStr",
-                    style = MaterialTheme.typography.labelSmall,
+                    fontSize = MiuixTheme.textStyles.footnote1.fontSize,
                     color = accentColor,
                     fontWeight = FontWeight.Medium
                 )
             } else {
                 // Progress bar
                 LinearProgressIndicator(
-                    progress = { progress },
+                    progress = progress,
                     modifier = Modifier.fillMaxWidth().height(6.dp),
-                    color = accentColor,
-                    trackColor = accentColor.copy(alpha = 0.1f),
+                    colors = ProgressIndicatorDefaults.progressIndicatorColors(
+                        foregroundColor = accentColor,
+                        backgroundColor = accentColor.copy(alpha = 0.1f)
+                    )
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
                     text = "${(progress * 100).toInt()}%",
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.35f)
+                    fontSize = MiuixTheme.textStyles.footnote1.fontSize,
+                    color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.35f)
                 )
             }
         }

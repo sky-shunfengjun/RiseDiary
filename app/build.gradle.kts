@@ -26,8 +26,8 @@ android {
         applicationId = "com.risediary.app"
         minSdk = 31
         targetSdk = 36
-versionCode = 55
-        versionName = "v1.1.0 Dev12"
+        versionCode = 56
+        versionName = "v1.1.0 Dev13"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
     }
@@ -101,6 +101,7 @@ dependencies {
     implementation(libs.backdrop)
     implementation(libs.capsule)
     implementation(libs.miuix.ui)
+    implementation(libs.miuix.preference)
     implementation(libs.activity.compose)
     implementation(libs.lifecycle.runtime.compose)
     implementation(libs.lifecycle.viewmodel.compose)
