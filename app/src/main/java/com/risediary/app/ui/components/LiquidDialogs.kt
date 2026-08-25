@@ -68,16 +68,17 @@ import top.yukonga.miuix.kmp.basic.TextButtonColors
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
- * 玻璃弹窗内按钮统一使用「透明底 + 文字色」的原始风格：
- * 确认钮主色文字、取消钮中性文字，避免 miuix 默认实底配色在玻璃上取色异常。
+ * 玻璃弹窗按钮配色：
+ * 确认钮的蓝底白字由 LiquidDialogActions 的蓝色胶囊层提供，按钮本体保持透明；
+ * 取消钮透明底中性文字。
  */
 @Composable
 fun liquidDialogConfirmButtonColors(): TextButtonColors =
     ButtonDefaults.textButtonColors(
         color = Color.Transparent,
         disabledColor = Color.Transparent,
-        textColor = MiuixTheme.colorScheme.primary,
-        disabledTextColor = MiuixTheme.colorScheme.disabledOnSecondaryVariant
+        textColor = Color.White,
+        disabledTextColor = Color.White.copy(alpha = 0.5f)
     )
 
 @Composable
@@ -189,7 +190,7 @@ fun LiquidDialogHost(
         else Color(0xFF29293A).copy(alpha = 0.23f)
     val interactionSource = remember { MutableInteractionSource() }
 
-    BackHandler(enabled = visible) {
+    BackHandler(enabled = retainedEntry != null) {
         currentEntry?.onDismissRequest?.value?.invoke()
     }
 

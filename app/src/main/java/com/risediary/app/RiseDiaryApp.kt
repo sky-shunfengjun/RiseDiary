@@ -47,7 +47,7 @@ class RiseDiaryApp : Application(), Configuration.Provider {
 
     private fun seedDefaultData() {
         appScope.launch {
-            SeedData.initializeIfNeeded(tagDao, userPreferences)
+            runCatching { SeedData.initializeIfNeeded(tagDao, userPreferences) }
         }
     }
 

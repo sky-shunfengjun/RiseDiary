@@ -19,13 +19,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavController
+import com.risediary.app.R
+import com.risediary.app.ui.navigation3.LocalNavigator
+import com.risediary.app.ui.navigation3.Route
 import com.risediary.app.ui.components.SecondaryPageScaffold
 import com.risediary.app.ui.theme.CardBlue
 import com.risediary.app.ui.theme.CardGreen
@@ -47,9 +50,9 @@ import com.risediary.app.ui.icons.AppIcons
 
 @Composable
 fun AchievementWallScreen(
-    navController: NavController,
     vm: AchievementWallViewModel = hiltViewModel()
 ) {
+    val navigator = LocalNavigator.current
     val unlocked by vm.unlockedAchievements.collectAsStateWithLifecycle()
     val progress by vm.progressMap.collectAsStateWithLifecycle()
 
@@ -59,16 +62,16 @@ fun AchievementWallScreen(
     val unlockedMap = unlocked.associateBy { it.achievementKey }
 
     SecondaryPageScaffold(
-        title = "成就墙",
-        onBack = { navController.navigateUp() }
+        title = stringResource(R.string.achievement_wall_title),
+        onBack = { navigator.pop() }
     ) { innerPadding ->
         LazyVerticalGrid(
             columns = GridCells.Fixed(2),
             modifier = Modifier
                 .fillMaxSize()
-                .padding(innerPadding)
                 .scrollEndHaptic()
                 .overScrollVertical(),
+            contentPadding = innerPadding,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
             overscrollEffect = null
@@ -76,7 +79,7 @@ fun AchievementWallScreen(
             items(vm.allDefinitions) { def ->
                 val isUnlocked = def.key in unlockedKeys
                 val achievement = unlockedMap[def.key]
-                val prog = progress[def.key] ?: 0f
+                val prog = progress[def.key]
                 val accentColor = when (def.category) {
                     "milestone" -> CardOrange
                     "record" -> CardPurple
@@ -101,7 +104,7 @@ private fun AchievementCard(
     def: AchievementDef,
     isUnlocked: Boolean,
     unlockedDate: Long?,
-    progress: Float,
+    progress: Float?,
     accentColor: Color
 ) {
     val locale = LocalConfiguration.current.locales[0]
@@ -129,7 +132,7 @@ private fun AchievementCard(
             } else {
                 Icon(
                     imageVector = AppIcons.Lock,
-                    contentDescription = "尚未解锁",
+                    contentDescription = stringResource(R.string.achievement_locked_content_description),
                     tint = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.35f),
                     modifier = Modifier.size(32.dp)
                 )
@@ -139,7 +142,7 @@ private fun AchievementCard(
 
             // Name
             Text(
-                text = def.name,
+                text = stringResource(def.nameRes),
                 fontSize = MiuixTheme.textStyles.body1.fontSize,
                 fontWeight = FontWeight.SemiBold,
                 color = if (isUnlocked) MiuixTheme.colorScheme.onSurface
@@ -151,7 +154,7 @@ private fun AchievementCard(
 
             // Description
             Text(
-                text = def.description,
+                text = stringResource(def.descriptionRes),
                 fontSize = MiuixTheme.textStyles.footnote1.fontSize,
                 color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.45f),
                 textAlign = TextAlign.Center,
@@ -164,13 +167,14 @@ private fun AchievementCard(
                 // Unlocked date
                 val dateStr = dateFormat.format(Date(unlockedDate))
                 Text(
-                    text = "已解锁 · $dateStr",
+                    text = stringResource(R.string.achievement_unlocked_on, dateStr),
                     fontSize = MiuixTheme.textStyles.footnote1.fontSize,
                     color = accentColor,
                     fontWeight = FontWeight.Medium
                 )
-            } else {
-                // Progress bar
+            } else if (progress != null) {
+                // Progress bar (only for achievements that track progress; pure
+                // record achievements show nothing instead of a misleading 0%).
                 LinearProgressIndicator(
                     progress = progress,
                     modifier = Modifier.fillMaxWidth().height(6.dp),

@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -41,6 +42,7 @@ import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.risediary.app.R
 import com.risediary.app.ui.components.LiquidGlassButton
 import com.risediary.app.ui.theme.CardBlue
+import com.risediary.app.ui.theme.SystemBarIconOverride
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.basic.Icon
@@ -67,6 +69,7 @@ fun AppLockScreen(
     onCancel: (() -> Unit)? = null,  // null = no cancel button
     vm: AppLockViewModel = hiltViewModel()
 ) {
+    SystemBarIconOverride(forceLightIcons = true)
     LaunchedEffect(mode) { vm.init(mode) }
 
     val pin by vm.pin.collectAsStateWithLifecycle()
@@ -150,7 +153,7 @@ fun AppLockScreen(
                     horizontalArrangement = Arrangement.End
                 ) {
                     TextButton(
-                        text = "取消",
+                        text = stringResource(R.string.action_cancel),
                         onClick = onCancel,
                         colors = ButtonDefaults.textButtonColors(
                             color = Color.Transparent,
@@ -189,7 +192,7 @@ fun AppLockScreen(
             if (lockout > 0) {
                 // Lockout countdown
                 Text(
-                    text = "请等待 ${lockout} 秒",
+                    text = stringResource(R.string.app_lock_wait_seconds, lockout),
                     fontSize = MiuixTheme.textStyles.title4.fontSize,
                     color = MiuixTheme.colorScheme.error
                 )
@@ -242,14 +245,14 @@ fun AppLockScreen(
                 ) {
                     Icon(
                         AppIcons.Fingerprint,
-                        contentDescription = "指纹验证",
+                        contentDescription = stringResource(R.string.app_lock_biometric),
                         modifier = Modifier.size(40.dp),
                         tint = Color.White
                     )
                 }
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    "指纹验证",
+                    stringResource(R.string.app_lock_biometric),
                     fontSize = MiuixTheme.textStyles.footnote1.fontSize,
                     color = Color.White.copy(alpha = 0.72f)
                 )
@@ -337,7 +340,7 @@ private fun NumericKeypad(
                                 icon = {
                                     Icon(
                                         AppIcons.Backspace,
-                                        contentDescription = "删除",
+                                        contentDescription = stringResource(R.string.action_delete),
                                         modifier = Modifier.size(26.dp),
                                         tint = Color.White
                                     )

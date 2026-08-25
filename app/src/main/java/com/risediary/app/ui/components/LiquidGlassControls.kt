@@ -121,8 +121,12 @@ fun LiquidToggle(
             onDragStarted = {},
             onDragStopped = {
                 if (didDrag) {
-                    requestedToggleState(currentChecked, fraction)?.let(currentOnCheckedChange)
-                    val authoritative = if (currentChecked) 1f else 0f
+                    val requested = requestedToggleState(currentChecked, fraction)
+                    if (requested != null) currentOnCheckedChange(requested)
+                    // Animate towards the drag outcome directly instead of waiting
+                    // for the (async) persisted state to flow back; otherwise the
+                    // thumb visibly snaps back before jumping to the new value.
+                    val authoritative = if (requested ?: currentChecked) 1f else 0f
                     fraction = authoritative
                     animateToValue(authoritative)
                     didDrag = false

@@ -13,18 +13,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -34,12 +30,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.kyant.backdrop.backdrops.layerBackdrop
-import com.kyant.backdrop.backdrops.rememberLayerBackdrop
-import com.kyant.capsule.ContinuousCapsule
 import com.risediary.app.R
+import com.risediary.app.ui.components.CompactRangeSwitcher
 import com.risediary.app.ui.components.LiquidSegmentOption
-import com.risediary.app.ui.components.LiquidSegmentedControl
 import org.json.JSONArray
 import org.json.JSONObject
 import top.yukonga.miuix.kmp.basic.Icon
@@ -137,41 +130,15 @@ internal fun TrendSelector(
             LiquidSegmentOption(distanceLabel, AppIcons.TrackChanges)
         )
     }
-    val currentTrackColor by rememberUpdatedState(
-        MiuixTheme.colorScheme.onSurface.copy(alpha = 0.035f)
+    CompactRangeSwitcher(
+        options = options,
+        selectedIndex = if (isVolume) 0 else 1,
+        onSelected = { if (it == 0) onSelectVolume() else onSelectDistance() },
+        modifier = Modifier
+            .width(176.dp)
+            .height(38.dp),
+        controlWidth = 144.dp
     )
-    val backdrop = rememberLayerBackdrop { drawContent() }
-    Box(modifier = Modifier.width(176.dp).height(38.dp)) {
-        Box(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .fillMaxWidth()
-                .requiredHeight(70.dp)
-        ) {
-            Box(modifier = Modifier.fillMaxSize().layerBackdrop(backdrop)) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .width(144.dp)
-                        .height(38.dp)
-                        .clip(ContinuousCapsule)
-                        .background(currentTrackColor)
-                )
-            }
-            LiquidSegmentedControl(
-                options = options,
-                selectedIndex = if (isVolume) 0 else 1,
-                onSelected = { if (it == 0) onSelectVolume() else onSelectDistance() },
-                backdrop = backdrop,
-                modifier = Modifier.align(Alignment.CenterEnd).width(144.dp),
-                containerHeight = 38.dp,
-                contentPadding = 3.dp,
-                showIcons = false,
-                labelFontSize = 12.sp,
-                showSelectionShadow = false
-            )
-        }
-    }
 }
 
 internal fun parseCardOrder(orderJson: String, visibilityJson: String): List<String> {

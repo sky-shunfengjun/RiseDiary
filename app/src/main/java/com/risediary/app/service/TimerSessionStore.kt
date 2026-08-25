@@ -2,42 +2,58 @@ package com.risediary.app.service
 
 import android.content.Context
 import androidx.datastore.core.DataStore
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.emptyPreferences
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
-import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.io.File
+import java.io.IOException
 import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 import javax.inject.Singleton
 
-private val Context.timerDataStore: DataStore<Preferences> by preferencesDataStore(
-    name = "timer_session"
-)
+private fun timerSessionDataStore(context: Context): DataStore<Preferences> =
+    PreferenceDataStoreFactory.create(
+        corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
+        produceFile = {
+            File(context.filesDir, "datastore/timer_session.preferences_pb")
+                .apply { parentFile?.mkdirs() }
+        }
+    )
 
 @Singleton
 class TimerSessionStore @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
+
+    private val timerDataStore: DataStore<Preferences> = timerSessionDataStore(context)
+
     suspend fun load(): TimerSession {
-        val values = context.timerDataStore.data.first()
-        val status = runCatching {
-            TimerStatus.valueOf(values[KEY_STATUS] ?: TimerStatus.IDLE.name)
-        }.getOrDefault(TimerStatus.IDLE)
-        return TimerSession(
-            status = status,
-            startedAtEpochMillis = values[KEY_STARTED_AT] ?: 0L,
-            elapsedMillis = values[KEY_ELAPSED] ?: 0L,
-            resumedAtElapsedRealtime = values[KEY_RESUMED_ELAPSED] ?: 0L,
-            resumedAtWallClock = values[KEY_RESUMED_WALL] ?: 0L,
-            notifiedMilestonesMask = values[KEY_NOTIFIED_MILESTONES] ?: 0
-        )
+        return try {
+            val values = timerDataStore.data.first()
+            val status = runCatching {
+                TimerStatus.valueOf(values[KEY_STATUS] ?: TimerStatus.IDLE.name)
+            }.getOrDefault(TimerStatus.IDLE)
+            TimerSession(
+                status = status,
+                startedAtEpochMillis = values[KEY_STARTED_AT] ?: 0L,
+                elapsedMillis = values[KEY_ELAPSED] ?: 0L,
+                resumedAtElapsedRealtime = values[KEY_RESUMED_ELAPSED] ?: 0L,
+                resumedAtWallClock = values[KEY_RESUMED_WALL] ?: 0L,
+                notifiedMilestonesMask = values[KEY_NOTIFIED_MILESTONES] ?: 0
+            )
+        } catch (error: IOException) {
+            TimerSession()
+        }
     }
 
     suspend fun save(session: TimerSession) {
-        context.timerDataStore.edit { values ->
+        timerDataStore.edit { values ->
             values[KEY_STATUS] = session.status.name
             values[KEY_STARTED_AT] = session.startedAtEpochMillis
             values[KEY_ELAPSED] = session.elapsedMillis

@@ -9,10 +9,13 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringArrayResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.risediary.app.R
 import com.risediary.app.ui.theme.CardBlue
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -38,7 +41,7 @@ fun CalendarHeatmap(
     dayCounts: Map<String, Int>,
     modifier: Modifier = Modifier
 ) {
-    val today = remember { LocalDate.now() }
+    val today = LocalDate.now()
     val currentYearMonth = remember(today) { YearMonth.from(today) }
     var displayedMonth by remember { mutableStateOf(currentYearMonth) }
     val dateFormatter = remember { DateTimeFormatter.ofPattern("yyyy-MM-dd") }
@@ -62,7 +65,11 @@ fun CalendarHeatmap(
             )
 
             Text(
-                text = "${displayedMonth.year}年${displayedMonth.monthValue}月",
+                text = stringResource(
+                    R.string.calendar_month_format,
+                    displayedMonth.year,
+                    displayedMonth.monthValue
+                ),
                 fontSize = MiuixTheme.textStyles.body2.fontSize,
                 fontWeight = FontWeight.SemiBold,
                 color = MiuixTheme.colorScheme.onSurface,
@@ -111,7 +118,7 @@ private fun MonthGrid(
     val startOffset = (firstDay.dayOfWeek.value - DayOfWeek.MONDAY.value + 7) % 7
     val totalRows = (startOffset + daysInMonth + 6) / 7
 
-    val weekdayLabels = listOf("一", "二", "三", "四", "五", "六", "日")
+    val weekdayLabels = stringArrayResource(R.array.weekday_labels)
 
     Column {
         Row(modifier = Modifier.fillMaxWidth()) {

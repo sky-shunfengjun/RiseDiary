@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -29,7 +30,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavController
+import com.risediary.app.ui.navigation3.LocalNavigator
+import com.risediary.app.ui.navigation3.Route
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.kyant.capsule.ContinuousCapsule
@@ -49,19 +51,49 @@ import org.json.JSONArray
 import org.json.JSONObject
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.PullToRefresh
+import top.yukonga.miuix.kmp.basic.PullToRefreshState
+import top.yukonga.miuix.kmp.basic.rememberPullToRefreshState
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import com.risediary.app.ui.icons.AppIcons
 
+private val pullRefreshThresholdSetter: java.lang.reflect.Method? by lazy {
+    try {
+        PullToRefreshState::class.java.getMethod(
+            "setRefreshThresholdOffset\$top_yukonga_miuix_kmp_miuix_ui",
+            Float::class.javaPrimitiveType
+        )
+    } catch (_: Throwable) {
+        null
+    }
+}
+
+/**
+ * miuix 0.9.3 的下拉刷新触发阈值固定为屏高/24，日常浏览容易误触。
+ * 通过内部 setter 抬高到屏高/12（约两倍），需要更刻意的下拉才会触发；
+ * 反射失败时静默回退到库默认行为。
+ */
+private fun raisePullToRefreshThreshold(state: PullToRefreshState, windowHeightPx: Float) {
+    if (windowHeightPx <= 0f) return
+    try {
+        pullRefreshThresholdSetter?.invoke(state, windowHeightPx * (1f / 6f) * (1f / 2f))
+    } catch (_: Throwable) {
+        // 保持库默认阈值
+    }
+}
+
 @Composable
 fun HomeScreen(
-    navController: NavController,
     vm: HomeViewModel = hiltViewModel()
 ) {
+    val navigator = LocalNavigator.current
     val scrollState = rememberScrollState()
 
-    // Refresh on first composition
-    LaunchedEffect(Unit) { vm.refresh() }
+    // Refresh on first composition and whenever we return to the main page
+    val currentRoute = navigator.current()
+    LaunchedEffect(currentRoute) {
+        if (currentRoute is Route.Main) vm.refresh()
+    }
 
     val username by vm.username.collectAsStateWithLifecycle()
     val todayCount by vm.todayCount.collectAsStateWithLifecycle()
@@ -91,29 +123,50 @@ fun HomeScreen(
     } else {
         stringResource(R.string.home_today_ready)
     }
-    val dateStr = SimpleDateFormat("yyyy年M月d日  EEEE", Locale.CHINESE).format(Date())
+    val dateStr = SimpleDateFormat(
+        stringResource(R.string.home_date_pattern),
+        Locale.CHINESE
+    ).format(Date())
 
     val isRefreshing by vm.isRefreshing.collectAsStateWithLifecycle()
+
+    val pullToRefreshState = rememberPullToRefreshState()
+    val windowHeightPx = LocalWindowInfo.current.containerSize.height.toFloat()
+    SideEffect {
+        raisePullToRefreshThreshold(pullToRefreshState, windowHeightPx)
+    }
 
     PullToRefresh(
         isRefreshing = isRefreshing,
         onRefresh = { vm.refresh() },
+        pullToRefreshState = pullToRefreshState,
+        refreshTexts = listOf(
+            stringResource(R.string.home_refresh_pull),
+            stringResource(R.string.home_refresh_release),
+            stringResource(R.string.home_refresh_refreshing),
+            stringResource(R.string.home_refresh_done)
+        ),
+        contentPadding = PaddingValues(
+            top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+        ),
         modifier = Modifier.fillMaxSize()
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(scrollState)
-                .padding(horizontal = 20.dp, vertical = 16.dp),
+                .statusBarsPadding()
+                .padding(horizontal = 20.dp, vertical = 16.dp)
+                .padding(bottom = 80.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Text(
                 text = dateStr,
-                style = MiuixTheme.textStyles.footnote1,
+                style = MiuixTheme.textStyles.body1,
                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary
             )
             Text(
-                "${vm.getGreeting()}，$username",
+                stringResource(vm.getGreeting(), username),
                 style = MiuixTheme.textStyles.headline1.copy(
                     fontSize = 30.sp,
                     fontWeight = FontWeight.SemiBold
@@ -123,105 +176,106 @@ fun HomeScreen(
                 overflow = TextOverflow.Ellipsis
             )
 
-            val statusCardBg = if (todayStatus.hasRecords) CardGreen else CardBlue
-            Column(
+            val isDarkCard = LocalRiseDarkTheme.current
+            val statusRecorded = todayStatus.hasRecords
+            val cardBg = when {
+                statusRecorded && !isDarkCard -> Color(0xFFDFFAE4)
+                statusRecorded -> Color(0xFF1B3A2A)
+                !isDarkCard -> Color(0xFFD9E9FF)
+                else -> Color(0xFF1A3356)
+            }
+            val cardAccent = when {
+                statusRecorded -> Color(0xFF36D167)
+                !isDarkCard -> Color(0xFF0A84FF)
+                else -> Color(0xFF5CA8FF)
+            }
+            val cardText = if (isDarkCard) Color(0xFFF2F2F2) else Color(0xFF111111)
+            val statusIcon = if (statusRecorded) AppIcons.CheckCircle else AppIcons.FlightTakeoffLite
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clip(RoundedCornerShape(28.dp))
-                    .background(
-                        if (LocalRiseDarkTheme.current) {
-                            statusCardBg.copy(alpha = 0.18f)
-                        } else {
-                            statusCardBg.copy(alpha = 0.12f)
-                        }
-                    )
-                    .padding(20.dp)
+                    .height(176.dp)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(cardBg)
             ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(44.dp)
-                                .clip(RoundedCornerShape(15.dp))
-                                .background(statusCardBg.copy(alpha = 0.14f)),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                if (todayStatus.hasRecords) {
-                                    AppIcons.CheckCircle
-                                } else {
-                                    AppIcons.Info
-                                },
-                                contentDescription = null,
-                                modifier = Modifier.size(25.dp),
-                                tint = statusCardBg
+                Icon(
+                    imageVector = statusIcon,
+                    contentDescription = null,
+                    tint = cardAccent,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .offset(x = 48.dp, y = 42.dp)
+                        .size(176.dp)
+                )
+                val daysAgo = lastFlightDaysAgo
+                if (!statusRecorded && daysAgo != null) {
+                    Text(
+                        when (daysAgo) {
+                            0 -> stringResource(R.string.home_last_record_today)
+                            1 -> stringResource(R.string.home_last_record_yesterday)
+                            else -> stringResource(
+                                R.string.home_last_record_days,
+                                daysAgo
                             )
-                        }
-                        Spacer(modifier = Modifier.width(14.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text =
-                                    if (todayStatus.hasRecords) {
-                                        stringResource(R.string.home_status_today)
-                                    } else {
-                                        stringResource(R.string.home_status_ready)
-                                    },
-                                style = MiuixTheme.textStyles.footnote2,
-                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                todayStatusText,
-                                style = MiuixTheme.textStyles.title3,
-                                fontWeight = FontWeight.SemiBold,
-                                color = MiuixTheme.colorScheme.onSurface
-                            )
-                        }
-                    }
-                    val daysAgo = lastFlightDaysAgo
-                    if (!todayStatus.hasRecords && daysAgo != null) {
-                        Spacer(modifier = Modifier.height(10.dp))
+                        },
+                        style = MiuixTheme.textStyles.body2,
+                        color = cardText.copy(alpha = 0.72f),
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(top = 18.dp, end = 20.dp)
+                    )
+                }
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 20.dp, vertical = 18.dp)
+                        .padding(end = 132.dp),
+                    verticalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         Text(
-                            when (daysAgo) {
-                                0 -> stringResource(R.string.home_last_record_today)
-                                1 -> stringResource(R.string.home_last_record_yesterday)
-                                else -> stringResource(
-                                    R.string.home_last_record_days,
-                                    daysAgo
-                                )
-                            },
-                            style = MiuixTheme.textStyles.body2,
-                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                            text =
+                                if (statusRecorded) {
+                                    stringResource(R.string.home_status_today)
+                                } else {
+                                    stringResource(R.string.home_status_ready)
+                                },
+                            style = MiuixTheme.textStyles.footnote2,
+                            fontWeight = FontWeight.SemiBold,
+                            color = cardText.copy(alpha = 0.78f)
+                        )
+                        Text(
+                            todayStatusText,
+                            style = MiuixTheme.textStyles.title3,
+                            fontWeight = FontWeight.SemiBold,
+                            color = cardText,
+                            maxLines = 2
                         )
                     }
-                    Spacer(modifier = Modifier.height(14.dp))
-                    Row(verticalAlignment = Alignment.Top) {
-                        Icon(
-                            imageVector = AppIcons.Lightbulb,
-                            contentDescription = null,
-                            modifier = Modifier
-                                .padding(top = 1.dp)
-                                .size(17.dp),
-                            tint = MiuixTheme.colorScheme.primary
-                        )
-                        Spacer(modifier = Modifier.width(8.dp))
-                        Column(modifier = Modifier.weight(1f)) {
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = AppIcons.Lightbulb,
+                                contentDescription = null,
+                                modifier = Modifier.size(15.dp),
+                                tint = cardAccent
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
                             Text(
                                 stringResource(R.string.home_tip_label),
                                 style = MiuixTheme.textStyles.footnote2,
-                                color = MiuixTheme.colorScheme.primary,
+                                color = cardAccent,
                                 fontWeight = FontWeight.SemiBold
                             )
-                            Text(
-                                stringResource(dailyTipResId),
-                                style = MiuixTheme.textStyles.body2,
-                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                                maxLines = 3
-                            )
                         }
+                        Text(
+                            stringResource(dailyTipResId),
+                            style = MiuixTheme.textStyles.body2,
+                            color = cardText.copy(alpha = 0.72f),
+                            maxLines = 2
+                        )
                     }
+                }
             }
 
             Text(
@@ -250,7 +304,10 @@ fun HomeScreen(
                 ) {
                     when (cardId) {
                     "checkin", "recent7", "summary", "heatmap" -> {
-                        RiseCard(modifier = Modifier.fillMaxWidth()) {
+                        RiseCard(
+                            modifier = Modifier.fillMaxWidth(),
+                            allowContentOverflow = true
+                        ) {
                             CheckinCard(
                                 dayCounts = heatmapData,
                                 weekCount = weekCount,
@@ -289,7 +346,9 @@ fun HomeScreen(
                                     MiniStat(stringResource(R.string.home_max_distance), "${maxDistance.toInt()}cm", CardTeal, Modifier.weight(1f))
                                     MiniStat(
                                         stringResource(R.string.home_average_interval),
-                                        averageIntervalDays?.let { "%.1f天".format(it) } ?: "—",
+                                        averageIntervalDays?.let {
+                                            stringResource(R.string.home_interval_days, it)
+                                        } ?: "—",
                                         CardTeal,
                                         Modifier.weight(1f)
                                     )
@@ -301,7 +360,7 @@ fun HomeScreen(
                         val lengthData by vm.lengthRecords.collectAsStateWithLifecycle()
                         RiseCard(
                             modifier = Modifier.fillMaxWidth(),
-                            onClick = { navController.navigate("length_history") }
+                            onClick = { navigator.push(Route.LengthHistory) }
                         ) {
                             Column(modifier = Modifier.padding(18.dp)) {
                                 HomeCardHeader(
@@ -384,7 +443,7 @@ fun HomeScreen(
                         val recentAchievements by vm.recentAchievements.collectAsStateWithLifecycle()
                         RiseCard(
                             modifier = Modifier.fillMaxWidth(),
-                            onClick = { navController.navigate("achievement_wall") }
+                            onClick = { navigator.push(Route.AchievementWall) }
                         ) {
                             Column(modifier = Modifier.padding(18.dp)) {
                                 HomeCardHeader(
@@ -406,12 +465,15 @@ fun HomeScreen(
                                 } else {
                                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                                         recentAchievements.take(3).forEach { achievement ->
-                                            val (icon, _) = ACHIEVEMENT_ICONS[achievement.achievementKey] ?: ("🏆" to "")
+                                            val (icon, _) = ACHIEVEMENT_ICONS[achievement.achievementKey] ?: ("🏆" to 0)
                                             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                                                 Text(icon, fontSize = 24.sp)
                                                 Spacer(modifier = Modifier.height(2.dp))
+                                                val shortNameRes =
+                                                    ACHIEVEMENT_ICONS[achievement.achievementKey]?.second
                                                 Text(
-                                                    ACHIEVEMENT_ICONS[achievement.achievementKey]?.second ?: achievement.achievementKey,
+                                                    shortNameRes?.let { stringResource(it) }
+                                                        ?: achievement.achievementKey,
                                                     style = MiuixTheme.textStyles.footnote2,
                                                     color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                                                     maxLines = 1

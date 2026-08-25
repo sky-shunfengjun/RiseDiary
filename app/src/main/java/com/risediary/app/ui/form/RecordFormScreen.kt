@@ -6,10 +6,12 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -44,13 +46,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavController
+import com.risediary.app.ui.LocalMainPagerState
+import com.risediary.app.ui.navigation3.LocalNavigator
+import com.risediary.app.ui.navigation3.Route
 import com.kyant.capsule.ContinuousCapsule
 import com.risediary.app.R
-import com.risediary.app.ui.Screen
 import com.risediary.app.ui.achievement.AchievementCatalog
 import com.risediary.app.ui.components.DurationPickerBottomSheet
 import com.risediary.app.ui.components.LiquidGlassButton
@@ -59,7 +63,6 @@ import com.risediary.app.ui.components.liquidDialogCancelButtonColors
 import com.risediary.app.ui.components.liquidDialogConfirmButtonColors
 import com.risediary.app.ui.components.LiquidSingleDatePickerDialog
 import com.risediary.app.ui.components.SecondaryPageScaffold
-import com.risediary.app.ui.components.WheelColumn
 import com.risediary.app.ui.theme.RiseCard
 import com.risediary.app.util.RecordValidation
 import java.time.Instant
@@ -69,6 +72,7 @@ import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Checkbox
 import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.NumberPicker
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
@@ -77,13 +81,14 @@ import com.risediary.app.ui.icons.AppIcons
 
 @Composable
 fun RecordFormScreen(
-    navController: NavController,
     isTimer: Boolean = false,
     durationMillis: Long = 0L,
     timerStartTimeMillis: Long = 0L,
     flightId: Long? = null,
     vm: FormViewModel = hiltViewModel()
 ) {
+    val navigator = LocalNavigator.current
+    val context = LocalContext.current
     val scrollState = rememberScrollState()
     val tags by vm.tags.collectAsStateWithLifecycle()
     var showDatePicker by remember { mutableStateOf(false) }
@@ -113,22 +118,27 @@ fun RecordFormScreen(
     }
 
     val activeAchievement = vm.newAchievementKeys.firstOrNull()
+    val mainPagerState = LocalMainPagerState.current
     LaunchedEffect(vm.saved, activeAchievement) {
         if (vm.saved && activeAchievement == null) {
-            if (flightId != null) {
-                navController.popBackStack()
-            } else {
-                navController.navigate(Screen.Home.route) {
-                    popUpTo(Screen.Home.route) { inclusive = false }
-                    launchSingleTop = true
-                }
+            // Pop exactly one level so a manual draft form pushed below the
+            // timer form is never destroyed by a popUntil(Main).
+            if (navigator.backStackSize() > 1) {
+                navigator.pop()
+            }
+            if (flightId == null) {
+                mainPagerState?.animateToPage(0)
             }
         }
     }
 
     SecondaryPageScaffold(
-        title = if (flightId == null) "新建记录" else "编辑记录",
-        onBack = { navController.navigateUp() },
+        title = if (flightId == null) {
+            stringResource(R.string.form_new_record)
+        } else {
+            stringResource(R.string.form_edit_record)
+        },
+        onBack = { navigator.pop() },
         reserveBottomActionSpace = false,
         bottomAction = { backdrop ->
             LiquidGlassButton(
@@ -147,28 +157,28 @@ fun RecordFormScreen(
             ) {
                 Icon(AppIcons.Save, null, Modifier.size(22.dp))
                 Text(
-                    if (vm.isSaving) "正在保存" else "保存记录",
+                    if (vm.isSaving) {
+                        stringResource(R.string.form_saving)
+                    } else {
+                        stringResource(R.string.form_save_record)
+                    },
                     style = MiuixTheme.textStyles.title4,
                     fontWeight = FontWeight.SemiBold
                 )
             }
         }
     ) { innerPadding ->
+        val formContentPadding = recordFormContentPadding(
+            innerPadding,
+            imeVisible = imeBottom > 0.dp
+        )
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .imePadding()
-                .padding(
-                    start = innerPadding.calculateLeftPadding(LayoutDirection.Ltr),
-                    top = innerPadding.calculateTopPadding(),
-                    end = innerPadding.calculateRightPadding(LayoutDirection.Ltr),
-                    bottom = if (imeBottom > 0.dp) {
-                        0.dp
-                    } else {
-                        innerPadding.calculateBottomPadding()
-                    }
-                )
-                .verticalScroll(scrollState),
+                .verticalScroll(scrollState)
+                .padding(formContentPadding)
+                .consumeWindowInsets(formContentPadding),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             RiseCard(modifier = Modifier.fillMaxWidth()) {
@@ -178,8 +188,8 @@ fun RecordFormScreen(
                 ) {
                     FormSectionTitle(
                         icon = AppIcons.Tune,
-                        title = "时间与用时",
-                        subtitle = "确认开始时间和本次用时"
+                        title = stringResource(R.string.form_time_section),
+                        subtitle = stringResource(R.string.form_time_section_subtitle)
                     )
 
                     Row(
@@ -188,7 +198,7 @@ fun RecordFormScreen(
                     ) {
                         CompactValueButton(
                             icon = AppIcons.CalendarMonth,
-                            text = formatDateOnly(vm.startTime),
+                            text = formatDateOnly(context, vm.startTime),
                             onClick = { showDatePicker = true },
                             modifier = Modifier.weight(1f)
                         )
@@ -215,7 +225,7 @@ fun RecordFormScreen(
                 ) {
                     FormSectionTitle(
                         icon = AppIcons.WaterDrop,
-                        title = "记录数据",
+                        title = stringResource(R.string.form_data_section),
                         subtitle = stringResource(R.string.form_data_subtitle)
                     )
                     Text(
@@ -225,7 +235,7 @@ fun RecordFormScreen(
                     )
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(
-                            "精液量",
+                            stringResource(R.string.form_volume_label),
                             style = MiuixTheme.textStyles.subtitle,
                             fontWeight = FontWeight.SemiBold
                         )
@@ -240,7 +250,17 @@ fun RecordFormScreen(
                             TextField(
                                 value = vm.spurtCount,
                                 onValueChange = vm::setSpurtCountInput,
-                                label = "射出股数",
+                                label = stringResource(R.string.form_spurt_count_label),
+                                leadingIcon = {
+                                    Icon(
+                                        AppIcons.Numbers,
+                                        contentDescription = null,
+                                        tint = MiuixTheme.colorScheme.primary,
+                                        modifier = Modifier
+                                            .padding(start = 16.dp, end = 10.dp)
+                                            .size(20.dp)
+                                    )
+                                },
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .onFocusChanged { focusState ->
@@ -256,15 +276,25 @@ fun RecordFormScreen(
                             )
                             QuickChoices(
                                 values = listOf(1, 3, 5, 8, 10),
-                                suffix = "股",
-                                selected = vm.spurtCount,
+                                suffix = stringResource(R.string.form_spurt_suffix),
+                                selected = vm.quickSpurtSelection,
                                 onClick = vm::quickSpurt
                             )
                         } else {
                             TextField(
                                 value = vm.volumeMl,
                                 onValueChange = vm::setVolumeInput,
-                                label = "精液量（毫升）",
+                                label = stringResource(R.string.form_volume_ml_label),
+                                leadingIcon = {
+                                    Icon(
+                                        AppIcons.WaterDrop,
+                                        contentDescription = null,
+                                        tint = MiuixTheme.colorScheme.primary,
+                                        modifier = Modifier
+                                            .padding(start = 16.dp, end = 10.dp)
+                                            .size(20.dp)
+                                    )
+                                },
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .onFocusChanged { focusState ->
@@ -281,7 +311,7 @@ fun RecordFormScreen(
                             QuickChoices(
                                 values = listOf(1, 3, 5, 10),
                                 suffix = "ml",
-                                selected = vm.volumeMl.removeSuffix(".0"),
+                                selected = vm.quickVolumeSelection,
                                 onClick = vm::quickVolume
                             )
                         }
@@ -289,14 +319,24 @@ fun RecordFormScreen(
 
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(
-                            "最远射出距离",
+                            stringResource(R.string.form_max_distance_label),
                             style = MiuixTheme.textStyles.subtitle,
                             fontWeight = FontWeight.SemiBold
                         )
                         TextField(
                             value = vm.distanceCm,
                             onValueChange = vm::setDistanceInput,
-                            label = "距离（厘米，可不填）",
+                            label = stringResource(R.string.form_distance_label),
+                            leadingIcon = {
+                                Icon(
+                                    AppIcons.Straighten,
+                                    contentDescription = null,
+                                    tint = MiuixTheme.colorScheme.primary,
+                                    modifier = Modifier
+                                        .padding(start = 16.dp, end = 10.dp)
+                                        .size(20.dp)
+                                )
+                            },
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .onFocusChanged { focusState ->
@@ -311,9 +351,9 @@ fun RecordFormScreen(
                             singleLine = true
                         )
                         QuickChoices(
-                            values = listOf(10, 30, 50, 80, 100),
+                            values = listOf(10, 30, 50, 80),
                             suffix = "cm",
-                            selected = vm.distanceCm,
+                            selected = vm.quickDistanceSelection,
                             onClick = vm::quickDistance
                         )
                     }
@@ -327,19 +367,19 @@ fun RecordFormScreen(
                 ) {
                     FormSectionTitle(
                         icon = AppIcons.EditNote,
-                        title = "补充信息",
-                        subtitle = "标签和备注可按需填写"
+                        title = stringResource(R.string.form_extra_section),
+                        subtitle = stringResource(R.string.form_extra_section_subtitle)
                     )
 
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
-                            "方式标签（可选）",
+                            stringResource(R.string.form_method_tags_label),
                             style = MiuixTheme.textStyles.subtitle,
                             fontWeight = FontWeight.SemiBold
                         )
                         if (tags.isEmpty()) {
                             Text(
-                                "暂无标签，可在设置中添加",
+                                stringResource(R.string.form_no_tags),
                                 style = MiuixTheme.textStyles.body2,
                                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                             )
@@ -390,7 +430,17 @@ fun RecordFormScreen(
                     TextField(
                         value = vm.moodNote,
                         onValueChange = { vm.moodNote = it },
-                        label = "备注与心情",
+                        label = stringResource(R.string.form_note_label),
+                        leadingIcon = {
+                            Icon(
+                                AppIcons.Notes,
+                                contentDescription = null,
+                                tint = MiuixTheme.colorScheme.primary,
+                                modifier = Modifier
+                                    .padding(start = 16.dp, end = 10.dp)
+                                    .size(20.dp)
+                            )
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .onFocusChanged { focusState ->
@@ -469,12 +519,14 @@ fun RecordFormScreen(
             .toLocalTime()
         var pickedHour by remember { mutableStateOf(oldTime.hour) }
         var pickedMinute by remember { mutableStateOf(oldTime.minute) }
+        val hourFormat = stringResource(R.string.form_hour_format)
+        val minuteFormat = stringResource(R.string.form_minute_format)
 
         LiquidAlertDialog(
             onDismissRequest = { showTimePicker = false },
             confirmButton = {
                 TextButton(
-                    text = "确定",
+                    text = stringResource(R.string.action_confirm),
                     onClick = {
                         val currentDate = Instant.ofEpochMilli(vm.startTime)
                             .atZone(ZoneId.systemDefault())
@@ -492,14 +544,14 @@ fun RecordFormScreen(
             },
             dismissButton = {
                 TextButton(
-                    text = "取消",
+                    text = stringResource(R.string.action_cancel),
                     onClick = { showTimePicker = false },
                     colors = liquidDialogCancelButtonColors()
                 )
             },
             title = {
                 Text(
-                    "选择开始时间",
+                    stringResource(R.string.form_pick_start_time),
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -512,18 +564,24 @@ fun RecordFormScreen(
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    WheelColumn(
-                        label = "时",
-                        range = 0..23,
+                    NumberPicker(
                         value = pickedHour,
                         onValueChange = { pickedHour = it },
+                        range = 0..23,
+                        label = { hourFormat.format(it) },
+                        visibleItemCount = 3,
+                        wrapAround = false,
+                        textStyle = MiuixTheme.textStyles.title2,
                         modifier = Modifier.weight(1f)
                     )
-                    WheelColumn(
-                        label = "分",
-                        range = 0..59,
+                    NumberPicker(
                         value = pickedMinute,
                         onValueChange = { pickedMinute = it },
+                        range = 0..59,
+                        label = { minuteFormat.format(it) },
+                        visibleItemCount = 3,
+                        wrapAround = false,
+                        textStyle = MiuixTheme.textStyles.title2,
                         modifier = Modifier.weight(1f)
                     )
                 }
@@ -535,23 +593,23 @@ fun RecordFormScreen(
         val key = activeAchievement
         val definition = AchievementCatalog.find(key)
         val icon = definition?.icon ?: "🏆"
-        val name = definition?.name ?: key
+        val name = definition?.let { stringResource(it.nameRes) } ?: key
         LaunchedEffect(activeAchievement) {
             kotlinx.coroutines.delay(3_000)
-            vm.consumeAchievement()
+            vm.consumeAchievement(key)
         }
         LiquidAlertDialog(
-            onDismissRequest = vm::consumeAchievement,
+            onDismissRequest = { vm.consumeAchievement(key) },
             confirmButton = {
                 TextButton(
-                    text = "知道了",
-                    onClick = vm::consumeAchievement,
+                    text = stringResource(R.string.form_got_it),
+                    onClick = { vm.consumeAchievement(key) },
                     colors = liquidDialogConfirmButtonColors()
                 )
             },
             title = {
                 Text(
-                    "成就解锁",
+                    stringResource(R.string.form_achievement_unlocked),
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth(),
                     style = MiuixTheme.textStyles.title2,
@@ -576,6 +634,16 @@ fun RecordFormScreen(
         )
     }
 }
+
+internal fun recordFormContentPadding(
+    innerPadding: PaddingValues,
+    imeVisible: Boolean
+): PaddingValues = PaddingValues(
+    start = innerPadding.calculateLeftPadding(LayoutDirection.Ltr),
+    top = innerPadding.calculateTopPadding(),
+    end = innerPadding.calculateRightPadding(LayoutDirection.Ltr),
+    bottom = if (imeVisible) 0.dp else innerPadding.calculateBottomPadding()
+)
 
 internal fun recordFormBottomSpacerDp(imeVisible: Boolean): Int =
     if (imeVisible) 0 else 68

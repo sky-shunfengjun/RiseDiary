@@ -20,12 +20,15 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavController
+import com.risediary.app.R
+import com.risediary.app.ui.navigation3.LocalNavigator
+import com.risediary.app.ui.navigation3.Route
 import com.risediary.app.ui.components.SecondaryPageScaffold
 import com.risediary.app.ui.components.LiquidAlertDialog
 import com.risediary.app.ui.components.liquidDialogCancelButtonColors
@@ -47,10 +50,10 @@ import com.risediary.app.ui.icons.AppIcons
 
 @Composable
 fun BackupRestoreScreen(
-    navController: NavController,
     snackbarHostState: SnackbarHostState,
     vm: BackupViewModel = hiltViewModel()
 ) {
+    val navigator = LocalNavigator.current
     val state by vm.state.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val showClearDialog by vm.showClearConfirm.collectAsStateWithLifecycle()
@@ -95,24 +98,24 @@ fun BackupRestoreScreen(
     }
 
     SecondaryPageScaffold(
-        title = "备份与恢复",
-        onBack = { navController.navigateUp() },
+        title = stringResource(R.string.settings_backup),
+        onBack = { navigator.pop() },
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .verticalScroll(rememberScrollState()),
+                .verticalScroll(rememberScrollState())
+                .padding(padding),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // ── Export ──
-            Text("导出备份", style = MiuixTheme.textStyles.title4,
+            Text(stringResource(R.string.backup_export_section), style = MiuixTheme.textStyles.title4,
                 fontWeight = FontWeight.SemiBold)
 
             RiseCard(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        "将所有记录和设置导出为 ZIP 文件，保存到 Downloads 文件夹。",
+                        stringResource(R.string.backup_export_description),
                         style = MiuixTheme.textStyles.body1,
                         color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                     )
@@ -121,7 +124,8 @@ fun BackupRestoreScreen(
                     Button(
                         onClick = { showExportConfirm = true },
                         enabled = state != BackupState.WORKING,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = ButtonDefaults.buttonColorsPrimary()
                     ) {
                         if (state == BackupState.WORKING) {
                             CircularProgressIndicator(
@@ -132,22 +136,22 @@ fun BackupRestoreScreen(
                                 )
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("导出中...")
+                            Text(stringResource(R.string.backup_exporting))
                         } else {
                             Icon(AppIcons.Upload, null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("导出备份")
+                            Text(stringResource(R.string.backup_export_section))
                         }
                     }
 
                     if (showExportConfirm) {
                         LiquidAlertDialog(
                             onDismissRequest = { showExportConfirm = false },
-title = { Text("确认导出") },
-                            text = { Text("将导出所有记录和设置到 Downloads 文件夹。文件名为 RiseDiary_backup_日期.zip。") },
+title = { Text(stringResource(R.string.backup_confirm_export_title)) },
+                            text = { Text(stringResource(R.string.backup_confirm_export_message)) },
                             confirmButton = {
                                 TextButton(
-                                    text = "确认导出",
+                                    text = stringResource(R.string.backup_confirm_export_title),
                                     onClick = {
                                         showExportConfirm = false
                                         if (vm.needsUserSelectedExportDestination) {
@@ -161,7 +165,7 @@ title = { Text("确认导出") },
                             },
                             dismissButton = {
                                 TextButton(
-                                    text = "取消",
+                                    text = stringResource(R.string.action_cancel),
                                     onClick = { showExportConfirm = false },
                                     colors = liquidDialogCancelButtonColors()
                                 )
@@ -172,13 +176,13 @@ title = { Text("确认导出") },
             }
 
             // ── Import ──
-            Text("恢复备份", style = MiuixTheme.textStyles.title4,
+            Text(stringResource(R.string.backup_restore_section), style = MiuixTheme.textStyles.title4,
                 fontWeight = FontWeight.SemiBold)
 
             RiseCard(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        "从 ZIP 备份文件恢复数据。当前数据将被覆盖。",
+                        stringResource(R.string.backup_restore_description),
                         style = MiuixTheme.textStyles.body1,
                         color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                     )
@@ -188,10 +192,7 @@ title = { Text("确认导出") },
                         onClick = { showRestoreConfirm = true },
                         enabled = state != BackupState.WORKING,
                         modifier = Modifier.fillMaxWidth(),
-                        colors = ButtonDefaults.buttonColors(
-                            color = MiuixTheme.colorScheme.secondary,
-                            contentColor = MiuixTheme.colorScheme.onSecondary
-                        )
+                        colors = ButtonDefaults.buttonColorsPrimary()
                     ) {
                         if (state == BackupState.WORKING) {
                             CircularProgressIndicator(
@@ -202,22 +203,22 @@ title = { Text("确认导出") },
                                 )
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("恢复中...")
+                            Text(stringResource(R.string.backup_restoring))
                         } else {
                             Icon(AppIcons.Download, null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text("选择备份文件")
+                            Text(stringResource(R.string.backup_select_file))
                         }
                     }
 
                     if (showRestoreConfirm) {
                         LiquidAlertDialog(
                             onDismissRequest = { showRestoreConfirm = false },
-title = { Text("确认恢复") },
-                            text = { Text("当前所有数据将被备份中的内容覆盖，此操作不可撤销。确定要继续吗？") },
+title = { Text(stringResource(R.string.backup_confirm_restore_title)) },
+                            text = { Text(stringResource(R.string.backup_confirm_restore_message)) },
                             confirmButton = {
                                 TextButton(
-                                    text = "确认恢复",
+                                    text = stringResource(R.string.backup_confirm_restore_title),
                                     onClick = {
                                         showRestoreConfirm = false
                                         importLauncher.launch(arrayOf("application/zip", "application/octet-stream"))
@@ -232,7 +233,7 @@ title = { Text("确认恢复") },
                             },
                             dismissButton = {
                                 TextButton(
-                                    text = "取消",
+                                    text = stringResource(R.string.action_cancel),
                                     onClick = { showRestoreConfirm = false },
                                     colors = liquidDialogCancelButtonColors()
                                 )
@@ -243,14 +244,14 @@ title = { Text("确认恢复") },
             }
 
             // ── Clear ──
-            Text("清除数据", style = MiuixTheme.textStyles.title4,
+            Text(stringResource(R.string.backup_clear_section), style = MiuixTheme.textStyles.title4,
                 fontWeight = FontWeight.SemiBold,
                 color = CardRed)
 
             RiseCard(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        "删除所有飞行记录、标签、成就和设置。此操作不可恢复，建议先导出备份。",
+                        stringResource(R.string.backup_clear_description),
                         style = MiuixTheme.textStyles.body1,
                         color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                     )
@@ -266,7 +267,7 @@ title = { Text("确认恢复") },
                     ) {
                         Icon(AppIcons.DeleteForever, null, modifier = Modifier.size(18.dp))
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text("清除所有数据")
+                        Text(stringResource(R.string.backup_clear_all))
                     }
                 }
             }
@@ -274,21 +275,22 @@ title = { Text("确认恢复") },
             // ── Clear confirmation dialog ──
             if (showClearDialog) {
                 var inputText by remember { mutableStateOf("") }
+                val confirmText = stringResource(R.string.backup_clear_confirmation_text)
                 LiquidAlertDialog(
                     onDismissRequest = {
                         vm.dismissClearDialog()
                         inputText = ""
                     },
                     containerColor = MiuixTheme.colorScheme.surface,
-                    title = { Text("危险操作", color = CardRed) },
+                    title = { Text(stringResource(R.string.backup_clear_danger_title), color = CardRed) },
                     text = {
                         Column {
-                            Text("此操作将永久删除所有数据。请输入「确认删除」以继续：")
+                            Text(stringResource(R.string.backup_clear_danger_message))
                             Spacer(modifier = Modifier.height(12.dp))
                             TextField(
                                 value = inputText,
                                 onValueChange = { inputText = it },
-                                label = "确认删除",
+                                label = confirmText,
                                 useLabelAsPlaceholder = true,
                                 singleLine = true,
                                 modifier = Modifier.fillMaxWidth()
@@ -296,9 +298,9 @@ title = { Text("确认恢复") },
                         }
                     },
                     confirmButton = {
-                        val confirmed = inputText.trim() == "确认删除"
+                        val confirmed = inputText.trim() == confirmText
                         TextButton(
-                            text = "确认清除",
+                            text = stringResource(R.string.backup_clear_confirm_button),
                             onClick = {
                                 vm.clearAllData()
                                 vm.dismissClearDialog()
@@ -320,7 +322,7 @@ title = { Text("确认恢复") },
                     },
                     dismissButton = {
                         TextButton(
-                            text = "取消",
+                            text = stringResource(R.string.action_cancel),
                             onClick = {
                                 vm.dismissClearDialog()
                                 inputText = ""

@@ -9,6 +9,7 @@ import com.risediary.app.data.repository.FlightRepository
 import com.risediary.app.data.repository.LengthRecordRepository
 import com.risediary.app.data.repository.TagJson
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -36,37 +37,46 @@ class AchievementWallViewModel @Inject constructor(
 
     fun refresh() {
         viewModelScope.launch {
-            val map = mutableMapOf<String, Float>()
-            val total = flightRepo.totalCount()
-            val streak = detector.calculateCurrentStreak()
-            val totalVol = flightRepo.sumTotalVolume()
-            val tags = countDistinctTags()
-            val lengthCount = lengthRepo.count()
-            val firstErect = lengthRepo.firstErectLength()
-            val maxErect = lengthRepo.maxErectLength()
-
-            map["milestone_1"] = if (total >= 1) 1f else 0f
-            map["milestone_10"] = (total.coerceAtMost(10)).toFloat() / 10f
-            map["milestone_50"] = (total.coerceAtMost(50)).toFloat() / 50f
-            map["milestone_100"] = (total.coerceAtMost(100)).toFloat() / 100f
-            map["milestone_500"] = (total.coerceAtMost(500)).toFloat() / 500f
-
-            map["streak_7"] = (streak.coerceAtMost(7)).toFloat() / 7f
-            map["streak_30"] = (streak.coerceAtMost(30)).toFloat() / 30f
-            map["streak_90"] = (streak.coerceAtMost(90)).toFloat() / 90f
-
-            map["volume_100ml"] = (totalVol / 100f).coerceAtMost(1f)
-            map["volume_500ml"] = (totalVol / 500f).coerceAtMost(1f)
-
-            map["tag_5_types"] = (tags.coerceAtMost(5)).toFloat() / 5f
-
-            map["length_first"] = if (lengthCount >= 1) 1f else 0f
-            map["length_growth_2cm"] = if (firstErect > 0f) {
-                ((maxErect - firstErect) / 2f).coerceIn(0f, 1f)
-            } else 0f
-
-            progressMap.value = map
+            try {
+                progressMap.value = buildProgressMap()
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                // Keep showing the last known progress instead of crashing
+            }
         }
+    }
+
+    private suspend fun buildProgressMap(): Map<String, Float> {
+        val map = mutableMapOf<String, Float>()
+        val total = flightRepo.totalCount()
+        val streak = detector.calculateCurrentStreak()
+        val totalVol = flightRepo.sumTotalVolume()
+        val tags = countDistinctTags()
+        val lengthCount = lengthRepo.count()
+        val firstErect = lengthRepo.firstErectLength() ?: 0f
+        val maxErect = lengthRepo.maxErectLength()
+
+        map["milestone_1"] = if (total >= 1) 1f else 0f
+        map["milestone_10"] = (total.coerceAtMost(10)).toFloat() / 10f
+        map["milestone_50"] = (total.coerceAtMost(50)).toFloat() / 50f
+        map["milestone_100"] = (total.coerceAtMost(100)).toFloat() / 100f
+        map["milestone_500"] = (total.coerceAtMost(500)).toFloat() / 500f
+
+        map["streak_7"] = (streak.coerceAtMost(7)).toFloat() / 7f
+        map["streak_30"] = (streak.coerceAtMost(30)).toFloat() / 30f
+        map["streak_90"] = (streak.coerceAtMost(90)).toFloat() / 90f
+
+        map["volume_100ml"] = (totalVol / 100f).coerceAtMost(1f)
+        map["volume_500ml"] = (totalVol / 500f).coerceAtMost(1f)
+
+        map["tag_5_types"] = (tags.coerceAtMost(5)).toFloat() / 5f
+
+        map["length_first"] = if (lengthCount >= 1) 1f else 0f
+        map["length_growth_2cm"] = if (firstErect > 0f) {
+            ((maxErect - firstErect) / 2f).coerceIn(0f, 1f)
+        } else 0f
+        return map
     }
 
     private suspend fun countDistinctTags(): Int {

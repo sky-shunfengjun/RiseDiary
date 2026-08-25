@@ -14,26 +14,28 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kyant.capsule.ContinuousRoundedRectangle
+import com.risediary.app.R
 import kotlin.math.abs
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.collectLatest
 import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.NumberPicker
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
- * Two-column scroll wheel picker for selecting minutes and seconds.
+ * Two-column number picker for selecting minutes and seconds.
  *
  * Controlled two-column duration selector.
  * @param onValueChange Called with (minutes, seconds) when selection changes
  */
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun DurationWheelPicker(
     minutes: Int,
@@ -42,26 +44,33 @@ fun DurationWheelPicker(
     maxMinutes: Int = 120,
     modifier: Modifier = Modifier
 ) {
+    val minuteFormat = stringResource(R.string.duration_picker_minute_format)
+    val secondFormat = stringResource(R.string.duration_picker_second_format)
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        WheelColumn(
-            label = "分钟",
-            range = 0..maxMinutes,
+        NumberPicker(
             value = minutes.coerceIn(0, maxMinutes),
             onValueChange = {
                 onValueChange(it, if (it == maxMinutes) 0 else seconds)
             },
-            modifier = Modifier.weight(1f),
-            padToTwoDigits = false
+            range = 0..maxMinutes,
+            label = { minuteFormat.format(it) },
+            visibleItemCount = 3,
+            wrapAround = false,
+            textStyle = MiuixTheme.textStyles.title2,
+            modifier = Modifier.weight(1f)
         )
-        WheelColumn(
-            label = "秒",
-            range = if (minutes >= maxMinutes) 0..0 else 0..59,
+        NumberPicker(
             value = if (minutes >= maxMinutes) 0 else seconds.coerceIn(0, 59),
             onValueChange = { onValueChange(minutes, it) },
+            range = if (minutes >= maxMinutes) 0..0 else 0..59,
+            label = { secondFormat.format(it) },
+            visibleItemCount = 3,
+            wrapAround = false,
+            textStyle = MiuixTheme.textStyles.title2,
             modifier = Modifier.weight(1f)
         )
     }
@@ -89,13 +98,13 @@ fun DurationPickerBottomSheet(
                 .then(modifier)
         ) {
             Text(
-                text = "选择用时",
+                text = stringResource(R.string.duration_picker_title),
                 style = MiuixTheme.textStyles.title3,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(bottom = 8.dp)
             )
             Text(
-                text = "表单按分钟和秒记录，最长 120 分钟",
+                text = stringResource(R.string.duration_picker_hint),
                 style = MiuixTheme.textStyles.body1,
                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary
             )
@@ -116,7 +125,7 @@ fun DurationPickerBottomSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 TextButton(
-                    text = "取消",
+                    text = stringResource(R.string.action_cancel),
                     onClick = onDismiss,
                     modifier = Modifier
                         .weight(1f)
@@ -132,7 +141,7 @@ fun DurationPickerBottomSheet(
                         .height(48.dp),
                     cornerRadius = 24.dp
                 ) {
-                    Text("确定")
+                    Text(stringResource(R.string.action_confirm))
                 }
             }
         }

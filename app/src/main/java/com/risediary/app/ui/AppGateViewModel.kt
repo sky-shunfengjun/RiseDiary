@@ -10,6 +10,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -34,11 +35,20 @@ class AppGateViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            _state.value = when {
-                !preferences.onboardingCompleted.first() -> AppGateState.ONBOARDING
-                preferences.appLockEnabled.first() &&
-                    preferences.appLockPin.first().isNotEmpty() -> AppGateState.LOCKED
-                else -> AppGateState.MAIN
+            _state.value = try {
+                when {
+                    !preferences.onboardingCompleted.first() -> AppGateState.ONBOARDING
+                    preferences.appLockEnabled.first() &&
+                        preferences.appLockPin.first().isNotEmpty() -> AppGateState.LOCKED
+                    else -> AppGateState.MAIN
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Throwable) {
+                // Never fall back to LOCKED: without a verified credential the
+                // user would be permanently stuck on the lock screen. Onboarding
+                // is self-healing and keeps all data.
+                AppGateState.ONBOARDING
             }
         }
     }

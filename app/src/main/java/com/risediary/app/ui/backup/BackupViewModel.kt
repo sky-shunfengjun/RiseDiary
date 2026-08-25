@@ -1,12 +1,15 @@
 package com.risediary.app.ui.backup
 
+import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.risediary.app.R
 import com.risediary.app.data.backup.BackupManager
 import com.risediary.app.data.backup.BackupResult
 import com.risediary.app.reminder.ReminderScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -18,7 +21,8 @@ enum class BackupState { IDLE, WORKING, SUCCESS, ERROR }
 @HiltViewModel
 class BackupViewModel @Inject constructor(
     private val manager: BackupManager,
-    private val reminderScheduler: ReminderScheduler
+    private val reminderScheduler: ReminderScheduler,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
     private val _state = MutableStateFlow(BackupState.IDLE)
     val state: StateFlow<BackupState> = _state.asStateFlow()
@@ -49,6 +53,7 @@ class BackupViewModel @Inject constructor(
     )
 
     fun resetState() {
+        if (_state.value == BackupState.WORKING) return
         _state.value = BackupState.IDLE
         _message.value = ""
     }
@@ -60,7 +65,7 @@ class BackupViewModel @Inject constructor(
         if (_state.value == BackupState.WORKING) return
         viewModelScope.launch {
             _state.value = BackupState.WORKING
-            _message.value = "正在处理…"
+            _message.value = context.getString(R.string.backup_processing)
             when (val result = operation()) {
                 is BackupResult.Success -> {
                     if (refreshReminders) {

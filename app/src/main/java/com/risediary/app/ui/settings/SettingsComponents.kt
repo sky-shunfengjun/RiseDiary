@@ -8,6 +8,12 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -21,6 +27,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -29,6 +36,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
@@ -153,6 +162,10 @@ internal fun SettingsEditItem(
 ) {
     var editing by remember { mutableStateOf(false) }
     var text by remember(value) { mutableStateOf(value) }
+    val focusRequester = remember { FocusRequester() }
+    LaunchedEffect(editing) {
+        if (editing) focusRequester.requestFocus()
+    }
 
     Row(
         modifier = Modifier
@@ -169,45 +182,60 @@ internal fun SettingsEditItem(
                 fontWeight = FontWeight.Medium,
                 color = MiuixTheme.colorScheme.onSurface
             )
-            if (editing) {
-                Spacer(modifier = Modifier.height(6.dp))
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    TextField(
-                        value = text,
-                        onValueChange = { text = inputTransform(it) },
-                        modifier = Modifier.weight(1f),
-                        label = placeholder,
-                        useLabelAsPlaceholder = true,
-                        singleLine = true,
-                        trailingIcon = {
-                            IconButton(
-                                onClick = {
-                                    onValueChange(text)
-                                    editing = false
+            AnimatedVisibility(
+                visible = editing,
+                enter = expandVertically(animationSpec = tween(190)) + fadeIn(tween(170)),
+                exit = shrinkVertically(animationSpec = tween(150)) + fadeOut(tween(120))
+            ) {
+                Column {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        TextField(
+                            value = text,
+                            onValueChange = { text = inputTransform(it) },
+                            modifier = Modifier
+                                .weight(1f)
+                                .focusRequester(focusRequester),
+                            label = placeholder,
+                            useLabelAsPlaceholder = true,
+                            singleLine = true,
+                            trailingIcon = {
+                                IconButton(
+                                    onClick = {
+                                        onValueChange(text)
+                                        editing = false
+                                    }
+                                ) {
+                                    Icon(
+                                        imageVector = AppIcons.Check,
+                                        contentDescription = stringResource(R.string.action_save)
+                                    )
                                 }
-                            ) {
-                                Icon(
-                                    imageVector = AppIcons.Check,
-                                    contentDescription = "保存"
-                                )
                             }
-                        }
+                        )
+                    }
+                }
+            }
+            AnimatedVisibility(
+                visible = !editing,
+                enter = expandVertically(animationSpec = tween(190)) + fadeIn(tween(170)),
+                exit = shrinkVertically(animationSpec = tween(150)) + fadeOut(tween(120))
+            ) {
+                Column {
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = subtitle,
+                        fontSize = MiuixTheme.textStyles.body2.fontSize,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                     )
                 }
-            } else {
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = subtitle,
-                    fontSize = MiuixTheme.textStyles.body2.fontSize,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                )
             }
         }
         if (!editing) {
             IconButton(onClick = { editing = true }) {
                 Icon(
                     imageVector = AppIcons.Edit,
-                    contentDescription = "编辑",
+                    contentDescription = stringResource(R.string.action_edit),
                     tint = MiuixTheme.colorScheme.primary,
                     modifier = Modifier.size(19.dp)
                 )

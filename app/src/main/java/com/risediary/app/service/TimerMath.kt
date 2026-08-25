@@ -10,8 +10,10 @@ object TimerMath {
     ): Long {
         if (session.status != TimerStatus.RUNNING) return session.elapsedMillis
         val monotonicDelta = elapsedRealtimeNow - session.resumedAtElapsedRealtime
-        val wallDelta = wallClockNow - session.resumedAtWallClock
-        val delta = if (monotonicDelta >= 0L) monotonicDelta else wallDelta.coerceAtLeast(0L)
+        // elapsedRealtime resets to 0 after a reboot, making the delta negative.
+        // Never fall back to wall-clock here: it would count the powered-off
+        // time into the duration and pollute saved records.
+        val delta = if (monotonicDelta >= 0L) monotonicDelta else 0L
         return (session.elapsedMillis + delta).coerceIn(0L, MAX_DURATION_MILLIS)
     }
 

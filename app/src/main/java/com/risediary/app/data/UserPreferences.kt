@@ -1,9 +1,9 @@
-package com.risediary.app.data
+﻿package com.risediary.app.data
 
 import android.content.Context
 import androidx.datastore.core.DataStore
+import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import androidx.datastore.preferences.core.*
-import androidx.datastore.preferences.preferencesDataStore
 import com.risediary.app.reminder.ReminderConfiguration
 import com.risediary.app.reminder.ReminderRuntimeState
 import com.risediary.app.reminder.ReminderType
@@ -11,14 +11,29 @@ import com.risediary.app.reminder.normalizeInactiveDays
 import com.risediary.app.reminder.normalizeReminderTime
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import java.io.File
+import java.io.IOException
 import java.time.LocalDate
 import java.time.ZoneId
 import javax.inject.Inject
 import javax.inject.Singleton
 
-private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "settings")
+/**
+ * Settings DataStore with a real corruption handler: a corrupt file is replaced
+ * by empty preferences and both reads and writes keep working afterwards.
+ * The file path matches the default `preferencesDataStoreFile("settings")`
+ * location so existing data keeps loading after this change.
+ */
+private fun settingsDataStore(context: Context): DataStore<Preferences> =
+    PreferenceDataStoreFactory.create(
+        corruptionHandler = ReplaceFileCorruptionHandler { emptyPreferences() },
+        produceFile = {
+            File(context.filesDir, "datastore/settings.preferences_pb").apply { parentFile?.mkdirs() }
+        }
+    )
 
 enum class BackgroundLockMode(val storedValue: String) {
     ALWAYS("always"),
@@ -45,136 +60,151 @@ class UserPreferences @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
 
+    private val dataStore: DataStore<Preferences> = settingsDataStore(context)
+
+    /**
+     * Wraps the raw DataStore flow. File corruption is repaired transparently by
+     * the DataStore corruption handler; this catch only guards against transient
+     * IO failures by falling back to defaults for display.
+     */
+    private val safeData: Flow<Preferences> = dataStore.data.catch { error: Throwable ->
+        if (error is IOException) {
+            emit(emptyPreferences())
+        } else {
+            throw error
+        }
+    }
+
     // --- Individual flows ---
 
-    val username: Flow<String> = context.dataStore.data.map { prefs ->
+    val username: Flow<String> = safeData.map { prefs ->
         UsernamePolicy.normalize(prefs[KEY_USERNAME].orEmpty())
     }
 
-    val mlPerSpurt: Flow<Float> = context.dataStore.data.map { prefs ->
+    val mlPerSpurt: Flow<Float> = safeData.map { prefs ->
         prefs[KEY_ML_PER_SPURT] ?: 2.0f
     }
 
-    val defaultVolumeMode: Flow<DefaultVolumeMode> = context.dataStore.data.map { prefs ->
+    val defaultVolumeMode: Flow<DefaultVolumeMode> = safeData.map { prefs ->
         DefaultVolumeMode.fromStoredValue(prefs[KEY_DEFAULT_VOLUME_MODE])
     }
 
-    val dailyReminderEnabled: Flow<Boolean> = context.dataStore.data.map { prefs ->
+    val dailyReminderEnabled: Flow<Boolean> = safeData.map { prefs ->
         prefs[KEY_DAILY_REMINDER_ENABLED] ?: false
     }
 
-    val dailyReminderTime: Flow<String> = context.dataStore.data.map { prefs ->
+    val dailyReminderTime: Flow<String> = safeData.map { prefs ->
         normalizeReminderTime(
             prefs[KEY_DAILY_REMINDER_TIME] ?: ReminderConfiguration.DEFAULT_TIME
         )
     }
 
-    val inactiveReminderEnabled: Flow<Boolean> = context.dataStore.data.map { prefs ->
+    val inactiveReminderEnabled: Flow<Boolean> = safeData.map { prefs ->
         prefs[KEY_INACTIVE_REMINDER_ENABLED] ?: false
     }
 
-    val inactiveReminderDays: Flow<Int> = context.dataStore.data.map { prefs ->
+    val inactiveReminderDays: Flow<Int> = safeData.map { prefs ->
         normalizeInactiveDays(
             prefs[KEY_INACTIVE_REMINDER_DAYS] ?: ReminderConfiguration.DEFAULT_INACTIVE_DAYS
         )
     }
 
-    val inactiveReminderTime: Flow<String> = context.dataStore.data.map { prefs ->
+    val inactiveReminderTime: Flow<String> = safeData.map { prefs ->
         normalizeReminderTime(
             prefs[KEY_INACTIVE_REMINDER_TIME] ?: ReminderConfiguration.DEFAULT_TIME
         )
     }
 
-    val monthlyLengthReminderEnabled: Flow<Boolean> = context.dataStore.data.map { prefs ->
+    val monthlyLengthReminderEnabled: Flow<Boolean> = safeData.map { prefs ->
         prefs[KEY_MONTHLY_LENGTH_REMINDER_ENABLED] ?: false
     }
 
-    val monthlyLengthReminderDay: Flow<Int> = context.dataStore.data.map { prefs ->
+    val monthlyLengthReminderDay: Flow<Int> = safeData.map { prefs ->
         (prefs[KEY_MONTHLY_LENGTH_REMINDER_DAY]
             ?: ReminderConfiguration.DEFAULT_MONTHLY_DAY).coerceIn(1, 28)
     }
 
-    val monthlyLengthReminderTime: Flow<String> = context.dataStore.data.map { prefs ->
+    val monthlyLengthReminderTime: Flow<String> = safeData.map { prefs ->
         normalizeReminderTime(
             prefs[KEY_MONTHLY_LENGTH_REMINDER_TIME] ?: ReminderConfiguration.DEFAULT_TIME
         )
     }
 
-    val reminderSound: Flow<Boolean> = context.dataStore.data.map { prefs ->
+    val reminderSound: Flow<Boolean> = safeData.map { prefs ->
         prefs[KEY_REMINDER_SOUND] ?: true
     }
 
-    val reminderVibration: Flow<Boolean> = context.dataStore.data.map { prefs ->
+    val reminderVibration: Flow<Boolean> = safeData.map { prefs ->
         prefs[KEY_REMINDER_VIBRATION] ?: true
     }
 
-    val appLockEnabled: Flow<Boolean> = context.dataStore.data.map { prefs ->
+    val appLockEnabled: Flow<Boolean> = safeData.map { prefs ->
         prefs[KEY_APP_LOCK_ENABLED] ?: false
     }
 
-    val appLockPin: Flow<String> = context.dataStore.data.map { prefs ->
+    val appLockPin: Flow<String> = safeData.map { prefs ->
         prefs[KEY_APP_LOCK_PIN] ?: ""
     }
 
-    val appLockAttempts: Flow<Int> = context.dataStore.data.map { prefs ->
+    val appLockAttempts: Flow<Int> = safeData.map { prefs ->
         prefs[KEY_APP_LOCK_ATTEMPTS] ?: 0
     }
 
-    val appLockoutUntil: Flow<Long> = context.dataStore.data.map { prefs ->
+    val appLockoutUntil: Flow<Long> = safeData.map { prefs ->
         prefs[KEY_APP_LOCKOUT_UNTIL] ?: 0L
     }
 
-    val biometricUnlockEnabled: Flow<Boolean> = context.dataStore.data.map { prefs ->
+    val biometricUnlockEnabled: Flow<Boolean> = safeData.map { prefs ->
         prefs[KEY_BIOMETRIC_UNLOCK_ENABLED] ?: false
     }
 
-    val backgroundAutoLockEnabled: Flow<Boolean> = context.dataStore.data.map { prefs ->
+    val backgroundAutoLockEnabled: Flow<Boolean> = safeData.map { prefs ->
         prefs[KEY_BACKGROUND_AUTO_LOCK_ENABLED] ?: false
     }
 
-    val backgroundLockMode: Flow<BackgroundLockMode> = context.dataStore.data.map { prefs ->
+    val backgroundLockMode: Flow<BackgroundLockMode> = safeData.map { prefs ->
         BackgroundLockMode.fromStoredValue(prefs[KEY_BACKGROUND_LOCK_MODE])
     }
 
-    val themeMode: Flow<String> = context.dataStore.data.map { prefs ->
+    val themeMode: Flow<String> = safeData.map { prefs ->
         prefs[KEY_THEME_MODE] ?: "system"
     }
 
-    val homeCardOrder: Flow<String> = context.dataStore.data.map { prefs ->
+    val homeCardOrder: Flow<String> = safeData.map { prefs ->
         prefs[KEY_HOME_CARD_ORDER] ?: "[]"
     }
 
-    val homeCardVisibility: Flow<String> = context.dataStore.data.map { prefs ->
+    val homeCardVisibility: Flow<String> = safeData.map { prefs ->
         prefs[KEY_HOME_CARD_VISIBILITY] ?: "{}"
     }
 
-    val onboardingCompleted: Flow<Boolean> = context.dataStore.data.map { prefs ->
+    val onboardingCompleted: Flow<Boolean> = safeData.map { prefs ->
         prefs[KEY_ONBOARDING_COMPLETED] ?: false
     }
 
-    val defaultTagsInitialized: Flow<Boolean> = context.dataStore.data.map { prefs ->
+    val defaultTagsInitialized: Flow<Boolean> = safeData.map { prefs ->
         prefs[KEY_DEFAULT_TAGS_INITIALIZED] ?: false
     }
 
     val reminderConfiguration: Flow<ReminderConfiguration> =
-        context.dataStore.data.map(::toReminderConfiguration)
+        safeData.map(::toReminderConfiguration)
 
     // --- Setters ---
 
     suspend fun setUsername(value: String) {
-        context.dataStore.edit { it[KEY_USERNAME] = UsernamePolicy.normalize(value) }
+        dataStore.edit { it[KEY_USERNAME] = UsernamePolicy.normalize(value) }
     }
 
     suspend fun setMlPerSpurt(value: Float) {
-        context.dataStore.edit { it[KEY_ML_PER_SPURT] = value }
+        dataStore.edit { it[KEY_ML_PER_SPURT] = value }
     }
 
     suspend fun setDefaultVolumeMode(mode: DefaultVolumeMode) {
-        context.dataStore.edit { it[KEY_DEFAULT_VOLUME_MODE] = mode.storedValue }
+        dataStore.edit { it[KEY_DEFAULT_VOLUME_MODE] = mode.storedValue }
     }
 
     suspend fun setDailyReminder(enabled: Boolean, time: String? = null) {
-        context.dataStore.edit {
+        dataStore.edit {
             it[KEY_DAILY_REMINDER_ENABLED] = enabled
             if (time != null) {
                 it[KEY_DAILY_REMINDER_TIME] = normalizeReminderTime(time)
@@ -188,7 +218,7 @@ class UserPreferences @Inject constructor(
         days: Int? = null,
         time: String? = null
     ) {
-        context.dataStore.edit { prefs ->
+        dataStore.edit { prefs ->
             val wasEnabled = prefs[KEY_INACTIVE_REMINDER_ENABLED] ?: false
             prefs[KEY_INACTIVE_REMINDER_ENABLED] = enabled
             if (days != null) {
@@ -211,7 +241,7 @@ class UserPreferences @Inject constructor(
     suspend fun setRecommendedReminders(enabled: Boolean, time: String) {
         val normalizedTime = normalizeReminderTime(time)
         val enabledEpochDay = LocalDate.now(ZoneId.systemDefault()).toEpochDay()
-        context.dataStore.edit { prefs ->
+        dataStore.edit { prefs ->
             val inactiveWasEnabled = prefs[KEY_INACTIVE_REMINDER_ENABLED] ?: false
             prefs[KEY_DAILY_REMINDER_ENABLED] = enabled
             prefs[KEY_DAILY_REMINDER_TIME] = normalizedTime
@@ -237,7 +267,7 @@ class UserPreferences @Inject constructor(
         day: Int? = null,
         time: String? = null
     ) {
-        context.dataStore.edit {
+        dataStore.edit {
             it[KEY_MONTHLY_LENGTH_REMINDER_ENABLED] = enabled
             if (day != null) it[KEY_MONTHLY_LENGTH_REMINDER_DAY] = day.coerceIn(1, 28)
             if (time != null) {
@@ -249,7 +279,7 @@ class UserPreferences @Inject constructor(
 
     suspend fun setReminderTime(type: ReminderType, time: String) {
         val normalized = normalizeReminderTime(time)
-        context.dataStore.edit { prefs ->
+        dataStore.edit { prefs ->
             when (type) {
                 ReminderType.DAILY ->
                     prefs[KEY_DAILY_REMINDER_TIME] = normalized
@@ -262,27 +292,27 @@ class UserPreferences @Inject constructor(
     }
 
     suspend fun setInactiveReminderDays(days: Int) {
-        context.dataStore.edit {
+        dataStore.edit {
             it[KEY_INACTIVE_REMINDER_DAYS] = normalizeInactiveDays(days)
         }
     }
 
     suspend fun setMonthlyLengthReminderDay(day: Int) {
-        context.dataStore.edit {
+        dataStore.edit {
             it[KEY_MONTHLY_LENGTH_REMINDER_DAY] = day.coerceIn(1, 28)
         }
     }
 
     suspend fun setReminderSound(enabled: Boolean) {
-        context.dataStore.edit { it[KEY_REMINDER_SOUND] = enabled }
+        dataStore.edit { it[KEY_REMINDER_SOUND] = enabled }
     }
 
     suspend fun setReminderVibration(enabled: Boolean) {
-        context.dataStore.edit { it[KEY_REMINDER_VIBRATION] = enabled }
+        dataStore.edit { it[KEY_REMINDER_VIBRATION] = enabled }
     }
 
     suspend fun setAppLock(enabled: Boolean, pin: String? = null) {
-        context.dataStore.edit {
+        dataStore.edit {
             it[KEY_APP_LOCK_ENABLED] = enabled
             if (pin != null) it[KEY_APP_LOCK_PIN] = pin
             if (!enabled) {
@@ -295,7 +325,7 @@ class UserPreferences @Inject constructor(
     }
 
     suspend fun setBiometricUnlockEnabled(enabled: Boolean) {
-        context.dataStore.edit { prefs ->
+        dataStore.edit { prefs ->
             val lockReady =
                 prefs[KEY_APP_LOCK_ENABLED] == true &&
                     !prefs[KEY_APP_LOCK_PIN].isNullOrEmpty()
@@ -304,15 +334,15 @@ class UserPreferences @Inject constructor(
     }
 
     suspend fun setBackgroundAutoLockEnabled(enabled: Boolean) {
-        context.dataStore.edit { it[KEY_BACKGROUND_AUTO_LOCK_ENABLED] = enabled }
+        dataStore.edit { it[KEY_BACKGROUND_AUTO_LOCK_ENABLED] = enabled }
     }
 
     suspend fun setBackgroundLockMode(mode: BackgroundLockMode) {
-        context.dataStore.edit { it[KEY_BACKGROUND_LOCK_MODE] = mode.storedValue }
+        dataStore.edit { it[KEY_BACKGROUND_LOCK_MODE] = mode.storedValue }
     }
 
     suspend fun setOnboardingLockDefaults() {
-        context.dataStore.edit {
+        dataStore.edit {
             it[KEY_BACKGROUND_AUTO_LOCK_ENABLED] = true
             it[KEY_BACKGROUND_LOCK_MODE] =
                 BackgroundLockMode.EXCEPT_WHILE_TIMER_ACTIVE.storedValue
@@ -320,7 +350,7 @@ class UserPreferences @Inject constructor(
     }
 
     suspend fun setAppLockFailureState(attempts: Int, lockoutUntil: Long) {
-        context.dataStore.edit {
+        dataStore.edit {
             it[KEY_APP_LOCK_ATTEMPTS] = attempts.coerceAtLeast(0)
             it[KEY_APP_LOCKOUT_UNTIL] = lockoutUntil.coerceAtLeast(0L)
         }
@@ -331,24 +361,24 @@ class UserPreferences @Inject constructor(
     }
 
     suspend fun setThemeMode(mode: String) {
-        context.dataStore.edit { it[KEY_THEME_MODE] = mode }
+        dataStore.edit { it[KEY_THEME_MODE] = mode }
     }
 
     suspend fun setHomeCardOrder(orderJson: String) {
-        context.dataStore.edit { it[KEY_HOME_CARD_ORDER] = orderJson }
+        dataStore.edit { it[KEY_HOME_CARD_ORDER] = orderJson }
     }
 
     suspend fun setHomeCardVisibility(visibilityJson: String) {
-        context.dataStore.edit { it[KEY_HOME_CARD_VISIBILITY] = visibilityJson }
+        dataStore.edit { it[KEY_HOME_CARD_VISIBILITY] = visibilityJson }
     }
 
     suspend fun setOnboardingCompleted(completed: Boolean) {
-        context.dataStore.edit { it[KEY_ONBOARDING_COMPLETED] = completed }
+        dataStore.edit { it[KEY_ONBOARDING_COMPLETED] = completed }
     }
 
     suspend fun finishOnboarding(firstRun: Boolean, reminderTime: String?) {
         val normalizedTime = reminderTime?.let(::normalizeReminderTime)
-        context.dataStore.edit {
+        dataStore.edit {
             if (normalizedTime != null) {
                 it[KEY_DAILY_REMINDER_TIME] = normalizedTime
                 it[KEY_INACTIVE_REMINDER_TIME] = normalizedTime
@@ -358,11 +388,54 @@ class UserPreferences @Inject constructor(
     }
 
     suspend fun markDefaultTagsInitialized() {
-        context.dataStore.edit { it[KEY_DEFAULT_TAGS_INITIALIZED] = true }
+        dataStore.edit { it[KEY_DEFAULT_TAGS_INITIALIZED] = true }
+    }
+
+    /**
+     * Restores a full settings snapshot in a single atomic DataStore write so a
+     * failure mid-restore cannot leave a half-old/half-new mix.
+     */
+    suspend fun applySettingsSnapshot(settings: com.risediary.app.data.backup.SettingsSnapshot) {
+        dataStore.edit { prefs ->
+            prefs[KEY_USERNAME] = UsernamePolicy.normalize(settings.username)
+            prefs[KEY_ML_PER_SPURT] = settings.mlPerSpurt
+            prefs[KEY_DEFAULT_VOLUME_MODE] = settings.defaultVolumeMode.storedValue
+            prefs[KEY_DAILY_REMINDER_ENABLED] = settings.dailyReminderEnabled
+            prefs[KEY_DAILY_REMINDER_TIME] = normalizeReminderTime(settings.dailyReminderTime)
+            prefs[KEY_INACTIVE_REMINDER_ENABLED] = settings.inactiveReminderEnabled
+            prefs[KEY_INACTIVE_REMINDER_DAYS] = normalizeInactiveDays(settings.inactiveReminderDays)
+            prefs[KEY_INACTIVE_REMINDER_TIME] =
+                normalizeReminderTime(settings.inactiveReminderTime)
+            prefs[KEY_MONTHLY_LENGTH_REMINDER_ENABLED] =
+                settings.monthlyLengthReminderEnabled
+            prefs[KEY_MONTHLY_LENGTH_REMINDER_DAY] =
+                settings.monthlyLengthReminderDay.coerceIn(1, 28)
+            prefs[KEY_MONTHLY_LENGTH_REMINDER_TIME] =
+                normalizeReminderTime(settings.monthlyLengthReminderTime)
+            prefs[KEY_REMINDER_SOUND] = settings.reminderSound
+            prefs[KEY_REMINDER_VIBRATION] = settings.reminderVibration
+            prefs[KEY_BACKGROUND_AUTO_LOCK_ENABLED] = settings.backgroundAutoLockEnabled
+            prefs[KEY_BACKGROUND_LOCK_MODE] = settings.backgroundLockMode.storedValue
+            prefs[KEY_THEME_MODE] = settings.themeMode
+            prefs[KEY_HOME_CARD_ORDER] = settings.homeCardOrder
+            prefs[KEY_HOME_CARD_VISIBILITY] = settings.homeCardVisibility
+            prefs[KEY_ONBOARDING_COMPLETED] = settings.onboardingCompleted
+            // Reminder runtime state is device-local: clear stale sent-marks from
+            // the previous device so reminders are not suppressed after restore,
+            // and re-anchor the inactive reminder window.
+            prefs[KEY_DAILY_LAST_SENT_EPOCH_DAY] = ReminderRuntimeState.UNSET_EPOCH_DAY
+            prefs[KEY_INACTIVE_LAST_SENT_EPOCH_DAY] = ReminderRuntimeState.UNSET_EPOCH_DAY
+            prefs[KEY_MONTHLY_LAST_SENT] = ""
+            if (settings.inactiveReminderEnabled) {
+                prefs[KEY_INACTIVE_ENABLED_EPOCH_DAY] = LocalDate.now().toEpochDay()
+            } else {
+                prefs[KEY_INACTIVE_ENABLED_EPOCH_DAY] = ReminderRuntimeState.UNSET_EPOCH_DAY
+            }
+        }
     }
 
     suspend fun getReminderRuntimeState(): ReminderRuntimeState {
-        val prefs = context.dataStore.data.first()
+        val prefs = safeData.first()
         return ReminderRuntimeState(
             inactiveEnabledEpochDay =
                 prefs[KEY_INACTIVE_ENABLED_EPOCH_DAY] ?: ReminderRuntimeState.UNSET_EPOCH_DAY,
@@ -375,7 +448,7 @@ class UserPreferences @Inject constructor(
     }
 
     suspend fun ensureInactiveReminderAnchor(epochDay: Long) {
-        context.dataStore.edit { prefs ->
+        dataStore.edit { prefs ->
             if (prefs[KEY_INACTIVE_ENABLED_EPOCH_DAY] == null) {
                 prefs[KEY_INACTIVE_ENABLED_EPOCH_DAY] = epochDay
             }
@@ -383,22 +456,22 @@ class UserPreferences @Inject constructor(
     }
 
     suspend fun resetInactiveReminderAnchor(epochDay: Long) {
-        context.dataStore.edit { prefs ->
+        dataStore.edit { prefs ->
             prefs[KEY_INACTIVE_ENABLED_EPOCH_DAY] = epochDay
             prefs.remove(KEY_INACTIVE_LAST_SENT_EPOCH_DAY)
         }
     }
 
     suspend fun markDailyReminderSent(epochDay: Long) {
-        context.dataStore.edit { it[KEY_DAILY_LAST_SENT_EPOCH_DAY] = epochDay }
+        dataStore.edit { it[KEY_DAILY_LAST_SENT_EPOCH_DAY] = epochDay }
     }
 
     suspend fun markInactiveReminderSent(epochDay: Long) {
-        context.dataStore.edit { it[KEY_INACTIVE_LAST_SENT_EPOCH_DAY] = epochDay }
+        dataStore.edit { it[KEY_INACTIVE_LAST_SENT_EPOCH_DAY] = epochDay }
     }
 
     suspend fun markMonthlyReminderSent(yearMonth: String) {
-        context.dataStore.edit { it[KEY_MONTHLY_LAST_SENT] = yearMonth }
+        dataStore.edit { it[KEY_MONTHLY_LAST_SENT] = yearMonth }
     }
 
     private fun toReminderConfiguration(prefs: Preferences): ReminderConfiguration =

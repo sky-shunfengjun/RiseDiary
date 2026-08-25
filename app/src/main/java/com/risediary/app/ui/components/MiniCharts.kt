@@ -10,6 +10,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
@@ -42,6 +43,7 @@ import com.patrykandpatrick.vico.compose.common.component.rememberTextComponent
 import com.patrykandpatrick.vico.compose.m3.common.rememberM3VicoTheme
 import com.risediary.app.data.entity.Flight
 import com.risediary.app.data.entity.LengthRecord
+import com.risediary.app.R
 import com.risediary.app.ui.theme.CardBlue
 import com.risediary.app.ui.theme.CardGreen
 import java.text.SimpleDateFormat
@@ -86,18 +88,20 @@ internal fun buildTrendChartPoints(
         }
         .sortedWith(compareBy<Pair<Flight, Float>> { it.first.startTime }.thenBy { it.first.id })
     val dayFormat = SimpleDateFormat("M/d", locale)
+    val dayKeyFormat = SimpleDateFormat("yyyy/M/d", locale)
     val timeFormat = SimpleDateFormat("M/d HH:mm", locale)
     val dayCounts = sorted.groupingBy {
-        dayFormat.format(Date(it.first.startTime))
+        dayKeyFormat.format(Date(it.first.startTime))
     }.eachCount()
     return sorted.map { (flight, value) ->
+        val dayKey = dayKeyFormat.format(Date(flight.startTime))
         val day = dayFormat.format(Date(flight.startTime))
         val marker = timeFormat.format(Date(flight.startTime))
         TrendChartPoint(
             x = 0,
             value = value,
             axisLabel =
-                if ((dayCounts[day] ?: 0) > 1) {
+                if ((dayCounts[dayKey] ?: 0) > 1) {
                     marker.replace(" ", "\n")
                 } else {
                     day
@@ -118,14 +122,16 @@ internal fun buildLengthChartPoints(
         }
         .sortedWith(compareBy<LengthRecord> { it.recordDate }.thenBy { it.id })
     val dayFormat = SimpleDateFormat("M/d", locale)
+    val dayKeyFormat = SimpleDateFormat("yyyy/M/d", locale)
     val fullFormat = SimpleDateFormat("yyyy/M/d", locale)
     val dayIndexes = mutableMapOf<String, Int>()
-    val dayCounts = valid.groupingBy { dayFormat.format(Date(it.recordDate)) }.eachCount()
+    val dayCounts = valid.groupingBy { dayKeyFormat.format(Date(it.recordDate)) }.eachCount()
     return valid.mapIndexed { index, record ->
+        val dayKey = dayKeyFormat.format(Date(record.recordDate))
         val day = dayFormat.format(Date(record.recordDate))
-        val occurrence = (dayIndexes[day] ?: 0) + 1
-        dayIndexes[day] = occurrence
-        val suffix = if ((dayCounts[day] ?: 0) > 1) " · $occurrence" else ""
+        val occurrence = (dayIndexes[dayKey] ?: 0) + 1
+        dayIndexes[dayKey] = occurrence
+        val suffix = if ((dayCounts[dayKey] ?: 0) > 1) " · $occurrence" else ""
         LengthChartPoint(
             x = index,
             erect = record.erectLengthCm,
@@ -328,6 +334,7 @@ private fun LengthTrendChartContent(
     modifier: Modifier = Modifier
 ) {
     val locale = LocalConfiguration.current.locales[0]
+    val markerFormat = stringResource(R.string.length_chart_marker)
     val points = remember(records, locale) { buildLengthChartPoints(records, locale) }
     if (points.isEmpty()) return
     val modelProducer = remember { CartesianChartModelProducer() }
@@ -372,7 +379,7 @@ private fun LengthTrendChartContent(
             }
         )
         val marker = rememberChartMarker(
-            formatter = remember(points) {
+            formatter = remember(points, markerFormat) {
                 DefaultCartesianMarker.ValueFormatter { _, targets ->
                     val target = targets.firstOrNull() as? LineCartesianLayerMarkerTarget
                     val x = target?.x?.roundToInt()
@@ -383,7 +390,7 @@ private fun LengthTrendChartContent(
                         val values = target.points.map { it.entry.y }
                         val erect = values.getOrNull(0) ?: point.erect.toDouble()
                         val flaccid = values.getOrNull(1) ?: point.flaccid.toDouble()
-                        formatLengthMarkerValue(erect, flaccid)
+                        formatLengthMarkerValue(markerFormat, erect, flaccid)
                     }
                 }
             }

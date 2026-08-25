@@ -62,7 +62,6 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastCoerceIn
-import androidx.compose.ui.util.fastCoerceAtMost
 import androidx.compose.ui.util.fastRoundToInt
 import androidx.compose.ui.util.lerp
 import com.kyant.backdrop.Backdrop
@@ -88,6 +87,15 @@ import kotlin.math.sign
 
 private val LocalLiquidBottomTabScale =
     staticCompositionLocalOf { { 1f } }
+
+/**
+ * 捕获层（隐藏采样 Row）标记：该层只画实心图标供玻璃胶囊采样，
+ * 可见层始终画空心图标，选中实心只通过胶囊覆盖区域渐显。
+ */
+internal val LocalLiquidBottomTabSampling =
+    staticCompositionLocalOf { false }
+
+internal fun originalLiquidSelectionPressedScale(): Float = 78f / 56f
 
 internal data class CompactLensMaskBounds(
     val left: Float,
@@ -218,7 +226,7 @@ internal fun LiquidBottomTabs(
                 valueRange = 0f..(tabsCount - 1).toFloat(),
                 visibilityThreshold = 0.001f,
                 initialScale = 1f,
-                pressedScale = 78f / 56f,
+                pressedScale = originalLiquidSelectionPressedScale(),
                 onDragStarted = {},
                 onDragStopped = {
                     val targetIndex =
@@ -393,7 +401,8 @@ internal fun LiquidBottomTabs(
                     1.2f,
                     dampedDragAnimation.pressProgress
                 )
-            }
+            },
+            LocalLiquidBottomTabSampling provides true
         ) {
             Row(
                 Modifier

@@ -25,7 +25,7 @@ interface LengthRecordDao {
     @Query("SELECT * FROM length_records WHERE id = :id LIMIT 1")
     suspend fun getById(id: Long): LengthRecord?
 
-    @Query("SELECT * FROM length_records WHERE recordDate >= :monthStart AND recordDate < :nextMonthStart LIMIT 1")
+    @Query("SELECT * FROM length_records WHERE recordDate >= :monthStart AND recordDate < :nextMonthStart ORDER BY recordDate DESC LIMIT 1")
     suspend fun getForMonth(monthStart: Long, nextMonthStart: Long): LengthRecord?
 
     @Query("SELECT * FROM length_records WHERE recordDate >= :yearStart AND recordDate < :yearEnd ORDER BY recordDate ASC")
@@ -41,7 +41,7 @@ interface LengthRecordDao {
     suspend fun maxErectLength(): Float
 
     @Query("SELECT COALESCE(erectLengthCm, 0) FROM length_records WHERE erectLengthCm > 0 ORDER BY recordDate ASC, id ASC LIMIT 1")
-    suspend fun firstErectLength(): Float
+    suspend fun firstErectLength(): Float?
 
     @Query("DELETE FROM length_records")
     suspend fun nuke()

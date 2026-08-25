@@ -24,6 +24,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -110,7 +111,10 @@ class TimerService : Service() {
             normalized.elapsedMillis >= TimerMath.MAX_DURATION_MILLIS
         ) {
             normalized = processMilestones(normalized)
-            if (normalized.status == TimerStatus.LIMIT_REACHED) return
+            if (normalized.status == TimerStatus.LIMIT_REACHED) {
+                store.save(normalized)
+                return
+            }
         }
         publish(normalized, persist = true)
         if (normalized.status == TimerStatus.RUNNING) startTicker()
@@ -176,26 +180,47 @@ class TimerService : Service() {
         stopSelf()
     }
 
+    /**
+     * The whole tick iteration runs inside [commandMutex] so a pause/finish/reset
+     * command can never interleave between reading the session and publishing the
+     * advanced state. This guarantees a stale RUNNING write can never land after
+     * a PAUSED write (pause only runs once the in-flight tick is fully done).
+     */
     private fun startTicker() {
         tickerJob?.cancel()
         tickerJob = serviceScope.launch {
-            while (true) {
-                val current = stateHolder.state.value
-                if (current.status != TimerStatus.RUNNING) break
-                val advanced = TimerMath.advance(
-                    session = current,
-                    elapsedRealtimeNow = elapsedClock.millis(),
-                    wallClockNow = wallClock.millis()
-                )
-                val updated = processMilestones(advanced)
-                val elapsed = updated.elapsedMillis
-                if (updated.status == TimerStatus.LIMIT_REACHED) break
+            while (isActive) {
+                var keepTicking = true
+                commandMutex.withLock {
+                    val current = stateHolder.state.value
+                    if (current.status != TimerStatus.RUNNING) {
+                        keepTicking = false
+                        return@withLock
+                    }
+                    val advanced = TimerMath.advance(
+                        session = current,
+                        elapsedRealtimeNow = elapsedClock.millis(),
+                        wallClockNow = wallClock.millis()
+                    )
+                    val updated = processMilestones(advanced)
+                    if (
+                        updated.status == TimerStatus.LIMIT_REACHED ||
+                        updated.notifiedMilestonesMask != current.notifiedMilestonesMask
+                    ) {
+                        store.save(updated)
+                    }
+                    if (updated.status == TimerStatus.LIMIT_REACHED) {
+                        keepTicking = false
+                        return@withLock
+                    }
 
-                val seconds = elapsed / 1_000L
-                if (seconds != lastNotificationSecond) {
-                    lastNotificationSecond = seconds
-                    notifyState(updated)
+                    val seconds = updated.elapsedMillis / 1_000L
+                    if (seconds != lastNotificationSecond) {
+                        lastNotificationSecond = seconds
+                        notifyState(updated)
+                    }
                 }
+                if (!keepTicking) break
                 delay(TICK_MILLIS)
             }
         }
@@ -221,9 +246,6 @@ class TimerService : Service() {
         )
 
         stateHolder.set(updated)
-        if (latest != null || reachedLimit) {
-            store.save(updated)
-        }
 
         if (reachedLimit) {
             stopForeground(STOP_FOREGROUND_REMOVE)

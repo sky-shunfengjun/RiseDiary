@@ -18,11 +18,15 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.navigation.NavController
+import com.risediary.app.R
+import com.risediary.app.ui.navigation3.LocalNavigator
+import com.risediary.app.ui.navigation3.Route
 import com.risediary.app.ui.components.SecondaryPageScaffold
 import com.risediary.app.ui.components.reorderByDragOffset
 import com.risediary.app.ui.theme.RiseCard
@@ -37,9 +41,9 @@ import com.risediary.app.ui.icons.AppIcons
 
 @Composable
 fun CardOrderScreen(
-    navController: NavController,
     vm: CardOrderViewModel = hiltViewModel()
 ) {
+    val navigator = LocalNavigator.current
     val scope = rememberCoroutineScope()
     var isClosing by remember { mutableStateOf(false) }
     val closeScreen: () -> Unit = {
@@ -47,7 +51,7 @@ fun CardOrderScreen(
             isClosing = true
             scope.launch {
                 runCatching { vm.save() }
-                    .onSuccess { navController.navigateUp() }
+                    .onSuccess { navigator.pop() }
                     .onFailure { isClosing = false }
             }
         }
@@ -55,23 +59,31 @@ fun CardOrderScreen(
     BackHandler(enabled = !isClosing, onBack = closeScreen)
 
     SecondaryPageScaffold(
-        title = "首页卡片排序",
+        title = stringResource(R.string.card_order_title),
         onBack = closeScreen
     ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding)
-        ) {
+        Column(modifier = Modifier.fillMaxSize()) {
             Text(
-                "长按左侧拖动柄调整顺序，右侧按钮控制首页显示。",
+                stringResource(R.string.card_order_instructions),
                 fontSize = MiuixTheme.textStyles.body1.fontSize,
                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                modifier = Modifier.padding(horizontal = 4.dp)
+                modifier = Modifier.padding(
+                    start = innerPadding.calculateLeftPadding(LayoutDirection.Ltr) + 4.dp,
+                    top = innerPadding.calculateTopPadding(),
+                    end = innerPadding.calculateRightPadding(LayoutDirection.Ltr) + 4.dp
+                )
             )
             Spacer(modifier = Modifier.height(16.dp))
 
-            CardOrderList(vm, Modifier.weight(1f))
+            CardOrderList(
+                vm = vm,
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(
+                    start = innerPadding.calculateLeftPadding(LayoutDirection.Ltr),
+                    end = innerPadding.calculateRightPadding(LayoutDirection.Ltr),
+                    bottom = innerPadding.calculateBottomPadding()
+                )
+            )
         }
     }
 }
@@ -79,7 +91,8 @@ fun CardOrderScreen(
 @Composable
 private fun CardOrderList(
     vm: CardOrderViewModel,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    contentPadding: PaddingValues = PaddingValues()
 ) {
     var draggedCardId by remember { mutableStateOf<String?>(null) }
     var dragOffsetY by remember { mutableFloatStateOf(0f) }
@@ -106,10 +119,12 @@ private fun CardOrderList(
         }
     }
 
-    LazyColumn(
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-        modifier = modifier.fillMaxWidth()
-    ) {
+LazyColumn(
+verticalArrangement = Arrangement.spacedBy(12.dp),
+modifier = modifier
+    .fillMaxWidth(),
+contentPadding = contentPadding
+) {
         itemsIndexed(
             items = vm.orderedIds,
             key = { _, id -> id }
@@ -174,7 +189,7 @@ private fun CardOrderList(
                     ) {
                         Icon(
                             AppIcons.DragHandle,
-                            contentDescription = "按住并上下拖动排序",
+                            contentDescription = stringResource(R.string.cd_drag_reorder),
                             tint = MiuixTheme.colorScheme.primary
                         )
                     }
@@ -198,13 +213,18 @@ private fun CardOrderList(
                     }
                     Spacer(modifier = Modifier.width(12.dp))
                     Column(modifier = Modifier.weight(1f)) {
+                        val labelRes = vm.getLabelRes(cardId)
                         Text(
-                            vm.getLabel(cardId),
+                            if (labelRes != 0) stringResource(labelRes) else cardId,
                             fontSize = MiuixTheme.textStyles.title4.fontSize,
                             fontWeight = FontWeight.SemiBold
                         )
                         Text(
-                            if (isVisible) "显示在首页" else "已隐藏",
+                            if (isVisible) {
+                                stringResource(R.string.card_order_visible)
+                            } else {
+                                stringResource(R.string.card_order_hidden)
+                            },
                             fontSize = MiuixTheme.textStyles.body2.fontSize,
                             color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                         )
@@ -213,7 +233,11 @@ private fun CardOrderList(
                     IconButton(onClick = { vm.toggleVisible(cardId) }) {
                         Icon(
                             if (isVisible) AppIcons.Visibility else AppIcons.VisibilityOff,
-                            contentDescription = if (isVisible) "显示" else "隐藏",
+                            contentDescription = if (isVisible) {
+                                stringResource(R.string.action_show)
+                            } else {
+                                stringResource(R.string.action_hide)
+                            },
                             tint = if (isVisible) {
                                 MiuixTheme.colorScheme.primary
                             } else {

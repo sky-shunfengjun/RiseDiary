@@ -183,12 +183,16 @@ fun OnboardingScreen(
         if (finishing) return
         finishing = true
         onboardingScope.launch {
-            settingsViewModel.awaitOnboardingWrites()
-            viewModel.finish(
-                firstRun = mode == OnboardingMode.FIRST_RUN,
-                reminderTime = reminderTimeDraft.takeIf { saveReminderTime }
-            )
-            onDone()
+            try {
+                settingsViewModel.awaitOnboardingWrites()
+                viewModel.finish(
+                    firstRun = mode == OnboardingMode.FIRST_RUN,
+                    reminderTime = reminderTimeDraft.takeIf { saveReminderTime }
+                )
+                onDone()
+            } finally {
+                finishing = false
+            }
         }
     }
 
@@ -196,25 +200,27 @@ fun OnboardingScreen(
         if (page > WELCOME_PAGE) page-- else onDone()
     }
 
-    if (showLockSetup) {
-        AppLockScreen(
-            mode = LockMode.CREATE,
-            onDone = {
-                settingsViewModel.applyOnboardingLockDefaults()
-                showLockSetup = false
-                if (settingsViewModel.biometricAvailable) {
-                    settingsViewModel.requestBiometricUnlock(true, activity)
-                }
-            },
-            onCancel = { showLockSetup = false }
-        )
-        return
-    }
-
     // The draft is the source of truth while the flow is open. Persisted settings may
     // still be catching up after saving the theme, which previously caused a brief light
     // flash on the following pages.
     val previewTheme = resolveOnboardingPreviewTheme(themeDraft, persistedTheme)
+
+    if (showLockSetup) {
+        RiseDiaryTheme(themeMode = previewTheme) {
+            AppLockScreen(
+                mode = LockMode.CREATE,
+                onDone = {
+                    settingsViewModel.applyOnboardingLockDefaults()
+                    showLockSetup = false
+                    if (settingsViewModel.biometricAvailable) {
+                        settingsViewModel.requestBiometricUnlock(true, activity)
+                    }
+                },
+                onCancel = { showLockSetup = false }
+            )
+        }
+        return
+    }
 
     RiseDiaryTheme(themeMode = previewTheme) {
         val backdrop = rememberLayerBackdrop()

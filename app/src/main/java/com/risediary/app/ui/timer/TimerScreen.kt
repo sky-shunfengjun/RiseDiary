@@ -45,6 +45,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -54,12 +55,13 @@ import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavController
+import com.risediary.app.R
+import com.risediary.app.ui.navigation3.LocalNavigator
+import com.risediary.app.ui.navigation3.Route
 import com.kyant.backdrop.Backdrop
 import com.risediary.app.service.TimerMath
 import com.risediary.app.service.TimerSession
 import com.risediary.app.service.TimerStatus
-import com.risediary.app.ui.Screen
 import com.risediary.app.ui.components.LiquidGlassButton
 import com.risediary.app.ui.components.LiquidAlertDialog
 import com.risediary.app.ui.components.SecondaryPageScaffold
@@ -75,9 +77,9 @@ import com.risediary.app.ui.icons.AppIcons
 
 @Composable
 fun TimerScreen(
-    navController: NavController,
     viewModel: TimerViewModel = hiltViewModel()
 ) {
+    val navigator = LocalNavigator.current
     val context = LocalContext.current
     val session by viewModel.session.collectAsStateWithLifecycle()
     var showFinishConfirm by remember { mutableStateOf(false) }
@@ -106,8 +108,8 @@ fun TimerScreen(
     fun openRecord() {
         val duration = session.elapsedMillis
         val startTime = session.startedAtEpochMillis
-        navController.navigate(
-            Screen.RecordForm.createRoute(
+        navigator.push(
+            Route.RecordForm(
                 isTimer = true,
                 duration = duration,
                 startTime = startTime
@@ -121,16 +123,16 @@ fun TimerScreen(
 
     val isRunning = session.status == TimerStatus.RUNNING
     val window = context.findActivity()?.window
-    DisposableEffect(isRunning) {
+    DisposableEffect(isRunning, window) {
         if (isRunning) window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         onDispose { window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
     }
 
     SecondaryPageScaffold(
-        title = "计时",
+        title = stringResource(R.string.timer_title),
         onBack = {
             if (session.isActive) showLeaveConfirm = true
-            else navController.navigateUp()
+            else navigator.pop()
         },
         bottomAction = { backdrop ->
             TimerActionDock(
@@ -183,11 +185,11 @@ fun TimerScreen(
     if (showFinishConfirm) {
         LiquidAlertDialog(
             onDismissRequest = { showFinishConfirm = false },
-            title = { Text("结束计时") },
-            text = { Text("结束后可以继续填写本次记录。") },
+            title = { Text(stringResource(R.string.timer_end_timing)) },
+            text = { Text(stringResource(R.string.timer_finish_dialog_message)) },
             confirmButton = {
                 TextButton(
-                    text = "确认结束",
+                    text = stringResource(R.string.timer_confirm_end),
                     onClick = {
                         showFinishConfirm = false
                         viewModel.finish()
@@ -202,7 +204,7 @@ fun TimerScreen(
             },
             dismissButton = {
                 TextButton(
-                    text = "继续计时",
+                    text = stringResource(R.string.timer_continue_timing),
                     onClick = { showFinishConfirm = false },
                     colors = liquidDialogCancelButtonColors()
                 )
@@ -213,21 +215,21 @@ fun TimerScreen(
     if (showLeaveConfirm) {
         LiquidAlertDialog(
             onDismissRequest = { showLeaveConfirm = false },
-            title = { Text("离开计时页面？") },
-            text = { Text("计时会在后台继续，你可以从应用或通知栏返回。") },
+            title = { Text(stringResource(R.string.timer_leave_dialog_title)) },
+            text = { Text(stringResource(R.string.timer_leave_dialog_message)) },
             confirmButton = {
                 TextButton(
-                    text = "后台继续",
+                    text = stringResource(R.string.timer_leave_confirm),
                     onClick = {
                         showLeaveConfirm = false
-                        navController.popBackStack()
+                        navigator.pop()
                     },
                     colors = liquidDialogConfirmButtonColors()
                 )
             },
             dismissButton = {
                 TextButton(
-                    text = "留在这里",
+                    text = stringResource(R.string.timer_leave_cancel),
                     onClick = { showLeaveConfirm = false },
                     colors = liquidDialogCancelButtonColors()
                 )
@@ -242,11 +244,11 @@ private fun TimerInstrument(
     modifier: Modifier = Modifier
 ) {
     val statusText = when (session.status) {
-        TimerStatus.IDLE -> "准备开始"
-        TimerStatus.RUNNING -> "正在计时"
-        TimerStatus.PAUSED -> "计时已暂停"
-        TimerStatus.FINISHED -> "计时已结束"
-        TimerStatus.LIMIT_REACHED -> "已达到 120 分钟上限"
+        TimerStatus.IDLE -> stringResource(R.string.timer_status_idle)
+        TimerStatus.RUNNING -> stringResource(R.string.timer_status_running)
+        TimerStatus.PAUSED -> stringResource(R.string.notification_timer_paused_title)
+        TimerStatus.FINISHED -> stringResource(R.string.timer_status_finished)
+        TimerStatus.LIMIT_REACHED -> stringResource(R.string.notification_timer_limit_title)
     }
     val statusColor = when (session.status) {
         TimerStatus.RUNNING -> MiuixTheme.colorScheme.primary
@@ -277,7 +279,7 @@ private fun TimerInstrument(
         )
         Spacer(modifier = Modifier.height(10.dp))
         Text(
-            text = "当前分钟 · 最长 120 分钟",
+            text = stringResource(R.string.timer_track_caption),
             fontSize = MiuixTheme.textStyles.footnote1.fontSize,
             color = MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.72f)
         )
@@ -401,7 +403,7 @@ private fun TimerActionDock(
     when (session.status) {
         TimerStatus.IDLE -> {
             PrimaryTimerButton(
-                text = "开始计时",
+                text = stringResource(R.string.mode_select_timer),
                 icon = { Icon(AppIcons.PlayArrow, null, Modifier.size(24.dp)) },
                 onClick = onStart,
                 backdrop = backdrop
@@ -414,7 +416,11 @@ private fun TimerActionDock(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 PrimaryTimerButton(
-                    text = if (session.status == TimerStatus.PAUSED) "继续" else "暂停",
+                    text = if (session.status == TimerStatus.PAUSED) {
+                        stringResource(R.string.timer_resume)
+                    } else {
+                        stringResource(R.string.timer_pause)
+                    },
                     icon = {
                         Icon(
                             if (session.status == TimerStatus.PAUSED) {
@@ -441,12 +447,17 @@ private fun TimerActionDock(
                     highlightRadiusMultiplier = 0.95f,
                     pressExpansion = 2.dp
                 ) {
-                    Icon(
-                        AppIcons.Stop,
-                        contentDescription = "结束计时",
-                        tint = MiuixTheme.colorScheme.error,
-                        modifier = Modifier.size(24.dp)
-                    )
+                    Box(
+                        modifier = Modifier.size(60.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            AppIcons.Stop,
+                            contentDescription = stringResource(R.string.timer_end_timing),
+                            tint = MiuixTheme.colorScheme.error,
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                 }
             }
         }
@@ -466,10 +477,10 @@ private fun TimerActionDock(
                     pressExpansion = 2.dp
                 ) {
                     Icon(AppIcons.Refresh, null, Modifier.size(22.dp))
-                    Text("重新计时", fontWeight = FontWeight.Medium)
+                    Text(stringResource(R.string.timer_restart), fontWeight = FontWeight.Medium)
                 }
                 PrimaryTimerButton(
-                    text = "填写记录",
+                    text = stringResource(R.string.timer_fill_record),
                     icon = { Icon(AppIcons.EditNote, null, Modifier.size(22.dp)) },
                     onClick = onRecord,
                     backdrop = backdrop,
@@ -480,7 +491,7 @@ private fun TimerActionDock(
 
         TimerStatus.LIMIT_REACHED -> {
             PrimaryTimerButton(
-                text = "填写记录",
+                text = stringResource(R.string.timer_fill_record),
                 icon = { Icon(AppIcons.EditNote, null, Modifier.size(24.dp)) },
                 onClick = onRecord,
                 backdrop = backdrop

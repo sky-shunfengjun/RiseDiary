@@ -21,7 +21,8 @@ import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavController
+import com.risediary.app.ui.navigation3.LocalNavigator
+import com.risediary.app.ui.navigation3.Route
 import com.risediary.app.R
 import com.risediary.app.ui.components.LiquidAlertDialog
 import com.risediary.app.ui.components.SecondaryPageScaffold
@@ -41,9 +42,9 @@ private tailrec fun Context.findFragmentActivity(): FragmentActivity? = when (th
 
 @Composable
 fun AppLockSettingsScreen(
-    navController: NavController,
     vm: SettingsViewModel = hiltViewModel()
 ) {
+    val navigator = LocalNavigator.current
     val context = LocalContext.current
     val activity = context.findFragmentActivity()
     val lockEnabled by vm.appLockEnabled.collectAsStateWithLifecycle()
@@ -55,7 +56,7 @@ fun AppLockSettingsScreen(
 
     SecondaryPageScaffold(
         title = stringResource(R.string.settings_app_lock),
-        onBack = { navController.popBackStack() }
+        onBack = { navigator.pop() }
     ) { contentPadding ->
         Column(
             modifier = Modifier
@@ -76,7 +77,7 @@ fun AppLockSettingsScreen(
                     onCheckedChange = { enabled ->
                         if (enabled != lockEnabled) {
                             if (enabled) {
-                                navController.navigate("lock_setup")
+                                navigator.push(Route.LockSetup)
                             } else {
                                 showDisableDialog = true
                             }
@@ -89,7 +90,7 @@ fun AppLockSettingsScreen(
                         icon = AppIcons.LockReset,
                         title = stringResource(R.string.settings_change_pin),
                         subtitle = stringResource(R.string.settings_change_pin_summary),
-                        onClick = { navController.navigate("lock_change") }
+                        onClick = { navigator.push(Route.LockChange) }
                     )
                     SettingsDivider()
                     val biometricAvailable = vm.biometricAvailable
@@ -150,7 +151,7 @@ fun AppLockSettingsScreen(
                     text = stringResource(R.string.settings_app_lock_continue_verify),
                     onClick = {
                         showDisableDialog = false
-                        navController.navigate("lock_disable")
+                        navigator.push(Route.LockDisable)
                     },
                     colors = ButtonDefaults.textButtonColors(
                         color = androidx.compose.ui.graphics.Color.Transparent,

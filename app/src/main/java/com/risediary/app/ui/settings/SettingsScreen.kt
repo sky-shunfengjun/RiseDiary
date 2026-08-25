@@ -3,9 +3,12 @@ package com.risediary.app.ui.settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -16,12 +19,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavController
+import com.risediary.app.ui.navigation3.LocalNavigator
+import com.risediary.app.ui.navigation3.Route
 import com.risediary.app.BuildConfig
 import com.risediary.app.R
 import com.risediary.app.data.DefaultVolumeMode
 import com.risediary.app.data.UsernamePolicy
-import com.risediary.app.ui.Screen
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.preference.ArrowPreference
@@ -34,15 +37,21 @@ import com.risediary.app.ui.icons.AppIcons
 
 @Composable
 fun SettingsScreen(
-    navController: NavController,
     vm: SettingsViewModel = hiltViewModel()
 ) {
+    val navigator = LocalNavigator.current
+    val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
             .scrollEndHaptic()
             .overScrollVertical(),
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 88.dp),
+        contentPadding = PaddingValues(
+            start = 20.dp,
+            top = statusBarTop,
+            end = 20.dp,
+            bottom = 88.dp
+        ),
         verticalArrangement = Arrangement.spacedBy(12.dp),
         overscrollEffect = null
     ) {
@@ -96,7 +105,7 @@ fun SettingsScreen(
                         title = stringResource(R.string.settings_manage_tags),
                         summary = stringResource(R.string.settings_manage_tags_summary),
                         startAction = { SettingsIcon(AppIcons.LocalOffer) },
-                        onClick = { navController.navigate(Screen.TagManager.route) }
+                        onClick = { navigator.push(Route.TagManager) }
                     )
                 }
             }
@@ -109,7 +118,7 @@ fun SettingsScreen(
                     title = stringResource(R.string.settings_reminder_settings),
                     summary = stringResource(R.string.settings_reminder_settings_summary),
                     startAction = { SettingsIcon(AppIcons.NotificationsActive) },
-                    onClick = { navController.navigate(Screen.ReminderSettings.route) }
+                    onClick = { navigator.push(Route.ReminderSettings) }
                 )
             }
         }
@@ -124,7 +133,7 @@ fun SettingsScreen(
                         if (lockEnabled) stringResource(R.string.settings_app_lock_on)
                         else stringResource(R.string.settings_app_lock_off),
                     startAction = { SettingsIcon(AppIcons.Lock) },
-                    onClick = { navController.navigate(Screen.AppLockSettings.route) }
+                    onClick = { navigator.push(Route.AppLockSettings) }
                 )
             }
         }
@@ -136,7 +145,7 @@ fun SettingsScreen(
                     title = stringResource(R.string.settings_backup),
                     summary = stringResource(R.string.settings_backup_summary),
                     startAction = { SettingsIcon(AppIcons.Backup) },
-                    onClick = { navController.navigate(Screen.BackupRestore.route) }
+                    onClick = { navigator.push(Route.BackupRestore) }
                 )
             }
         }
@@ -154,7 +163,7 @@ fun SettingsScreen(
                         title = stringResource(R.string.settings_card_order),
                         summary = stringResource(R.string.settings_card_order_summary),
                         startAction = { SettingsIcon(AppIcons.Reorder) },
-                        onClick = { navController.navigate(Screen.CardOrder.route) }
+                        onClick = { navigator.push(Route.CardOrder) }
                     )
                 }
             }
@@ -168,13 +177,13 @@ fun SettingsScreen(
                         title = stringResource(R.string.settings_review_onboarding),
                         summary = stringResource(R.string.settings_review_onboarding_summary),
                         startAction = { SettingsIcon(AppIcons.School) },
-                        onClick = { navController.navigate("onboarding_review") }
+                        onClick = { navigator.push(Route.OnboardingReview) }
                     )
                     ArrowPreference(
                         title = stringResource(R.string.settings_about),
                         summary = stringResource(R.string.settings_version, BuildConfig.VERSION_NAME),
                         startAction = { SettingsIcon(AppIcons.Info) },
-                        onClick = { navController.navigate(Screen.About.route) }
+                        onClick = { navigator.push(Route.About) }
                     )
                 }
             }

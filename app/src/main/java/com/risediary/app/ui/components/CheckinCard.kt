@@ -20,6 +20,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringArrayResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -28,9 +30,6 @@ import com.risediary.app.R
 import com.risediary.app.ui.theme.CardBlue
 import com.risediary.app.ui.theme.StatusSuccess
 import com.risediary.app.ui.theme.StatusWarning
-import com.kyant.backdrop.backdrops.layerBackdrop
-import com.kyant.backdrop.backdrops.rememberLayerBackdrop
-import com.kyant.capsule.ContinuousCapsule
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 import com.risediary.app.ui.icons.AppIcons
@@ -53,7 +52,7 @@ fun CheckinCard(
     modifier: Modifier = Modifier
 ) {
     var showMonth by remember { mutableStateOf(false) }
-    val today = remember { LocalDate.now() }
+    val today = LocalDate.now()
     val dateFormatter = remember { DateTimeFormatter.ofPattern("yyyy-MM-dd") }
 
     // Calculate this week's Monday–Sunday
@@ -64,9 +63,9 @@ fun CheckinCard(
     val weekDays = remember(weekStart) {
         (0..6).map { weekStart.plusDays(it.toLong()) }
     }
-    val weekdayLabels = listOf("一", "二", "三", "四", "五", "六", "日")
+    val weekdayLabels = stringArrayResource(R.array.weekday_labels)
 
-    Column(modifier = modifier.animateContentSize()) {
+    Column(modifier = modifier) {
         // Header row with toggle
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -88,89 +87,53 @@ fun CheckinCard(
             }
             Spacer(modifier = Modifier.width(10.dp))
             Text(
-                "打卡",
+                stringResource(R.string.checkin_title),
                 fontSize = MiuixTheme.textStyles.title4.fontSize,
                 fontWeight = FontWeight.SemiBold,
                 color = MiuixTheme.colorScheme.onSurface,
                 modifier = Modifier.weight(1f)
             )
-            val trackColor = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.035f)
-            val currentTrackColor by rememberUpdatedState(trackColor)
-            val backdrop = rememberLayerBackdrop { drawContent() }
-            Box(
+            CompactRangeSwitcher(
+                options = listOf(
+                    LiquidSegmentOption(stringResource(R.string.checkin_week), AppIcons.CalendarMonth),
+                    LiquidSegmentOption(stringResource(R.string.checkin_month), AppIcons.CalendarMonth)
+                ),
+                selectedIndex = if (showMonth) 1 else 0,
+                onSelected = { showMonth = it == 1 },
                 modifier = Modifier
                     .width(156.dp)
-                    .height(38.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .fillMaxWidth()
-                        .requiredHeight(70.dp)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .layerBackdrop(backdrop)
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .align(Alignment.CenterEnd)
-                                .width(124.dp)
-                                .height(38.dp)
-                                .clip(ContinuousCapsule)
-                                .background(currentTrackColor)
-                        )
-                    }
-                    LiquidSegmentedControl(
-                        options = remember {
-                            listOf(
-                                LiquidSegmentOption("本周", AppIcons.CalendarMonth),
-                                LiquidSegmentOption("本月", AppIcons.CalendarMonth)
-                            )
-                        },
-                        selectedIndex = if (showMonth) 1 else 0,
-                        onSelected = { showMonth = it == 1 },
-                        backdrop = backdrop,
-                        modifier = Modifier
-                            .align(Alignment.CenterEnd)
-                            .width(124.dp),
-                        containerHeight = 38.dp,
-                        contentPadding = 3.dp,
-                        showIcons = false,
-                        labelFontSize = 12.sp,
-                        showSelectionShadow = false
-                    )
-                }
-            }
+                    .height(38.dp),
+                controlWidth = 124.dp
+            )
         }
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        AnimatedContent(
-            targetState = showMonth,
-            transitionSpec = {
-                (
-                    fadeIn(tween(180)) +
-                        slideInHorizontally(tween(220)) { width ->
-                            if (targetState) width / 12 else -width / 12
-                        }
-                    ).togetherWith(
-                    fadeOut(tween(120)) +
-                        slideOutHorizontally(tween(180)) { width ->
-                            if (targetState) -width / 12 else width / 12
-                        }
-                )
-            },
-            label = "checkin_range_content"
-        ) { showingMonth ->
-            if (showingMonth) {
-                CalendarHeatmap(
-                    dayCounts = dayCounts,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            } else {
-                Column(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.animateContentSize()) {
+            AnimatedContent(
+                targetState = showMonth,
+                transitionSpec = {
+                    (
+                        fadeIn(tween(180)) +
+                            slideInHorizontally(tween(220)) { width ->
+                                if (targetState) width / 12 else -width / 12
+                            }
+                        ).togetherWith(
+                        fadeOut(tween(120)) +
+                            slideOutHorizontally(tween(180)) { width ->
+                                if (targetState) -width / 12 else width / 12
+                            }
+                    )
+                },
+                label = "checkin_range_content"
+            ) { showingMonth ->
+                if (showingMonth) {
+                    CalendarHeatmap(
+                        dayCounts = dayCounts,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                } else {
+                    Column(modifier = Modifier.fillMaxWidth()) {
                     // ── Duolingo-style week check-in ──
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -281,11 +244,16 @@ fun CheckinCard(
                             val changeColor = if (change >= 0) StatusSuccess else StatusWarning
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                "较上周 $arrow ${kotlin.math.abs(change)}%",
+                                stringResource(
+                                    R.string.checkin_vs_last_week,
+                                    arrow,
+                                    kotlin.math.abs(change)
+                                ),
                                 fontSize = MiuixTheme.textStyles.footnote1.fontSize,
                                 color = changeColor
                             )
                         }
+                    }
                     }
                 }
             }

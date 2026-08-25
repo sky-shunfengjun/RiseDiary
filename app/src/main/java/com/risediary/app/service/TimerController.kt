@@ -32,7 +32,9 @@ class ServiceTimerController @Inject constructor(
 
     private fun send(action: String, foreground: Boolean = false) {
         val intent = Intent(context, TimerService::class.java).setAction(action)
-        if (foreground) ContextCompat.startForegroundService(context, intent)
-        else context.startService(intent)
+        runCatching {
+            if (foreground) ContextCompat.startForegroundService(context, intent)
+            else context.startService(intent)
+        }
     }
 }

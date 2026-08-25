@@ -1,3 +1,8 @@
+/*
+ * Copyright (C) 2026 sky-shunfengjun
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ */
 package com.risediary.app.ui.components
 
 import androidx.compose.foundation.background
@@ -8,11 +13,15 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -22,30 +31,26 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kyant.backdrop.Backdrop
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import com.risediary.app.R
 import com.risediary.app.ui.theme.backgroundBrush
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import com.risediary.app.ui.icons.AppIcons
 
 /**
- * Shared frame for secondary and tertiary pages.
- *
- * The content is captured in its own backdrop layer while the glass controls
- * are drawn as siblings above it. This keeps the glass button from capturing
- * itself and matches the layering used by AndroidLiquidGlass's demo.
+ * 二级页面骨架：沉浸式边界 + 液体玻璃返回键 + 标题顶栏。
  */
 @Composable
 fun SecondaryPageScaffold(
@@ -58,20 +63,16 @@ fun SecondaryPageScaffold(
     reserveFloatingActionButtonSpace: Boolean = true,
     bottomAction: (@Composable (Backdrop) -> Unit)? = null,
     reserveBottomActionSpace: Boolean = true,
+    titleAlpha: (() -> Float)? = null,
     content: @Composable (PaddingValues) -> Unit
 ) {
-    val density = LocalDensity.current
-    val statusBarTopPx = with(density) {
-        WindowInsets.statusBars
-            .asPaddingValues()
-            .calculateTopPadding()
-            .toPx()
-    }
-    val windowHeightPx = LocalView.current.height.toFloat()
-    val pageBackground = backgroundBrush(
-        topInsetPx = statusBarTopPx,
-        windowHeightPx = windowHeightPx
-    )
+    val statusBarTopDp = WindowInsets.statusBars
+        .asPaddingValues()
+        .calculateTopPadding()
+    val navigationBarBottomDp = WindowInsets.navigationBars
+        .asPaddingValues()
+        .calculateBottomPadding()
+    val pageBackground = backgroundBrush()
     val currentBackground by rememberUpdatedState(pageBackground)
     val backdrop = rememberLayerBackdrop {
         drawRect(brush = currentBackground)
@@ -96,98 +97,109 @@ fun SecondaryPageScaffold(
                 .fillMaxSize()
                 .background(pageBackground)
         ) {
-        Scaffold(
-            modifier = Modifier
-                .fillMaxSize()
-                .layerBackdrop(backdrop),
-            containerColor = Color.Transparent,
-            contentWindowInsets = WindowInsets(0, 0, 0, 0),
-            snackbarHost = snackbarHost
-        ) { scaffoldPadding ->
-            content(
-                PaddingValues(
-                    start = 20.dp,
-                    // The top bar below is 60dp; keep a small 16dp breathing room.
-                    top = scaffoldPadding.calculateTopPadding() + 76.dp,
-                    end = 20.dp,
-                    bottom = scaffoldPadding.calculateBottomPadding() +
-                        if (
-                            (
-                                floatingActionButton != null &&
-                                    reserveFloatingActionButtonSpace
-                                ) || (bottomAction != null && reserveBottomActionSpace)
-                        ) {
-                            104.dp
-                        } else {
-                            20.dp
-                        }
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .layerBackdrop(backdrop)
+            ) {
+                content(
+                    PaddingValues(
+                        start = 20.dp,
+                        top = statusBarTopDp + 76.dp,
+                        end = 20.dp,
+                        bottom = navigationBarBottomDp +
+                            if (
+                                (
+                                    floatingActionButton != null &&
+                                        reserveFloatingActionButtonSpace
+                                    ) || (bottomAction != null && reserveBottomActionSpace)
+                            ) {
+                                104.dp
+                            } else {
+                                20.dp
+                            }
+                    )
                 )
+            }
+
+            snackbarHost()
+
+            PageTopBar(
+                title = title,
+                onBack = guardedBack,
+                backdrop = backdrop,
+                actions = actions,
+                titleAlpha = titleAlpha
             )
-        }
 
-        SecondaryPageTopBar(
-            title = title,
-            onBack = guardedBack,
-            backdrop = backdrop,
-            actions = actions
-        )
-
-        if (floatingActionButton != null) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .padding(end = 20.dp, bottom = 20.dp)
-            ) {
-                floatingActionButton(backdrop)
+            if (floatingActionButton != null) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .navigationBarsPadding()
+                        .padding(end = 20.dp, bottom = 20.dp)
+                ) {
+                    floatingActionButton(backdrop)
+                }
             }
-        }
 
-        if (bottomAction != null) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    // The activity no longer relies on adjustResize; IME insets are
-                    // consumed once here so the bottom action floats above the keyboard.
-                    .imePadding()
-                    .padding(horizontal = 20.dp, vertical = 12.dp)
-            ) {
-                bottomAction(backdrop)
+            if (bottomAction != null) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .navigationBarsPadding()
+                        .imePadding()
+                        .padding(horizontal = 20.dp, vertical = 12.dp)
+                ) {
+                    bottomAction(backdrop)
+                }
             }
-        }
         }
     }
 }
 
+/**
+ * 共享顶栏：液体玻璃返回键 + 标题（30sp SemiBold 左对齐）。
+ */
 @Composable
-private fun SecondaryPageTopBar(
+fun PageTopBar(
     title: String,
     onBack: () -> Unit,
     backdrop: Backdrop,
-    actions: @Composable RowScope.() -> Unit
+    modifier: Modifier = Modifier,
+    actions: @Composable RowScope.() -> Unit = {},
+    titleAlpha: (() -> Float)? = null,
+    endPadding: Dp = 12.dp
 ) {
-    Row(
-        modifier = Modifier
-            .padding(start = 20.dp, end = 12.dp)
-            .height(60.dp),
-        verticalAlignment = Alignment.CenterVertically
+    val baseAlpha = titleAlpha?.invoke() ?: 1f
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .statusBarsPadding()
+            .height(60.dp)
+            .padding(start = 20.dp, end = endPadding)
     ) {
         LiquidBackButton(
             onClick = onBack,
-            backdrop = backdrop
+            backdrop = backdrop,
+            modifier = Modifier.align(Alignment.CenterStart)
         )
         Text(
             text = title,
             modifier = Modifier
-                .weight(1f)
-                .padding(start = 14.dp),
-            style = MiuixTheme.textStyles.headline1.copy(
-                fontSize = 30.sp,
-                fontWeight = FontWeight.SemiBold
-            ),
+                .align(Alignment.CenterStart)
+                .padding(start = 62.dp)
+                .graphicsLayer { alpha = baseAlpha },
+            fontSize = 30.sp,
+            fontWeight = FontWeight.SemiBold,
             color = MiuixTheme.colorScheme.onSurface,
             maxLines = 1
         )
-        actions()
+        Row(
+            modifier = Modifier.align(Alignment.CenterEnd),
+            verticalAlignment = Alignment.CenterVertically,
+            content = actions
+        )
     }
 }
 
@@ -237,7 +249,7 @@ fun LiquidBackButton(
     ) {
         Icon(
             imageVector = AppIcons.ArrowBack,
-            contentDescription = "返回",
+            contentDescription = stringResource(R.string.action_back),
             tint = MiuixTheme.colorScheme.onSurface,
             modifier = Modifier.size(24.dp)
         )

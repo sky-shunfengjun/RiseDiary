@@ -1,5 +1,6 @@
 package com.risediary.app.ui.home
 
+import androidx.annotation.StringRes
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.risediary.app.data.UserPreferences
@@ -11,6 +12,7 @@ import com.risediary.app.data.repository.FlightRepository
 import com.risediary.app.data.repository.LengthRecordRepository
 import com.risediary.app.R
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -119,19 +121,24 @@ class HomeViewModel @Inject constructor(
                     trendFlights.value = trends.await()
                     dailyTipResId.value = getRandomTipResId()
                 }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (error: Exception) {
+                // Keep showing the last successfully loaded data instead of crashing
             } finally {
                 isRefreshing.value = false
             }
         }
     }
 
-    fun getGreeting(): String {
+    @StringRes
+    fun getGreeting(): Int {
         val hour = ZonedDateTime.now(clock).hour
         return when (hour) {
-            in 5..11 -> "早上好"
-            in 12..13 -> "中午好"
-            in 14..17 -> "下午好"
-            else -> "晚上好"
+            in 5..11 -> R.string.home_greeting_morning
+            in 12..13 -> R.string.home_greeting_noon
+            in 14..17 -> R.string.home_greeting_afternoon
+            else -> R.string.home_greeting_evening
         }
     }
 

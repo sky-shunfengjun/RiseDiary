@@ -21,7 +21,7 @@ interface LengthRecordRepository {
     suspend fun count(): Int
     suspend fun getSince(since: Long): List<LengthRecord>
     suspend fun maxErectLength(): Float
-    suspend fun firstErectLength(): Float
+    suspend fun firstErectLength(): Float?
 }
 
 class RoomLengthRecordRepository @Inject constructor(
@@ -52,7 +52,7 @@ class RoomLengthRecordRepository @Inject constructor(
     override suspend fun count(): Int = dao.count()
     override suspend fun getSince(since: Long): List<LengthRecord> = dao.getSince(since)
     override suspend fun maxErectLength(): Float = dao.maxErectLength()
-    override suspend fun firstErectLength(): Float = dao.firstErectLength()
+    override suspend fun firstErectLength(): Float? = dao.firstErectLength()
 
     private fun LocalDate.toEpochMillis(): Long =
         atStartOfDay(zoneId).toInstant().toEpochMilli()

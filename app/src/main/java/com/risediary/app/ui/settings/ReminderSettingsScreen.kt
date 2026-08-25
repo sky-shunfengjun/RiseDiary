@@ -37,7 +37,8 @@ import androidx.core.net.toUri
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavController
+import com.risediary.app.ui.navigation3.LocalNavigator
+import com.risediary.app.ui.navigation3.Route
 import com.risediary.app.R
 import com.risediary.app.reminder.ReminderType
 import com.risediary.app.ui.components.LiquidAlertDialog
@@ -52,9 +53,9 @@ import com.risediary.app.ui.icons.AppIcons
 
 @Composable
 fun ReminderSettingsScreen(
-    navController: NavController,
     vm: SettingsViewModel = hiltViewModel()
 ) {
+    val navigator = LocalNavigator.current
     val context = LocalContext.current
     var notificationsAvailable by remember {
         mutableStateOf(reminderNotificationsAvailable(context))
@@ -87,7 +88,7 @@ fun ReminderSettingsScreen(
         if (granted && notificationsAvailable) {
             target?.let {
                 vm.setReminderEnabled(it, true)
-                if (!exactAlarmsAllowed) showExactAlarmDialog = true
+                if (!exactAlarmsAllowed) showNotificationBlockedDialog = false; showExactAlarmDialog = true
             }
             if (shouldTest) testSent = vm.sendTestNotification()
             if (shouldScheduleBackgroundTest) {
@@ -95,11 +96,11 @@ fun ReminderSettingsScreen(
                     backgroundTestScheduled = vm.scheduleBackgroundReminderTest()
                 } else {
                     scheduleTestAfterExactGrant = true
-                    showExactAlarmDialog = true
+                    showNotificationBlockedDialog = false; showExactAlarmDialog = true
                 }
             }
         } else {
-            showNotificationBlockedDialog = true
+            showExactAlarmDialog = false; showNotificationBlockedDialog = true
         }
     }
 
@@ -145,7 +146,7 @@ fun ReminderSettingsScreen(
             pendingBackgroundTest = backgroundTest
             notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         } else {
-            showNotificationBlockedDialog = true
+            showExactAlarmDialog = false; showNotificationBlockedDialog = true
         }
     }
 
@@ -157,7 +158,7 @@ fun ReminderSettingsScreen(
         notificationsAvailable = reminderNotificationsAvailable(context)
         if (notificationsAvailable) {
             vm.setReminderEnabled(type, true)
-            if (!exactAlarmsAllowed) showExactAlarmDialog = true
+            if (!exactAlarmsAllowed) showNotificationBlockedDialog = false; showExactAlarmDialog = true
         } else {
             requestPermission(type = type)
         }
@@ -167,7 +168,7 @@ fun ReminderSettingsScreen(
         notificationsAvailable = reminderNotificationsAvailable(context)
         if (notificationsAvailable) {
             testSent = vm.sendTestNotification()
-            if (!testSent) showNotificationBlockedDialog = true
+            if (!testSent) showExactAlarmDialog = false; showNotificationBlockedDialog = true
         } else {
             requestPermission(immediateTest = true)
         }
@@ -184,19 +185,19 @@ fun ReminderSettingsScreen(
             requestPermission(backgroundTest = true)
         } else if (!exactAlarmsAllowed) {
             scheduleTestAfterExactGrant = true
-            showExactAlarmDialog = true
+            showNotificationBlockedDialog = false; showExactAlarmDialog = true
         } else {
             backgroundTestScheduled = vm.scheduleBackgroundReminderTest()
             if (!backgroundTestScheduled) {
                 exactAlarmsAllowed = vm.exactAlarmsAllowed()
-                if (!exactAlarmsAllowed) showExactAlarmDialog = true
+                if (!exactAlarmsAllowed) showNotificationBlockedDialog = false; showExactAlarmDialog = true
             }
         }
     }
 
     SecondaryPageScaffold(
         title = stringResource(R.string.settings_reminder_settings),
-        onBack = { navController.popBackStack() }
+        onBack = { navigator.pop() }
     ) { contentPadding ->
         Column(
             modifier = Modifier
@@ -341,7 +342,7 @@ fun ReminderSettingsScreen(
                     },
                     onClick = {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                            showExactAlarmDialog = true
+                            showNotificationBlockedDialog = false; showExactAlarmDialog = true
                         }
                     }
                 )

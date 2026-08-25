@@ -1,8 +1,10 @@
 package com.risediary.app.ui.settings
 
+import android.content.Context
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.risediary.app.R
 import com.risediary.app.data.BackgroundLockMode
 import com.risediary.app.data.DefaultVolumeMode
 import com.risediary.app.data.UserPreferences
@@ -12,8 +14,10 @@ import com.risediary.app.reminder.ReminderType
 import com.risediary.app.security.BiometricAuthResult
 import com.risediary.app.security.BiometricAuthenticator
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -24,9 +28,11 @@ class SettingsViewModel @Inject constructor(
     private val biometricAuthenticator: BiometricAuthenticator,
     private val reminderNotifier: ReminderNotifier,
     private val reminderScheduler: ReminderScheduler,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
     private var biometricRequestInProgress = false
     private var pendingOnboardingWrite: Job? = null
+    private var biometricResetJob: Job? = null
 
     // --- State holders ---
     private val sharing = SharingStarted.WhileSubscribed(5_000)
@@ -146,12 +152,18 @@ class SettingsViewModel @Inject constructor(
             biometricRequestInProgress
         ) return
         biometricRequestInProgress = true
+        biometricResetJob?.cancel()
+        biometricResetJob = viewModelScope.launch {
+            delay(15_000)
+            biometricRequestInProgress = false
+        }
         biometricAuthenticator.authenticate(
             activity = activity,
-            title = "开启指纹解锁",
-            subtitle = "验证指纹后，打开起飞日记时可优先使用指纹",
-            negativeButtonText = "取消",
+            title = context.getString(R.string.settings_biometric_enable_title),
+            subtitle = context.getString(R.string.settings_biometric_enable_subtitle),
+            negativeButtonText = context.getString(R.string.action_cancel),
             onResult = { result ->
+                biometricResetJob?.cancel()
                 biometricRequestInProgress = false
                 if (result == BiometricAuthResult.Success) {
                     viewModelScope.launch { prefs.setBiometricUnlockEnabled(true) }

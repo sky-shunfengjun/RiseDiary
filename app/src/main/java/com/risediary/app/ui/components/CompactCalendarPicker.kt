@@ -25,11 +25,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringArrayResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import java.time.LocalDate
 import java.time.YearMonth
+import com.risediary.app.R
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
@@ -52,21 +55,21 @@ fun LiquidSingleDatePickerDialog(
         onDismissRequest = onDismissRequest,
         dismissButton = {
             TextButton(
-                text = "取消",
+                text = stringResource(R.string.action_cancel),
                 onClick = onDismissRequest,
                 colors = liquidDialogCancelButtonColors()
             )
         },
         confirmButton = {
             TextButton(
-                text = "确定",
+                text = stringResource(R.string.action_confirm),
                 onClick = { onConfirm(selectedDate) },
                 colors = liquidDialogConfirmButtonColors()
             )
         }
     ) {
         CompactCalendar(
-            title = "选择日期",
+            title = stringResource(R.string.calendar_pick_date),
             visibleMonth = visibleMonth,
             onVisibleMonthChange = { visibleMonth = it },
             selectedStart = selectedDate,
@@ -90,14 +93,14 @@ fun LiquidDateRangePickerDialog(
         onDismissRequest = onDismissRequest,
         dismissButton = {
             TextButton(
-                text = "取消",
+                text = stringResource(R.string.action_cancel),
                 onClick = onDismissRequest,
                 colors = liquidDialogCancelButtonColors()
             )
         },
         confirmButton = {
             TextButton(
-                text = "确定",
+                text = stringResource(R.string.action_confirm),
                 enabled = selectedStart != null,
                 onClick = {
                     val start = selectedStart
@@ -111,9 +114,9 @@ fun LiquidDateRangePickerDialog(
     ) {
         CompactCalendar(
             title = when {
-                selectedStart == null -> "选择开始日期"
-                selectedEnd == null -> "选择结束日期"
-                else -> "已选择日期范围"
+                selectedStart == null -> stringResource(R.string.calendar_pick_start_date)
+                selectedEnd == null -> stringResource(R.string.calendar_pick_end_date)
+                else -> stringResource(R.string.calendar_range_selected)
             },
             visibleMonth = visibleMonth,
             onVisibleMonthChange = { visibleMonth = it },
@@ -147,7 +150,7 @@ private fun CompactCalendar(
     selectedEnd: LocalDate?,
     onDateSelected: (LocalDate) -> Unit
 ) {
-    val weekdays = remember { listOf("一", "二", "三", "四", "五", "六", "日") }
+    val weekdays = stringArrayResource(R.array.weekday_labels)
     val firstOffset = visibleMonth.atDay(1).dayOfWeek.value - 1
     val dayCells = remember(visibleMonth) {
         List(42) { cellIndex ->
@@ -172,24 +175,28 @@ private fun CompactCalendar(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "${visibleMonth.year}年${visibleMonth.monthValue}月",
+                text = stringResource(
+                    R.string.calendar_month_format,
+                    visibleMonth.year,
+                    visibleMonth.monthValue
+                ),
                 style = MiuixTheme.textStyles.title4,
                 fontWeight = FontWeight.Medium,
                 color = MiuixTheme.colorScheme.onSurface,
                 modifier = Modifier.weight(1f)
             )
             CalendarNavButton(
-                contentDescription = "上个月",
+                contentDescription = stringResource(R.string.calendar_previous_month),
                 onClick = { onVisibleMonthChange(visibleMonth.minusMonths(1)) }
             ) {
-                Icon(AppIcons.ChevronLeft, "上个月")
+                Icon(AppIcons.ChevronLeft, stringResource(R.string.calendar_previous_month))
             }
             Spacer(Modifier.width(6.dp))
             CalendarNavButton(
-                contentDescription = "下个月",
+                contentDescription = stringResource(R.string.calendar_next_month),
                 onClick = { onVisibleMonthChange(visibleMonth.plusMonths(1)) }
             ) {
-                Icon(AppIcons.ChevronRight, "下个月")
+                Icon(AppIcons.ChevronRight, stringResource(R.string.calendar_next_month))
             }
         }
         Row(Modifier.fillMaxWidth()) {

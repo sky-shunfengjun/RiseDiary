@@ -1,7 +1,6 @@
 package com.risediary.app.ui.length
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,37 +19,33 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavController
+import com.risediary.app.R
+import com.risediary.app.ui.navigation3.LocalNavigator
+import com.risediary.app.ui.navigation3.Route
 import com.risediary.app.data.entity.LengthRecord
 import com.risediary.app.ui.components.LiquidAddButton
 import com.risediary.app.ui.components.LiquidAlertDialog
 import com.risediary.app.ui.components.liquidDialogCancelButtonColors
 import com.risediary.app.ui.components.liquidDialogConfirmButtonColors
-import com.risediary.app.ui.components.LiquidSegmentOption
-import com.risediary.app.ui.components.LiquidSegmentedControl
 import com.risediary.app.ui.components.LengthTrendChart
 import com.risediary.app.ui.components.SecondaryPageScaffold
 import com.risediary.app.ui.theme.CardBlue
 import com.risediary.app.ui.theme.CardGreen
 import com.risediary.app.ui.theme.RiseCard
-import com.kyant.backdrop.backdrops.layerBackdrop
-import com.kyant.backdrop.backdrops.rememberLayerBackdrop
-import com.kyant.capsule.ContinuousCapsule
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.Date
@@ -67,9 +62,9 @@ import com.risediary.app.ui.icons.AppIcons
 
 @Composable
 fun LengthHistoryScreen(
-    navController: NavController,
     viewModel: LengthHistoryViewModel = hiltViewModel()
 ) {
+    val navigator = LocalNavigator.current
     val records by viewModel.periodRecords.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
     var editorRecord by remember { mutableStateOf<LengthRecord?>(null) }
@@ -77,8 +72,8 @@ fun LengthHistoryScreen(
     var deleteTarget by remember { mutableStateOf<LengthRecord?>(null) }
 
     SecondaryPageScaffold(
-        title = "长度追踪",
-        onBack = { navController.navigateUp() },
+        title = stringResource(R.string.home_length_title),
+        onBack = { navigator.pop() },
         floatingActionButton = { backdrop ->
             LiquidAddButton(
                 onClick = {
@@ -86,25 +81,22 @@ fun LengthHistoryScreen(
                     showEditor = true
                 },
                 backdrop = backdrop,
-                contentDescription = "新增长度记录"
+                contentDescription = stringResource(R.string.length_add_record)
             )
         },
         reserveFloatingActionButtonSpace = false
     ) { innerPadding ->
         LazyColumn(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-            contentPadding = PaddingValues(bottom = 88.dp),
+                .fillMaxSize(),
+            contentPadding = PaddingValues(
+                start = innerPadding.calculateLeftPadding(LayoutDirection.Ltr),
+                top = innerPadding.calculateTopPadding(),
+                end = innerPadding.calculateRightPadding(LayoutDirection.Ltr),
+                bottom = innerPadding.calculateBottomPadding() + 88.dp
+            ),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            item {
-                PeriodSegmentedControl(
-                    selectedIndex = viewModel.selectedPeriod,
-                    onSelected = viewModel::selectPeriod
-                )
-            }
-
             if (records.isEmpty()) {
                 item {
                     Box(
@@ -115,11 +107,11 @@ fun LengthHistoryScreen(
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
-                                "暂无长度记录",
+                                stringResource(R.string.length_empty),
                                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                             )
                             TextButton(
-                                text = "添加第一条记录",
+                                text = stringResource(R.string.length_add_first),
                                 onClick = {
                                     editorRecord = null
                                     showEditor = true
@@ -152,7 +144,7 @@ fun LengthHistoryScreen(
                 }
                 item {
                     Text(
-                        "测量记录",
+                        stringResource(R.string.length_measurement_records),
                         style = MiuixTheme.textStyles.title3,
                         fontWeight = FontWeight.SemiBold,
                         color = MiuixTheme.colorScheme.onSurface
@@ -176,7 +168,10 @@ fun LengthHistoryScreen(
         LengthRecordDialog(
             record = editorRecord,
             error = error,
-            onDismiss = { showEditor = false },
+            onDismiss = {
+                showEditor = false
+                viewModel.clearError()
+            },
             onSave = {
                 viewModel.save(it)
                 if (
@@ -192,11 +187,11 @@ fun LengthHistoryScreen(
     deleteTarget?.let { target ->
         LiquidAlertDialog(
             onDismissRequest = { deleteTarget = null },
-            title = { Text("删除长度记录") },
-            text = { Text("确认删除这次测量吗？") },
+            title = { Text(stringResource(R.string.length_delete_dialog_title)) },
+            text = { Text(stringResource(R.string.length_delete_dialog_message)) },
             confirmButton = {
                 TextButton(
-                    text = "删除",
+                    text = stringResource(R.string.action_delete),
                     onClick = {
                         viewModel.delete(target)
                         deleteTarget = null
@@ -211,62 +206,11 @@ fun LengthHistoryScreen(
             },
             dismissButton = {
                 TextButton(
-                    text = "取消",
+                    text = stringResource(R.string.action_cancel),
                     onClick = { deleteTarget = null },
                     colors = liquidDialogCancelButtonColors()
                 )
             }
-        )
-    }
-}
-
-@Composable
-private fun PeriodSegmentedControl(
-    selectedIndex: Int,
-    onSelected: (Int) -> Unit
-) {
-    val trackColor = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.035f)
-    val currentTrackColor by rememberUpdatedState(trackColor)
-    val backdrop = rememberLayerBackdrop { drawContent() }
-    Box(
-        modifier = Modifier
-            // Preserve the compact visual size while reserving room for the
-            // official liquid-glass shadow during long-press and drag.
-            .width(264.dp)
-            .height(72.dp)
-    ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .layerBackdrop(backdrop)
-        ) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .width(232.dp)
-                    .height(40.dp)
-                    .clip(ContinuousCapsule)
-                    .background(currentTrackColor)
-            )
-        }
-        LiquidSegmentedControl(
-            options = remember {
-                listOf(
-                    LiquidSegmentOption("30天", AppIcons.DateRange),
-                    LiquidSegmentOption("90天", AppIcons.DateRange),
-                    LiquidSegmentOption("全年", AppIcons.DateRange)
-                )
-            },
-            selectedIndex = selectedIndex,
-            onSelected = onSelected,
-            backdrop = backdrop,
-            modifier = Modifier
-                .align(Alignment.Center)
-                .width(232.dp),
-            containerHeight = 40.dp,
-            contentPadding = 3.dp,
-            showIcons = false,
-            labelFontSize = 12.sp
         )
     }
 }
@@ -277,7 +221,10 @@ private fun ChartLegend() {
         horizontalArrangement = Arrangement.Center,
         modifier = Modifier.fillMaxWidth()
     ) {
-        listOf(CardBlue to "勃起长度", CardGreen to "松弛长度").forEach { (color, label) ->
+        listOf(
+            CardBlue to stringResource(R.string.length_legend_erect),
+            CardGreen to stringResource(R.string.length_legend_flaccid)
+        ).forEach { (color, label) ->
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Canvas(Modifier.size(12.dp)) { drawCircle(color, 5f, Offset(6f, 6f)) }
                 Spacer(Modifier.width(4.dp))
@@ -309,27 +256,35 @@ private fun LengthRecordDialog(
 
     LiquidAlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (record == null) "新增长度记录" else "编辑长度记录") },
+        title = {
+            Text(
+                if (record == null) {
+                    stringResource(R.string.length_add_record)
+                } else {
+                    stringResource(R.string.length_edit_record)
+                }
+            )
+        },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 TextField(
                     value = flaccid,
                     onValueChange = { if (it.isValidDecimal()) flaccid = it.take(6) },
-                    label = "疲软长度（cm）",
+                    label = stringResource(R.string.length_flaccid_label),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true
                 )
                 TextField(
                     value = erect,
                     onValueChange = { if (it.isValidDecimal()) erect = it.take(6) },
-                    label = "勃起长度（cm）",
+                    label = stringResource(R.string.length_erect_label),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     singleLine = true
                 )
                 TextField(
                     value = note,
                     onValueChange = { note = it.take(200) },
-                    label = "备注（可选）",
+                    label = stringResource(R.string.length_note_label),
                     maxLines = 3
                 )
                 if (error != null) Text(error, color = MiuixTheme.colorScheme.error)
@@ -337,7 +292,7 @@ private fun LengthRecordDialog(
         },
         confirmButton = {
             TextButton(
-                text = "保存",
+                text = stringResource(R.string.action_save),
                 onClick = {
                     val todayStart = LocalDate.now()
                         .atStartOfDay(ZoneId.systemDefault())
@@ -358,7 +313,7 @@ private fun LengthRecordDialog(
         },
         dismissButton = {
             TextButton(
-                text = "取消",
+                text = stringResource(R.string.action_cancel),
                 onClick = onDismiss,
                 colors = liquidDialogCancelButtonColors()
             )
@@ -385,17 +340,21 @@ private fun LengthRecordCard(
             Column(modifier = Modifier.weight(1f)) {
                 Text(dateFormat.format(Date(record.recordDate)))
                 Text(
-                    "勃起 ${record.erectLengthCm}cm · 疲软 ${record.flaccidLengthCm}cm",
+                    stringResource(
+                        R.string.length_record_summary,
+                        record.erectLengthCm,
+                        record.flaccidLengthCm
+                    ),
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                 )
             }
             IconButton(onClick = onEdit) {
-                Icon(AppIcons.Edit, contentDescription = "编辑")
+                Icon(AppIcons.Edit, contentDescription = stringResource(R.string.action_edit))
             }
             IconButton(onClick = onDelete) {
                 Icon(
                     AppIcons.Delete,
-                    contentDescription = "删除",
+                    contentDescription = stringResource(R.string.action_delete),
                     tint = MiuixTheme.colorScheme.error
                 )
             }

@@ -352,6 +352,7 @@ internal fun SmallFeature(icon: ImageVector, label: String, color: Color, modifi
 
 @Composable
 internal fun WelcomeAction(backdrop: Backdrop, onClick: () -> Unit) {
+    val beginSetupDescription = stringResource(R.string.onboarding_begin_setup)
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -366,7 +367,7 @@ internal fun WelcomeAction(backdrop: Backdrop, onClick: () -> Unit) {
             modifier = Modifier
                 .fillMaxWidth()
                 .semantics {
-                    contentDescription = "开始设置"
+                    contentDescription = beginSetupDescription
                 }
         ) {
             Icon(
