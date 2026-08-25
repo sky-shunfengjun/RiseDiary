@@ -1,6 +1,6 @@
 # 起飞日记（RiseDiary）
 
-「起飞日记」是一款记录机长起飞的安卓APP，提供数据统计，应用采用 Jetpack Compose + Material 3 构建，以液态玻璃（Liquid Glass）作为核心视觉语言。
+「起飞日记」是一款记录机长起飞的安卓APP，提供数据统计。应用基于 Jetpack Compose 构建，控件采用 miuix（HyperOS 风格），以液态玻璃（Liquid Glass）作为核心视觉语言。
 
 本项目受 [sky22333/luleme](https://github.com/sky22333/luleme) 的启发，由 Codex 协助编写。
 
@@ -11,6 +11,7 @@
 **⬇️ [下载最新版 APK](https://github.com/sky-shunfengjun/RiseDiary/releases/latest)　|　💬 [加入QQ群组](https://qm.qq.com/q/Z3XTPXXEEW)**
 
 - 支持系统：Android 12（API 31）及以上；推荐 Android 13（API 33）及以上，Android 12/12L 会使用部分液态玻璃实体降级效果
+- 当前版本：v1.1.0
 
 ![起飞日记](screenshots/app.png)
 
@@ -20,10 +21,9 @@
 
 ### 液态玻璃 UI
 
-基于 [Kyant0/AndroidLiquidGlass](https://github.com/Kyant0/AndroidLiquidGlass) 移植：
-
 - 底栏、按钮、开关、滑杆、弹窗与分段控件均采用液态玻璃效果
-- 保留原版的折射、高光、按压与拖动形变
+- 控件体系基于 [YuKongA/miuix](https://github.com/YuKongA/miuix)（HyperOS 风格）构建
+- 液态玻璃效果移植自 [Kyant0/AndroidLiquidGlass](https://github.com/Kyant0/AndroidLiquidGlass)，保留原版的折射、高光、按压与拖动形变
 - Android 12/12L 自动使用部分实体降级样式；Android 13 及以上启用完整 RuntimeShader 高光效果
 
 ### 首页看板
@@ -33,16 +33,19 @@
 - 数据概览：累计次数、本月次数、平均用时、估算射精量、最远距离、平均间隔
 - 射精量 / 射精距离趋势柱状图，长度追踪双线折线图（支持触摸标记与横向滚动）
 - 首页卡片支持自定义排序与显隐
+- 下拉刷新
 
 ### 计时器
 
 - 精密仪表式界面，`HH:MM:SS` 精确到秒
-- 可快捷填充进表单
+- 计时过程中到达里程碑（如 10 分钟）会发送提醒
+- 达到 120 分钟自动弹出记录表单并快捷填充时长
 
 ### 记录管理
 
 - 表单字段：开始 / 结束时间、用时、射精量、距离、方式标签、备注
 - 日期范围 + 方式标签筛选
+- 长按记录卡片删除，5 秒内可撤销
 
 ### 应用锁
 
@@ -66,29 +69,30 @@
 
 ### 其他
 
-- 主题：跟随系统 / 浅色 / 深色
+- 主题：跟随系统 / 浅色 / 深色（状态栏与导航栏图标随主题自适应）
 - 方式标签管理、首页卡片排序
+- 长度追踪
 
 ## 技术栈
 
 
-| 类别     | 技术                                                  |
-| -------- | ----------------------------------------------------- |
-| 语言     | Kotlin 2.2.21                                         |
-| UI       | Jetpack Compose + Material 3（BOM 2025.10.01）        |
-| 架构     | MVVM（ViewModel + Flow + Repository）                 |
-| 依赖注入 | Hilt 2.57.2                                           |
-| 数据库   | Room 2.8.4（含 KSP 编译）                             |
-| 设置存储 | DataStore Preferences 1.1.7                           |
-| 导航     | Navigation Compose 2.9.8                              |
-| 后台任务 | WorkManager 2.10.1 + 前台服务                         |
-| 生物识别 | AndroidX Biometric 1.1.0                              |
-| 图表     | Vico 3.2.1                                            |
-| 液态玻璃 | Kyant Backdrop 1.0.0 + Capsule 2.1.1                  |
-| 序列化   | kotlinx.serialization JSON                            |
-| 异步     | Kotlin Coroutines 1.8.1                               |
-| 构建     | Gradle 8.13 / AGP 8.13.2、KSP                         |
-| 支持版本 | 最低 Android 12（API 31），目标 Android 16（API 36） |
+| 类别     | 技术                                                               |
+| -------- | ------------------------------------------------------------------ |
+| 语言     | Kotlin 2.4.10                                                      |
+| UI       | Jetpack Compose（BOM 2026.06.01）+ miuix 0.9.3（HyperOS 风格控件） |
+| 液态玻璃 | Kyant Backdrop 1.0.0 + Capsule 2.1.1                               |
+| 架构     | MVVM（ViewModel + Flow + Repository）                              |
+| 依赖注入 | Hilt 2.60.1                                                        |
+| 数据库   | Room 2.8.4（含 KSP 编译）                                          |
+| 设置存储 | DataStore Preferences 1.1.7                                        |
+| 导航     | Navigation 3（1.1.2）+ 自研 Navigator 封装                         |
+| 后台任务 | WorkManager 2.10.1 + 前台服务                                      |
+| 生物识别 | AndroidX Biometric 1.1.0                                           |
+| 图表     | Vico 3.2.1（趋势 / 长度图表）+ Compose Canvas 自绘（热力图）       |
+| 备份格式 | ZIP + JSON（流式读写，大库不占内存）                               |
+| 异步     | Kotlin Coroutines 1.8.1                                            |
+| 构建     | Gradle 9.6.1 / AGP 9.1.0 / KSP 2.3.11                              |
+| 支持版本 | 最低 Android 12（API 31），目标 Android 16（API 36），编译 SDK 37  |
 
 ## 架构与构建
 
@@ -97,13 +101,21 @@
 构建方式：
 
 1. 使用 Android Studio 打开项目根目录，等待 Gradle 同步完成后直接运行；
-2. 或使用命令行（需要 JDK 17）：
+2. 或使用命令行（需要 JDK 17 及以上；单元测试任务使用 JDK 26 工具链）：
 
 ```powershell
+# 调试版（包名 com.risediary.app.dev）
 .\gradlew.bat assembleDebug
+
+# 单元测试与 lint
+.\gradlew.bat testDebugUnitTest lintDebug
+
+# 正式版（包名 com.risediary.app，R8 混淆 + 正式签名）
+.\gradlew.bat assembleRelease
 ```
 
-调试 APK 生成在 `app/build/outputs/apk/debug/`。
+- 调试 APK 生成在 `app/build/outputs/apk/debug/`；
+- 正式 APK 生成在 `app/build/outputs/apk/release/`，构建前需在项目根目录提供 `keystore.properties`（含 `storeFile`、`storePassword`、`keyAlias`、`keyPassword` 四个字段，该文件已被 `.gitignore` 忽略）。
 
 ## 参与贡献
 
@@ -125,6 +137,7 @@
 ## 使用与致谢
 
 - [sky22333/luleme](https://github.com/sky22333/luleme)（GPL-3.0）—— 产品灵感来源
+- [YuKongA/miuix](https://github.com/YuKongA/miuix)（Apache-2.0）—— HyperOS 风格控件库
 - [Kyant0/AndroidLiquidGlass](https://github.com/Kyant0/AndroidLiquidGlass)（Apache-2.0）—— 液态玻璃组件（Backdrop、Capsule）的移植来源
 - 本项目仓库：[sky-shunfengjun/RiseDiary](https://github.com/sky-shunfengjun/RiseDiary)
 

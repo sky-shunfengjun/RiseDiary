@@ -38,6 +38,7 @@ import com.kyant.capsule.ContinuousCapsule
 import com.risediary.app.R
 import com.risediary.app.ui.components.CalendarHeatmap
 import com.risediary.app.ui.components.CheckinCard
+import com.risediary.app.ui.components.mainPageBottomSpacing
 import com.risediary.app.ui.components.ACHIEVEMENT_ICONS
 import com.risediary.app.ui.components.LiquidSegmentOption
 import com.risediary.app.ui.components.LiquidSegmentedControl
@@ -56,6 +57,10 @@ import top.yukonga.miuix.kmp.basic.rememberPullToRefreshState
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import com.risediary.app.ui.icons.AppIcons
+import kotlinx.coroutines.delay
+
+/** 返回主页后延迟再刷新，让 pop 转场动画先平稳结束。 */
+private const val RETURN_REFRESH_SETTLE_MILLIS = 250L
 
 private val pullRefreshThresholdSetter: java.lang.reflect.Method? by lazy {
     try {
@@ -89,10 +94,21 @@ fun HomeScreen(
     val navigator = LocalNavigator.current
     val scrollState = rememberScrollState()
 
-    // Refresh on first composition and whenever we return to the main page
+    // Refresh on first composition (with spinner) and whenever we return to the
+    // main page (silently, after the pop transition settles, so the reload work
+    // does not compete with the animation frame budget).
+    var hasLoadedOnce by rememberSaveable { mutableStateOf(false) }
     val currentRoute = navigator.current()
     LaunchedEffect(currentRoute) {
-        if (currentRoute is Route.Main) vm.refresh()
+        if (currentRoute is Route.Main) {
+            if (!hasLoadedOnce) {
+                vm.refresh()
+                hasLoadedOnce = true
+            } else {
+                delay(RETURN_REFRESH_SETTLE_MILLIS)
+                vm.refresh(silent = true)
+            }
+        }
     }
 
     val username by vm.username.collectAsStateWithLifecycle()
@@ -130,6 +146,8 @@ fun HomeScreen(
 
     val isRefreshing by vm.isRefreshing.collectAsStateWithLifecycle()
 
+    val bottomSpacing = mainPageBottomSpacing()
+
     val pullToRefreshState = rememberPullToRefreshState()
     val windowHeightPx = LocalWindowInfo.current.containerSize.height.toFloat()
     SideEffect {
@@ -157,7 +175,7 @@ fun HomeScreen(
                 .verticalScroll(scrollState)
                 .statusBarsPadding()
                 .padding(horizontal = 20.dp, vertical = 16.dp)
-                .padding(bottom = 80.dp),
+                .padding(bottom = bottomSpacing),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             Text(

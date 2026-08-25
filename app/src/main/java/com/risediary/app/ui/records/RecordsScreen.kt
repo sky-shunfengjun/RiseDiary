@@ -44,15 +44,20 @@ import com.risediary.app.ui.navigation3.Route
 import com.risediary.app.data.entity.Flight
 import com.risediary.app.data.entity.RecordVolumeMode
 import com.risediary.app.data.repository.TagJson
+import com.risediary.app.ui.components.LiquidAlertDialog
 import com.risediary.app.ui.components.LiquidDateRangePickerDialog
 import com.risediary.app.ui.components.LiquidSnackbarTone
+import com.risediary.app.ui.components.liquidDialogCancelButtonColors
+import com.risediary.app.ui.components.mainPageBottomSpacing
 import com.risediary.app.ui.components.showLiquidSnackbar
 import com.risediary.app.ui.theme.RiseCard
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.ListPopupColumn
 import top.yukonga.miuix.kmp.basic.PopupPositionProvider
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.overlay.OverlayListPopup
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.time.Instant
@@ -86,8 +91,14 @@ fun RecordsScreen(
     }
     var showDatePicker by remember { mutableStateOf(false) }
     var showFilterMenu by remember { mutableStateOf(false) }
+    var deleteTarget by remember { mutableStateOf<Flight?>(null) }
 
     val hasActiveFilter = viewModel.selectedTag != null || viewModel.startDate != null
+
+    val bottomSpacing = mainPageBottomSpacing()
+
+    val deletedMessage = stringResource(R.string.records_deleted)
+    val undoAction = stringResource(R.string.action_undo)
 
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     Column(modifier = Modifier.fillMaxSize()) {
@@ -223,8 +234,6 @@ fun RecordsScreen(
                         )
                     }
                     items(group.items, key = Flight::id) { flight ->
-                        val deletedMessage = stringResource(R.string.records_deleted)
-                        val undoAction = stringResource(R.string.action_undo)
                         FlightCard(
                             flight = flight,
                             zoneId = viewModel.userZoneId,
@@ -232,26 +241,12 @@ fun RecordsScreen(
                                 navigator.push(Route.RecordDetail(flight.id))
                             },
                             onLongClick = {
-                                viewModel.delete(flight)
-                                // Launched on the stable MainAppContent scope so the
-                                // undo Snackbar survives navigation to detail/edit.
-                                snackbarScope.launch {
-                                    val result = snackbarHostState.showLiquidSnackbar(
-                                        message = deletedMessage,
-                                        actionLabel = undoAction,
-                                        tone = LiquidSnackbarTone.UNDO
-                                    )
-                                    if (result == SnackbarResult.ActionPerformed) {
-                                        viewModel.undoDelete(flight)
-                                    } else {
-                                        viewModel.finalizeDeletion(flight.id)
-                                    }
-                                }
+                                deleteTarget = flight
                             }
                         )
                     }
                 }
-                item { Spacer(modifier = Modifier.height(80.dp)) }
+                item { Spacer(modifier = Modifier.height(bottomSpacing)) }
             }
         }
     }
@@ -262,6 +257,50 @@ fun RecordsScreen(
             onConfirm = { start, end ->
                 viewModel.setDateRange(start, end)
                 showDatePicker = false
+            }
+        )
+    }
+
+    deleteTarget?.let { target ->
+        LiquidAlertDialog(
+            onDismissRequest = { deleteTarget = null },
+            title = { Text(stringResource(R.string.record_detail_delete_dialog_title)) },
+            text = { Text(stringResource(R.string.record_detail_delete_dialog_message)) },
+            confirmButton = {
+                TextButton(
+                    text = stringResource(R.string.action_delete),
+                    onClick = {
+                        deleteTarget = null
+                        viewModel.delete(target)
+                        // Launched on the stable MainAppContent scope so the
+                        // undo Snackbar survives navigation to detail/edit.
+                        snackbarScope.launch {
+                            val result = snackbarHostState.showLiquidSnackbar(
+                                message = deletedMessage,
+                                actionLabel = undoAction,
+                                tone = LiquidSnackbarTone.UNDO
+                            )
+                            if (result == SnackbarResult.ActionPerformed) {
+                                viewModel.undoDelete(target)
+                            } else {
+                                viewModel.finalizeDeletion(target.id)
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.textButtonColors(
+                        color = androidx.compose.ui.graphics.Color.Transparent,
+                        disabledColor = androidx.compose.ui.graphics.Color.Transparent,
+                        textColor = MiuixTheme.colorScheme.error,
+                        disabledTextColor = MiuixTheme.colorScheme.error
+                    )
+                )
+            },
+            dismissButton = {
+                TextButton(
+                    text = stringResource(R.string.action_cancel),
+                    onClick = { deleteTarget = null },
+                    colors = liquidDialogCancelButtonColors()
+                )
             }
         )
     }

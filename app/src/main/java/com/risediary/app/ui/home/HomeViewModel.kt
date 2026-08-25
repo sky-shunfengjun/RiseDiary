@@ -13,6 +13,7 @@ import com.risediary.app.data.repository.LengthRecordRepository
 import com.risediary.app.R
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -76,10 +77,17 @@ class HomeViewModel @Inject constructor(
     val trendFlights = MutableStateFlow<List<Flight>>(emptyList())
     val selectedTrend = MutableStateFlow("volume")
 
-    fun refresh() {
-        if (isRefreshing.value) return
-        viewModelScope.launch {
-            isRefreshing.value = true
+    private var refreshJob: Job? = null
+
+    /**
+     * Reloads all home data. [silent] refreshes update the data without toggling
+     * the pull-to-refresh spinner, so background refreshes triggered when
+     * returning to the main page don't add animation work to the pop transition.
+     */
+    fun refresh(silent: Boolean = false) {
+        if (refreshJob?.isActive == true) return
+        refreshJob = viewModelScope.launch {
+            if (!silent) isRefreshing.value = true
             try {
                 coroutineScope {
                     val today = async { flightRepository.countToday() }

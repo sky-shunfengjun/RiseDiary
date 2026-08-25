@@ -248,15 +248,10 @@ fun OnboardingScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .then(
-                        if (mode == OnboardingMode.FIRST_RUN) {
-                            Modifier
-                                .statusBarsPadding()
-                                .navigationBarsPadding()
-                        } else {
-                            Modifier
-                        }
-                    )
+                    // Both modes keep content inside the system bars; the cockpit
+                    // backdrop still draws edge-to-edge behind them (immersive).
+                    .statusBarsPadding()
+                    .navigationBarsPadding()
                     .imePadding()
                     .padding(horizontal = 20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally

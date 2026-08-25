@@ -76,6 +76,7 @@ import kotlinx.coroutines.launch
 import kotlin.math.abs
 import kotlin.math.sqrt
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
+import top.yukonga.miuix.kmp.utils.MiuixPopupUtils
 import com.risediary.app.ui.icons.AppIcons
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.Icon
@@ -402,6 +403,10 @@ private fun MainAppContent(
                         state = liquidDialogHostState,
                         backdrop = backdrop
                     )
+                    // miuix popups (OverlayListPopup/OverlayDropdownPreference) register
+                    // their state into the popup host; without it the popup never renders
+                    // and the triggering row stays stuck in its pressed state.
+                    MiuixPopupUtils.MiuixPopupHost()
                     val availableRelease = (updateState as? UpdateCheckState.Available)?.release
                     if (!interactionsBlocked && availableRelease != null) {
                         UpdateAvailableDialog(

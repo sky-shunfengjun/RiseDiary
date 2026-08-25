@@ -51,3 +51,4 @@ dev-logs/
 
 # ===== 本地交付物 =====
 /artifacts/
+skills-lock.json

@@ -24,9 +24,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
@@ -87,6 +90,15 @@ import kotlin.math.sign
 
 private val LocalLiquidBottomTabScale =
     staticCompositionLocalOf { { 1f } }
+
+/**
+ * 主三页（首页/记录/设置）内容底部与玻璃底栏之间的安全间距：
+ * 导航栏高度 + 底栏(8dp 边距 + 64dp 高) + ~16dp 呼吸空间。
+ * 底栏 top 位于 navBar + 72dp，此处取 navBar + 88dp，保证约 16dp 空隙。
+ */
+@Composable
+fun mainPageBottomSpacing(): Dp =
+    WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 88.dp
 
 /**
  * 捕获层（隐藏采样 Row）标记：该层只画实心图标供玻璃胶囊采样，

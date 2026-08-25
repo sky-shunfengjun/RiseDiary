@@ -25,6 +25,7 @@ import com.risediary.app.BuildConfig
 import com.risediary.app.R
 import com.risediary.app.data.DefaultVolumeMode
 import com.risediary.app.data.UsernamePolicy
+import com.risediary.app.ui.components.mainPageBottomSpacing
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.preference.ArrowPreference
@@ -50,7 +51,7 @@ fun SettingsScreen(
             start = 20.dp,
             top = statusBarTop,
             end = 20.dp,
-            bottom = 88.dp
+            bottom = mainPageBottomSpacing()
         ),
         verticalArrangement = Arrangement.spacedBy(12.dp),
         overscrollEffect = null
