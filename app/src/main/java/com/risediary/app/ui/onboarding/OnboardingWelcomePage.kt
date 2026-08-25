@@ -15,15 +15,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CloudOff
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Storage
-import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,6 +31,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.risediary.app.R
 import com.risediary.app.ui.theme.LocalRiseDarkTheme
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.Surface
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import com.risediary.app.ui.icons.AppIcons
 
 @Composable
 internal fun WelcomeOnboardingPage() {
@@ -55,17 +51,17 @@ internal fun WelcomeOnboardingPage() {
         Spacer(modifier = Modifier.height(30.dp))
         Text(
             text = stringResource(R.string.onboarding_welcome_title),
-            style = MaterialTheme.typography.headlineLarge,
+            fontSize = MiuixTheme.textStyles.title1.fontSize,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onSurface
+            color = MiuixTheme.colorScheme.onSurface
         )
         Spacer(modifier = Modifier.height(12.dp))
         Text(
             text = stringResource(R.string.onboarding_welcome_subtitle),
-            style = MaterialTheme.typography.bodyLarge,
+            fontSize = MiuixTheme.textStyles.headline1.fontSize,
             textAlign = TextAlign.Center,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             modifier = Modifier.padding(horizontal = 20.dp)
         )
         Surface(
@@ -73,7 +69,7 @@ internal fun WelcomeOnboardingPage() {
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp),
             shape = RoundedCornerShape(14.dp),
-            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+            color = MiuixTheme.colorScheme.primary.copy(alpha = 0.08f)
         ) {
             Row(
                 modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
@@ -81,15 +77,15 @@ internal fun WelcomeOnboardingPage() {
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Icon(
-                    Icons.Default.Info,
+                    AppIcons.Info,
                     contentDescription = stringResource(R.string.onboarding_usage_disclaimer_title),
-                    tint = MaterialTheme.colorScheme.primary,
+                    tint = MiuixTheme.colorScheme.primary,
                     modifier = Modifier.size(18.dp)
                 )
                 Text(
                     text = stringResource(R.string.usage_disclaimer),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    fontSize = MiuixTheme.textStyles.body2.fontSize,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                 )
             }
         }
@@ -98,9 +94,9 @@ internal fun WelcomeOnboardingPage() {
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            WelcomeStatus(Icons.Default.Storage, stringResource(R.string.onboarding_status_local), Modifier.weight(1f))
-            WelcomeStatus(Icons.Default.CloudOff, stringResource(R.string.onboarding_status_no_account), Modifier.weight(1f))
-            WelcomeStatus(Icons.Default.Tune, stringResource(R.string.onboarding_status_editable), Modifier.weight(1f))
+            WelcomeStatus(AppIcons.Storage, stringResource(R.string.onboarding_status_local), Modifier.weight(1f))
+            WelcomeStatus(AppIcons.CloudOff, stringResource(R.string.onboarding_status_no_account), Modifier.weight(1f))
+            WelcomeStatus(AppIcons.Tune, stringResource(R.string.onboarding_status_editable), Modifier.weight(1f))
         }
     }
 }
@@ -138,14 +134,19 @@ private fun InstrumentHero() {
 
 @Composable
 private fun WelcomeStatus(icon: ImageVector, text: String, modifier: Modifier = Modifier) {
-    Surface(modifier, RoundedCornerShape(16.dp), color = MaterialTheme.colorScheme.surface.copy(alpha = 0.72f), tonalElevation = 2.dp) {
+    Surface(modifier, RoundedCornerShape(16.dp), color = MiuixTheme.colorScheme.surface.copy(alpha = 0.72f)) {
         Column(
             Modifier.padding(horizontal = 6.dp, vertical = 12.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Icon(icon, null, tint = MaterialTheme.colorScheme.primary)
-            Text(text, style = MaterialTheme.typography.labelSmall, textAlign = TextAlign.Center, color = MaterialTheme.colorScheme.onSurface)
+            Icon(icon, null, tint = MiuixTheme.colorScheme.primary)
+            Text(
+                text,
+                fontSize = MiuixTheme.textStyles.footnote1.fontSize,
+                textAlign = TextAlign.Center,
+                color = MiuixTheme.colorScheme.onSurface
+            )
         }
     }
 }

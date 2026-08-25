@@ -6,20 +6,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Dashboard
-import androidx.compose.material.icons.filled.EditNote
-import androidx.compose.material.icons.filled.EmojiEvents
-import androidx.compose.material.icons.filled.Fingerprint
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.NotificationsActive
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material.icons.filled.ShowChart
-import androidx.compose.material.icons.filled.Timer
-import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -39,7 +25,11 @@ import com.risediary.app.ui.theme.CardGreen
 import com.risediary.app.ui.theme.CardOrange
 import com.risediary.app.ui.theme.CardPurple
 import com.risediary.app.ui.theme.RiseCard
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.text.DecimalFormat
+import com.risediary.app.ui.icons.AppIcons
 
 @Composable
 internal fun RecordingOnboardingPage(
@@ -50,7 +40,7 @@ internal fun RecordingOnboardingPage(
     onMlPerSpurtChange: (Float) -> Unit
 ) {
     SetupPage(
-        icon = Icons.Default.EditNote,
+        icon = AppIcons.EditNote,
         title = stringResource(R.string.onboarding_recording_title),
         subtitle = stringResource(R.string.onboarding_recording_subtitle)
     ) {
@@ -59,7 +49,7 @@ internal fun RecordingOnboardingPage(
             if (volumeMode == DefaultVolumeMode.SPURTS) {
                 SettingsDivider()
                 SettingsSliderItem(
-                    icon = Icons.Default.Tune,
+                    icon = AppIcons.Tune,
                     title = stringResource(R.string.settings_ml_conversion),
                     subtitle = stringResource(
                         R.string.settings_ml_conversion_summary,
@@ -77,14 +67,14 @@ internal fun RecordingOnboardingPage(
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             FeatureCard(
-                Icons.Default.Timer,
+                AppIcons.Timer,
                 stringResource(R.string.onboarding_timer_title),
                 stringResource(R.string.onboarding_timer_summary),
                 CardBlue,
                 Modifier.weight(1f)
             )
             FeatureCard(
-                Icons.Default.EditNote,
+                AppIcons.EditNote,
                 stringResource(R.string.onboarding_direct_title),
                 stringResource(R.string.onboarding_direct_summary),
                 CardPurple,
@@ -109,7 +99,7 @@ internal fun PrivacyOnboardingPage(
     onEditReminderTime: () -> Unit
 ) {
     SetupPage(
-        icon = Icons.Default.Lock,
+        icon = AppIcons.Lock,
         title = stringResource(R.string.onboarding_privacy_setup_title),
         subtitle = stringResource(R.string.onboarding_privacy_setup_subtitle)
     ) {
@@ -119,7 +109,7 @@ internal fun PrivacyOnboardingPage(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 InfoRow(
-                    Icons.Default.Lock,
+                    AppIcons.Lock,
                     stringResource(
                         if (appLockEnabled) R.string.settings_app_lock_on
                         else R.string.settings_app_lock_off
@@ -135,13 +125,13 @@ internal fun PrivacyOnboardingPage(
                             tint = CardPurple,
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Icon(Icons.Default.Lock, null, tint = MaterialTheme.colorScheme.onPrimary)
+                            Icon(AppIcons.Lock, null, tint = MiuixTheme.colorScheme.onPrimary)
                             Text(
                                 stringResource(
                                     if (appLockEnabled) R.string.onboarding_manage_app_lock
                                     else R.string.onboarding_enable_app_lock
                                 ),
-                                color = MaterialTheme.colorScheme.onPrimary,
+                                color = MiuixTheme.colorScheme.onPrimary,
                                 fontWeight = FontWeight.SemiBold
                             )
                         }
@@ -152,10 +142,10 @@ internal fun PrivacyOnboardingPage(
                         LiquidGlassButton(
                             onClick = onEnableBiometric,
                             backdrop = backdrop,
-                            surfaceColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.48f),
+                            surfaceColor = MiuixTheme.colorScheme.surface.copy(alpha = 0.48f),
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Icon(Icons.Default.Fingerprint, null)
+                            Icon(AppIcons.Fingerprint, null)
                             Text(stringResource(R.string.onboarding_enable_biometric))
                         }
                     }
@@ -164,7 +154,7 @@ internal fun PrivacyOnboardingPage(
         }
         RiseCard(modifier = Modifier.fillMaxWidth()) {
             SettingsToggleItem(
-                icon = Icons.Default.NotificationsActive,
+                icon = AppIcons.NotificationsActive,
                 title = stringResource(R.string.onboarding_recommended_reminders),
                 subtitle = stringResource(
                     R.string.onboarding_recommended_reminders_summary,
@@ -178,10 +168,10 @@ internal fun PrivacyOnboardingPage(
                 LiquidGlassButton(
                     onClick = onEditReminderTime,
                     backdrop = backdrop,
-                    surfaceColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.48f),
+                    surfaceColor = MiuixTheme.colorScheme.surface.copy(alpha = 0.48f),
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Icon(Icons.Default.Schedule, null)
+                    Icon(AppIcons.Schedule, null)
                     Text(
                         stringResource(R.string.onboarding_reminder_time, reminderTime),
                         fontWeight = FontWeight.Medium
@@ -197,19 +187,19 @@ internal fun PrivacyOnboardingPage(
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             SmallFeature(
-                Icons.Default.Dashboard,
+                AppIcons.Dashboard,
                 stringResource(R.string.onboarding_feature_dashboard),
                 CardBlue,
                 Modifier.weight(1f)
             )
             SmallFeature(
-                Icons.Default.ShowChart,
+                AppIcons.ShowChart,
                 stringResource(R.string.onboarding_feature_trends),
                 CardGreen,
                 Modifier.weight(1f)
             )
             SmallFeature(
-                Icons.Default.EmojiEvents,
+                AppIcons.EmojiEvents,
                 stringResource(R.string.onboarding_feature_achievements),
                 CardOrange,
                 Modifier.weight(1f)

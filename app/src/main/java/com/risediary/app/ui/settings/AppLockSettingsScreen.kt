@@ -9,14 +9,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Fingerprint
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.LockReset
-import androidx.compose.material.icons.filled.Timer
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -29,11 +21,18 @@ import androidx.compose.ui.unit.dp
 import androidx.fragment.app.FragmentActivity
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavController
+import com.risediary.app.ui.navigation3.LocalNavigator
+import com.risediary.app.ui.navigation3.Route
 import com.risediary.app.R
 import com.risediary.app.ui.components.LiquidAlertDialog
 import com.risediary.app.ui.components.SecondaryPageScaffold
+import com.risediary.app.ui.components.liquidDialogCancelButtonColors
 import com.risediary.app.ui.theme.RiseCard
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import com.risediary.app.ui.icons.AppIcons
 
 private tailrec fun Context.findFragmentActivity(): FragmentActivity? = when (this) {
     is FragmentActivity -> this
@@ -43,9 +42,9 @@ private tailrec fun Context.findFragmentActivity(): FragmentActivity? = when (th
 
 @Composable
 fun AppLockSettingsScreen(
-    navController: NavController,
     vm: SettingsViewModel = hiltViewModel()
 ) {
+    val navigator = LocalNavigator.current
     val context = LocalContext.current
     val activity = context.findFragmentActivity()
     val lockEnabled by vm.appLockEnabled.collectAsStateWithLifecycle()
@@ -57,7 +56,7 @@ fun AppLockSettingsScreen(
 
     SecondaryPageScaffold(
         title = stringResource(R.string.settings_app_lock),
-        onBack = { navController.popBackStack() }
+        onBack = { navigator.pop() }
     ) { contentPadding ->
         Column(
             modifier = Modifier
@@ -69,7 +68,7 @@ fun AppLockSettingsScreen(
             SettingsGroupHeader(stringResource(R.string.settings_app_lock_access_group))
             RiseCard(modifier = Modifier.fillMaxWidth()) {
                 SettingsToggleItem(
-                    icon = Icons.Default.Lock,
+                    icon = AppIcons.Lock,
                     title = stringResource(R.string.settings_app_lock),
                     subtitle =
                         if (lockEnabled) stringResource(R.string.settings_app_lock_on)
@@ -78,7 +77,7 @@ fun AppLockSettingsScreen(
                     onCheckedChange = { enabled ->
                         if (enabled != lockEnabled) {
                             if (enabled) {
-                                navController.navigate("lock_setup")
+                                navigator.push(Route.LockSetup)
                             } else {
                                 showDisableDialog = true
                             }
@@ -88,15 +87,15 @@ fun AppLockSettingsScreen(
                 if (lockEnabled) {
                     SettingsDivider()
                     SettingsNavItem(
-                        icon = Icons.Default.LockReset,
+                        icon = AppIcons.LockReset,
                         title = stringResource(R.string.settings_change_pin),
                         subtitle = stringResource(R.string.settings_change_pin_summary),
-                        onClick = { navController.navigate("lock_change") }
+                        onClick = { navigator.push(Route.LockChange) }
                     )
                     SettingsDivider()
                     val biometricAvailable = vm.biometricAvailable
                     SettingsToggleItem(
-                        icon = Icons.Default.Fingerprint,
+                        icon = AppIcons.Fingerprint,
                         title = stringResource(R.string.settings_biometric_unlock),
                         subtitle = when {
                             !biometricAvailable ->
@@ -119,7 +118,7 @@ fun AppLockSettingsScreen(
                 SettingsGroupHeader(stringResource(R.string.settings_app_lock_background_group))
                 RiseCard(modifier = Modifier.fillMaxWidth()) {
                     SettingsToggleItem(
-                        icon = Icons.Default.Timer,
+                        icon = AppIcons.Timer,
                         title = stringResource(R.string.settings_background_auto_lock),
                         subtitle =
                             if (backgroundAutoLockEnabled) {
@@ -149,21 +148,25 @@ fun AppLockSettingsScreen(
             text = { Text(stringResource(R.string.settings_app_lock_disable_message)) },
             confirmButton = {
                 TextButton(
+                    text = stringResource(R.string.settings_app_lock_continue_verify),
                     onClick = {
                         showDisableDialog = false
-                        navController.navigate("lock_disable")
-                    }
-                ) {
-                    Text(
-                        stringResource(R.string.settings_app_lock_continue_verify),
-                        color = MaterialTheme.colorScheme.error
+                        navigator.push(Route.LockDisable)
+                    },
+                    colors = ButtonDefaults.textButtonColors(
+                        color = androidx.compose.ui.graphics.Color.Transparent,
+                        disabledColor = androidx.compose.ui.graphics.Color.Transparent,
+                        textColor = MiuixTheme.colorScheme.error,
+                        disabledTextColor = MiuixTheme.colorScheme.error
                     )
-                }
+                )
             },
             dismissButton = {
-                TextButton(onClick = { showDisableDialog = false }) {
-                    Text(stringResource(R.string.action_cancel))
-                }
+                TextButton(
+                    text = stringResource(R.string.action_cancel),
+                    onClick = { showDisableDialog = false },
+                    colors = liquidDialogCancelButtonColors()
+                )
             }
         )
     }

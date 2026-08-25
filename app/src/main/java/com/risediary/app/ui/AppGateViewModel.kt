@@ -10,6 +10,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -27,25 +30,44 @@ class AppGateViewModel @Inject constructor(
 ) : ViewModel() {
     private val _state = MutableStateFlow(AppGateState.LOADING)
     val state: StateFlow<AppGateState> = _state.asStateFlow()
+    private var backgroundLockJob: Job? = null
+    private var backgroundTransition = 0L
 
     init {
         viewModelScope.launch {
-            _state.value = when {
-                !preferences.onboardingCompleted.first() -> AppGateState.ONBOARDING
-                preferences.appLockEnabled.first() &&
-                    preferences.appLockPin.first().isNotEmpty() -> AppGateState.LOCKED
-                else -> AppGateState.MAIN
+            _state.value = try {
+                when {
+                    !preferences.onboardingCompleted.first() -> AppGateState.ONBOARDING
+                    preferences.appLockEnabled.first() &&
+                        preferences.appLockPin.first().isNotEmpty() -> AppGateState.LOCKED
+                    else -> AppGateState.MAIN
+                }
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Throwable) {
+                // Never fall back to LOCKED: without a verified credential the
+                // user would be permanently stuck on the lock screen. Onboarding
+                // is self-healing and keeps all data.
+                AppGateState.ONBOARDING
             }
         }
     }
 
     fun showMain() {
+        onAppReturnedToForeground()
         _state.value = AppGateState.MAIN
     }
 
     fun onAppMovedToBackground() {
+        backgroundLockJob?.cancel()
+        backgroundLockJob = null
         if (_state.value != AppGateState.MAIN) return
-        viewModelScope.launch {
+
+        val transition = ++backgroundTransition
+        backgroundLockJob = viewModelScope.launch {
+            // System prompts and OEM app-lock screens can briefly stop the activity.
+            // Wait before locking so a quick return cancels this transition.
+            delay(BACKGROUND_LOCK_GRACE_MILLIS)
             val shouldLock = shouldLockOnBackground(
                 appLockEnabled = preferences.appLockEnabled.first(),
                 credentialPresent = preferences.appLockPin.first().isNotEmpty(),
@@ -53,10 +75,24 @@ class AppGateViewModel @Inject constructor(
                 mode = preferences.backgroundLockMode.first(),
                 timerActive = timerController.state.value.isActive
             )
-            if (shouldLock && _state.value == AppGateState.MAIN) {
+            if (
+                transition == backgroundTransition &&
+                shouldLock &&
+                _state.value == AppGateState.MAIN
+            ) {
                 _state.value = AppGateState.LOCKED
             }
         }
+    }
+
+    fun onAppReturnedToForeground() {
+        backgroundTransition++
+        backgroundLockJob?.cancel()
+        backgroundLockJob = null
+    }
+
+    private companion object {
+        const val BACKGROUND_LOCK_GRACE_MILLIS = 300L
     }
 }
 

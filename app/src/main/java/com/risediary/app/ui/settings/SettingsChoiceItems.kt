@@ -8,14 +8,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Numbers
-import androidx.compose.material.icons.filled.Palette
-import androidx.compose.material.icons.filled.Timer
-import androidx.compose.material.icons.filled.WaterDrop
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -36,6 +28,31 @@ import com.risediary.app.data.DefaultVolumeMode
 import com.risediary.app.ui.components.LiquidSegmentOption
 import com.risediary.app.ui.components.LiquidSegmentedControl
 import com.risediary.app.ui.theme.LocalRiseDarkTheme
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import com.risediary.app.ui.icons.AppIcons
+
+@Composable
+internal fun SettingsThemeDropdown(
+    value: String,
+    onSelect: (String) -> Unit
+) {
+    val systemLabel = stringResource(R.string.settings_theme_system)
+    val lightLabel = stringResource(R.string.settings_theme_light)
+    val darkLabel = stringResource(R.string.settings_theme_dark)
+    val optionKeys = remember { listOf("system", "light", "dark") }
+    val labels = remember(systemLabel, lightLabel, darkLabel) {
+        listOf(systemLabel, lightLabel, darkLabel)
+    }
+    OverlayDropdownPreference(
+        items = labels,
+        selectedIndex = optionKeys.indexOf(value).coerceAtLeast(0),
+        title = stringResource(R.string.settings_theme),
+        startAction = { SettingsIcon(AppIcons.Palette) },
+        onSelectedIndexChange = { index -> optionKeys.getOrNull(index)?.let(onSelect) }
+    )
+}
 
 @Composable
 internal fun SettingsThemeItem(
@@ -50,9 +67,9 @@ internal fun SettingsThemeItem(
     val optionKeys = remember { listOf("system", "light", "dark") }
     val options = remember(systemLabel, lightLabel, darkLabel) {
         listOf(
-            LiquidSegmentOption(systemLabel, Icons.Default.Palette),
-            LiquidSegmentOption(lightLabel, Icons.Default.Palette),
-            LiquidSegmentOption(darkLabel, Icons.Default.Palette)
+            LiquidSegmentOption(systemLabel, AppIcons.Palette),
+            LiquidSegmentOption(lightLabel, AppIcons.Palette),
+            LiquidSegmentOption(darkLabel, AppIcons.Palette)
         )
     }
     val rowSurface by rememberUpdatedState(
@@ -87,8 +104,8 @@ internal fun SettingsVolumeModeItem(
     val modes = remember { listOf(DefaultVolumeMode.MILLILITERS, DefaultVolumeMode.SPURTS) }
     val options = remember(millilitersLabel, spurtsLabel) {
         listOf(
-            LiquidSegmentOption(millilitersLabel, Icons.Default.WaterDrop),
-            LiquidSegmentOption(spurtsLabel, Icons.Default.Numbers)
+            LiquidSegmentOption(millilitersLabel, AppIcons.WaterDrop),
+            LiquidSegmentOption(spurtsLabel, AppIcons.Numbers)
         )
     }
     val rowSurface by rememberUpdatedState(
@@ -99,7 +116,7 @@ internal fun SettingsVolumeModeItem(
         drawContent()
     }
     SettingsChoiceLayout(
-        icon = Icons.Default.WaterDrop,
+        icon = AppIcons.WaterDrop,
         title = stringResource(R.string.settings_default_volume_mode),
         captureModifier = Modifier.layerBackdrop(rowBackdrop),
         summary = stringResource(R.string.settings_default_volume_mode_summary)
@@ -130,8 +147,8 @@ internal fun SettingsBackgroundLockModeItem(
     }
     val options = remember(alwaysLabel, exceptTimerLabel) {
         listOf(
-            LiquidSegmentOption(alwaysLabel, Icons.Default.Lock),
-            LiquidSegmentOption(exceptTimerLabel, Icons.Default.Timer)
+            LiquidSegmentOption(alwaysLabel, AppIcons.Lock),
+            LiquidSegmentOption(exceptTimerLabel, AppIcons.Timer)
         )
     }
     val rowSurface by rememberUpdatedState(
@@ -142,7 +159,7 @@ internal fun SettingsBackgroundLockModeItem(
         drawContent()
     }
     SettingsChoiceLayout(
-        icon = Icons.Default.Timer,
+        icon = AppIcons.Timer,
         title = stringResource(R.string.settings_background_lock_mode),
         captureModifier = Modifier.layerBackdrop(rowBackdrop),
         summary = stringResource(R.string.settings_background_lock_mode_summary)
@@ -182,16 +199,16 @@ private fun SettingsChoiceLayout(
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = title,
-                        style = MaterialTheme.typography.bodyLarge,
+                        fontSize = MiuixTheme.textStyles.headline1.fontSize,
                         fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurface
+                        color = MiuixTheme.colorScheme.onSurface
                     )
                     if (summary != null) {
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
                             text = summary,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            fontSize = MiuixTheme.textStyles.body2.fontSize,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                         )
                     }
                 }

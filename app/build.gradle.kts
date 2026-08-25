@@ -2,8 +2,8 @@ import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
-    alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.parcelize)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
 }
@@ -20,17 +20,15 @@ val hasReleaseSigning = listOf("storeFile", "storePassword", "keyAlias", "keyPas
 android {
     namespace = "com.risediary.app"
     compileSdk {
-        version = release(36) {
-            minorApiLevel = 1
-        }
+        version = release(37)
     }
 
     defaultConfig {
         applicationId = "com.risediary.app"
-        minSdk = 26
-        targetSdk = 34
-        versionCode = 43
-        versionName = "v1.0.2"
+        minSdk = 31
+        targetSdk = 36
+        versionCode = 79
+        versionName = "v1.1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
     }
@@ -84,6 +82,12 @@ ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
 }
 
+tasks.withType<Test>().configureEach {
+    javaLauncher.set(javaToolchains.launcherFor {
+        languageVersion.set(JavaLanguageVersion.of(26))
+    })
+}
+
 dependencies {
     val composeBom = platform(libs.compose.bom)
     implementation(composeBom)
@@ -93,10 +97,16 @@ dependencies {
     implementation(libs.compose.ui.graphics)
     implementation(libs.compose.ui.tooling.preview)
     implementation(libs.compose.material3)
-    implementation(libs.compose.material)
-    implementation(libs.compose.material.icons.extended)
     implementation(libs.backdrop)
     implementation(libs.capsule)
+    implementation(libs.miuix.ui)
+    implementation(libs.miuix.preference)
+    implementation(libs.miuix.icons)
+    implementation(libs.miuix.blur)
+    implementation(libs.miuix.navigation3.ui)
+    implementation(libs.navigation3.runtime)
+    implementation(libs.navigationevent.compose)
+    implementation(libs.lifecycle.viewmodel.navigation3)
     implementation(libs.activity.compose)
     implementation(libs.lifecycle.runtime.compose)
     implementation(libs.lifecycle.viewmodel.compose)

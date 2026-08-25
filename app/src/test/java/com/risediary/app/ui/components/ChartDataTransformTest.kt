@@ -102,7 +102,7 @@ class ChartDataTransformTest {
         assertEquals("12.5 ml", formatTrendMarkerValue(12.5, "ml"))
         assertEquals(
             "勃起 9 cm\n疲软 5.5 cm",
-            formatLengthMarkerValue(9.0, 5.5)
+            formatLengthMarkerValue("勃起 %1\$s cm\n疲软 %2\$s cm", 9.0, 5.5)
         )
     }
 

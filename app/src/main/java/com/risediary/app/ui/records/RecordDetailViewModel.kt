@@ -1,6 +1,5 @@
 package com.risediary.app.ui.records
 
-import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.risediary.app.data.entity.Flight
@@ -15,11 +14,10 @@ import javax.inject.Inject
 
 @HiltViewModel
 class RecordDetailViewModel @Inject constructor(
-    savedStateHandle: SavedStateHandle,
     private val repository: FlightRepository,
     private val reminderScheduler: ReminderScheduler
 ) : ViewModel() {
-    private val flightId: Long = checkNotNull(savedStateHandle["flightId"])
+    private var flightId: Long? = null
 
     private val _flight = MutableStateFlow<Flight?>(null)
     val flight: StateFlow<Flight?> = _flight.asStateFlow()
@@ -30,14 +28,16 @@ class RecordDetailViewModel @Inject constructor(
     private val _deleted = MutableStateFlow(false)
     val deleted: StateFlow<Boolean> = _deleted.asStateFlow()
 
-    init {
+    fun load(id: Long) {
+        flightId = id
         refresh()
     }
 
     fun refresh() {
+        val id = flightId ?: return
         viewModelScope.launch {
             _loading.value = true
-            _flight.value = repository.getById(flightId)
+            _flight.value = repository.getById(id)
             _loading.value = false
         }
     }

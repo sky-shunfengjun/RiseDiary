@@ -17,7 +17,7 @@ class TimerMathTest {
     }
 
     @Test
-    fun rebootFallsBackToWallClock() {
+    fun rebootFreezesElapsedInsteadOfCountingPoweredOffTime() {
         val session = TimerSession(
             status = TimerStatus.RUNNING,
             elapsedMillis = 2_000L,
@@ -25,7 +25,9 @@ class TimerMathTest {
             resumedAtWallClock = 100_000L
         )
 
-        assertEquals(7_000L, TimerMath.elapsed(session, 1_000L, 105_000L))
+        // elapsedRealtime reset after reboot: delta is negative and must not
+        // fall back to wall clock (which would add the powered-off interval).
+        assertEquals(2_000L, TimerMath.elapsed(session, 1_000L, 105_000L))
     }
 
     @Test

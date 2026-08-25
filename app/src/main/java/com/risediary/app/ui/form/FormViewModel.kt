@@ -1,10 +1,12 @@
 package com.risediary.app.ui.form
 
+import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.risediary.app.R
 import com.risediary.app.data.UserPreferences
 import com.risediary.app.data.DefaultVolumeMode
 import com.risediary.app.data.entity.Flight
@@ -17,6 +19,7 @@ import com.risediary.app.data.repository.TagRepository
 import com.risediary.app.reminder.ReminderScheduler
 import com.risediary.app.service.TimerController
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
@@ -34,7 +37,8 @@ class FormViewModel @Inject constructor(
     private val preferences: UserPreferences,
     private val clock: Clock,
     private val reminderScheduler: ReminderScheduler,
-    private val timerController: TimerController
+    private val timerController: TimerController,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     val tags: StateFlow<List<Tag>> = tagRepository.allTags.stateIn(
@@ -60,6 +64,9 @@ class FormViewModel @Inject constructor(
     var spurtCount by mutableStateOf("")
     var volumeMl by mutableStateOf("")
     var distanceCm by mutableStateOf("")
+    var quickSpurtSelection by mutableStateOf<Int?>(null)
+    var quickVolumeSelection by mutableStateOf<Int?>(null)
+    var quickDistanceSelection by mutableStateOf<Int?>(null)
     var selectedTags by mutableStateOf<List<String>>(emptyList())
     var moodNote by mutableStateOf("")
 
@@ -120,7 +127,7 @@ class FormViewModel @Inject constructor(
         viewModelScope.launch {
             val flight = flightRepository.getById(flightId)
             if (flight == null) {
-                errorMessage = "记录不存在或已被删除"
+                errorMessage = context.getString(R.string.form_error_record_missing)
             } else {
                 originalFlight = flight
                 editingFlightId = flight.id
@@ -149,11 +156,12 @@ class FormViewModel @Inject constructor(
 
     fun updateEndTime(value: Long) {
         if (value <= startTime) {
-            errorMessage = "结束时间必须晚于开始时间"
+            errorMessage = context.getString(R.string.form_error_end_before_start)
             return
         }
-        val seconds = ((value - startTime) / 1_000L).toInt()
-        updateDurationSeconds(seconds)
+        // Clamp in Long first so an absurd span cannot overflow toInt().
+        val seconds = ((value - startTime) / 1_000L).coerceIn(0L, MAX_DURATION_SECONDS.toLong())
+        updateDurationSeconds(seconds.toInt())
     }
 
     fun updateDurationSeconds(value: Int) {
@@ -173,35 +181,43 @@ class FormViewModel @Inject constructor(
         } else if (!useSpurtMode && volumeMl.isNotEmpty() && mlPerSpurt.value > 0f) {
             volumeMl.toFloatOrNull()?.let { spurtCount = (it / mlPerSpurt.value).toInt().toString() }
         }
+        quickSpurtSelection = null
+        quickVolumeSelection = null
         useSpurtMode = !useSpurtMode
     }
 
     fun setSpurtCountInput(value: String) {
         if (value.isEmpty() || value.all(Char::isDigit)) spurtCount = value.take(4)
+        quickSpurtSelection = null
     }
 
     fun setVolumeInput(value: String) {
         if (isDecimalInput(value)) volumeMl = value.take(7)
+        quickVolumeSelection = null
     }
 
     fun setDistanceInput(value: String) {
         if (isDecimalInput(value)) distanceCm = value.take(7)
+        quickDistanceSelection = null
     }
 
     fun quickSpurt(value: Int) {
         volumeModeTouched = true
         spurtCount = value.toString()
         useSpurtMode = true
+        quickSpurtSelection = value
     }
 
     fun quickVolume(value: Int) {
         volumeModeTouched = true
         volumeMl = "$value.0"
         useSpurtMode = false
+        quickVolumeSelection = value
     }
 
     fun quickDistance(value: Int) {
         distanceCm = value.toString()
+        quickDistanceSelection = value
     }
 
     fun toggleTag(tagName: String) {
@@ -209,8 +225,10 @@ class FormViewModel @Inject constructor(
         else selectedTags + tagName
     }
 
-    fun consumeAchievement() {
-        newAchievementKeys = newAchievementKeys.drop(1)
+    fun consumeAchievement(key: String? = null) {
+        if (key == null || newAchievementKeys.firstOrNull() == key) {
+            newAchievementKeys = newAchievementKeys.drop(1)
+        }
     }
 
     fun save() {
@@ -263,7 +281,10 @@ class FormViewModel @Inject constructor(
                 }
                 saved = true
             } catch (error: Exception) {
-                errorMessage = "保存失败：${error.message ?: "未知错误"}"
+                errorMessage = context.getString(
+                    R.string.form_error_save_failed,
+                    error.message ?: context.getString(R.string.form_error_unknown)
+                )
             } finally {
                 isSaving = false
             }

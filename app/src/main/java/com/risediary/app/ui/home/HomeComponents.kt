@@ -13,25 +13,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.requiredHeight
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.TrackChanges
-import androidx.compose.material.icons.filled.WaterDrop
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -41,14 +30,15 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.kyant.backdrop.backdrops.layerBackdrop
-import com.kyant.backdrop.backdrops.rememberLayerBackdrop
-import com.kyant.capsule.ContinuousCapsule
 import com.risediary.app.R
+import com.risediary.app.ui.components.CompactRangeSwitcher
 import com.risediary.app.ui.components.LiquidSegmentOption
-import com.risediary.app.ui.components.LiquidSegmentedControl
 import org.json.JSONArray
 import org.json.JSONObject
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import com.risediary.app.ui.icons.AppIcons
 
 @Composable
 internal fun MiniStat(label: String, value: String, accent: Color, modifier: Modifier) {
@@ -75,8 +65,8 @@ internal fun MiniStat(label: String, value: String, accent: Color, modifier: Mod
         Spacer(modifier = Modifier.height(3.dp))
         Text(
             label,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MiuixTheme.textStyles.footnote2,
+            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
             maxLines = 1
         )
     }
@@ -94,17 +84,17 @@ internal fun HomeCardHeader(
             modifier = Modifier
                 .size(36.dp)
                 .clip(RoundedCornerShape(12.dp))
-                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.11f)),
+                .background(MiuixTheme.colorScheme.primary.copy(alpha = 0.11f)),
             contentAlignment = Alignment.Center
         ) {
-            Icon(icon, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
+            Icon(icon, null, Modifier.size(20.dp), tint = MiuixTheme.colorScheme.primary)
         }
         Spacer(modifier = Modifier.width(10.dp))
         Text(
             text = title,
-            style = MaterialTheme.typography.titleMedium,
+            style = MiuixTheme.textStyles.title4,
             fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = MiuixTheme.colorScheme.onSurface,
             modifier = Modifier.weight(1f)
         )
         if (trailing != null) {
@@ -112,15 +102,15 @@ internal fun HomeCardHeader(
         } else if (actionLabel != null) {
             Text(
                 text = actionLabel,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.primary
+                style = MiuixTheme.textStyles.footnote2,
+                color = MiuixTheme.colorScheme.primary
             )
             Spacer(modifier = Modifier.width(2.dp))
             Icon(
-                Icons.Default.ChevronRight,
+                AppIcons.ChevronRight,
                 null,
                 Modifier.size(17.dp),
-                tint = MaterialTheme.colorScheme.primary
+                tint = MiuixTheme.colorScheme.primary
             )
         }
     }
@@ -136,45 +126,19 @@ internal fun TrendSelector(
     val distanceLabel = stringResource(R.string.home_distance)
     val options = remember(volumeLabel, distanceLabel) {
         listOf(
-            LiquidSegmentOption(volumeLabel, Icons.Default.WaterDrop),
-            LiquidSegmentOption(distanceLabel, Icons.Default.TrackChanges)
+            LiquidSegmentOption(volumeLabel, AppIcons.WaterDrop),
+            LiquidSegmentOption(distanceLabel, AppIcons.TrackChanges)
         )
     }
-    val currentTrackColor by rememberUpdatedState(
-        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.035f)
+    CompactRangeSwitcher(
+        options = options,
+        selectedIndex = if (isVolume) 0 else 1,
+        onSelected = { if (it == 0) onSelectVolume() else onSelectDistance() },
+        modifier = Modifier
+            .width(176.dp)
+            .height(38.dp),
+        controlWidth = 144.dp
     )
-    val backdrop = rememberLayerBackdrop { drawContent() }
-    Box(modifier = Modifier.width(176.dp).height(38.dp)) {
-        Box(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .fillMaxWidth()
-                .requiredHeight(70.dp)
-        ) {
-            Box(modifier = Modifier.fillMaxSize().layerBackdrop(backdrop)) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.CenterEnd)
-                        .width(144.dp)
-                        .height(38.dp)
-                        .clip(ContinuousCapsule)
-                        .background(currentTrackColor)
-                )
-            }
-            LiquidSegmentedControl(
-                options = options,
-                selectedIndex = if (isVolume) 0 else 1,
-                onSelected = { if (it == 0) onSelectVolume() else onSelectDistance() },
-                backdrop = backdrop,
-                modifier = Modifier.align(Alignment.CenterEnd).width(144.dp),
-                containerHeight = 38.dp,
-                contentPadding = 3.dp,
-                showIcons = false,
-                labelFontSize = 12.sp,
-                showSelectionShadow = false
-            )
-        }
-    }
 }
 
 internal fun parseCardOrder(orderJson: String, visibilityJson: String): List<String> {

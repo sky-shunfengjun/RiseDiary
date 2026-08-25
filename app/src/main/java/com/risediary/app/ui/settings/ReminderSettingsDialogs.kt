@@ -4,8 +4,6 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -20,6 +18,10 @@ import com.risediary.app.R
 import com.risediary.app.reminder.ReminderType
 import com.risediary.app.ui.components.LiquidAlertDialog
 import com.risediary.app.ui.components.WheelColumn
+import com.risediary.app.ui.components.liquidDialogCancelButtonColors
+import com.risediary.app.ui.components.liquidDialogConfirmButtonColors
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
 import java.time.LocalTime
 import java.util.Locale
 
@@ -86,18 +88,22 @@ internal fun ReminderSettingsDialogs(
             },
             confirmButton = {
                 TextButton(
+                    text = stringResource(R.string.action_confirm),
                     onClick = {
                         onTimeSelected(
                             type,
                             String.format(Locale.ROOT, "%02d:%02d", pickedHour, pickedMinute)
                         )
-                    }
-                ) { Text(stringResource(R.string.action_confirm)) }
+                    },
+                    colors = liquidDialogConfirmButtonColors()
+                )
             },
             dismissButton = {
-                TextButton(onClick = onDismissTime) {
-                    Text(stringResource(R.string.action_cancel))
-                }
+                TextButton(
+                    text = stringResource(R.string.action_cancel),
+                    onClick = onDismissTime,
+                    colors = liquidDialogCancelButtonColors()
+                )
             }
         )
     }
@@ -123,14 +129,18 @@ internal fun ReminderSettingsDialogs(
                 )
             },
             confirmButton = {
-                TextButton(onClick = { onMonthlyDaySelected(pickedDay) }) {
-                    Text(stringResource(R.string.action_confirm))
-                }
+                TextButton(
+                    text = stringResource(R.string.action_confirm),
+                    onClick = { onMonthlyDaySelected(pickedDay) },
+                    colors = liquidDialogConfirmButtonColors()
+                )
             },
             dismissButton = {
-                TextButton(onClick = onDismissMonthlyDay) {
-                    Text(stringResource(R.string.action_cancel))
-                }
+                TextButton(
+                    text = stringResource(R.string.action_cancel),
+                    onClick = onDismissMonthlyDay,
+                    colors = liquidDialogCancelButtonColors()
+                )
             }
         )
     }
@@ -141,14 +151,18 @@ internal fun ReminderSettingsDialogs(
             title = { Text(stringResource(R.string.settings_notification_blocked_title)) },
             text = { Text(stringResource(R.string.settings_notification_blocked_message)) },
             confirmButton = {
-                TextButton(onClick = onOpenNotificationSettings) {
-                    Text(stringResource(R.string.settings_open_system_settings))
-                }
+                TextButton(
+                    text = stringResource(R.string.settings_open_system_settings),
+                    onClick = onOpenNotificationSettings,
+                    colors = liquidDialogConfirmButtonColors()
+                )
             },
             dismissButton = {
-                TextButton(onClick = onDismissNotificationBlocked) {
-                    Text(stringResource(R.string.action_cancel))
-                }
+                TextButton(
+                    text = stringResource(R.string.action_cancel),
+                    onClick = onDismissNotificationBlocked,
+                    colors = liquidDialogCancelButtonColors()
+                )
             }
         )
     }
@@ -159,14 +173,18 @@ internal fun ReminderSettingsDialogs(
             title = { Text(stringResource(R.string.settings_exact_alarm_dialog_title)) },
             text = { Text(stringResource(R.string.settings_exact_alarm_dialog_message)) },
             confirmButton = {
-                TextButton(onClick = onOpenExactAlarmSettings) {
-                    Text(stringResource(R.string.settings_open_system_settings))
-                }
+                TextButton(
+                    text = stringResource(R.string.settings_open_system_settings),
+                    onClick = onOpenExactAlarmSettings,
+                    colors = liquidDialogConfirmButtonColors()
+                )
             },
             dismissButton = {
-                TextButton(onClick = onDismissExactAlarm) {
-                    Text(stringResource(R.string.action_cancel))
-                }
+                TextButton(
+                    text = stringResource(R.string.action_cancel),
+                    onClick = onDismissExactAlarm,
+                    colors = liquidDialogCancelButtonColors()
+                )
             }
         )
     }

@@ -1,7 +1,6 @@
 package com.risediary.app.ui.records
 
 import com.risediary.app.util.formatNaturalDuration
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -9,73 +8,73 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.FlightTakeoff
-import androidx.compose.material.icons.filled.Straighten
-import androidx.compose.material.icons.filled.Timer
-import androidx.compose.material.icons.filled.WaterDrop
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
-import androidx.compose.material3.SuggestionChip
-import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.SwipeToDismissBoxValue
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavController
+import com.risediary.app.R
+import com.risediary.app.ui.navigation3.LocalNavigator
+import com.risediary.app.ui.navigation3.Route
 import com.risediary.app.data.entity.Flight
 import com.risediary.app.data.entity.RecordVolumeMode
 import com.risediary.app.data.repository.TagJson
-import com.risediary.app.ui.Screen
 import com.risediary.app.ui.components.LiquidAlertDialog
 import com.risediary.app.ui.components.LiquidDateRangePickerDialog
 import com.risediary.app.ui.components.LiquidSnackbarTone
+import com.risediary.app.ui.components.liquidDialogCancelButtonColors
+import com.risediary.app.ui.components.mainPageBottomSpacing
 import com.risediary.app.ui.components.showLiquidSnackbar
 import com.risediary.app.ui.theme.RiseCard
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.ListPopupColumn
+import top.yukonga.miuix.kmp.basic.PopupPositionProvider
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.overlay.OverlayListPopup
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import com.risediary.app.ui.icons.AppIcons
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun RecordsScreen(
-    navController: NavController,
     snackbarHostState: SnackbarHostState,
+    snackbarScope: CoroutineScope,
     viewModel: RecordsViewModel = hiltViewModel()
 ) {
+    val navigator = LocalNavigator.current
     val currentTags by viewModel.tags.collectAsStateWithLifecycle()
     val allFlights by viewModel.allFlights.collectAsStateWithLifecycle()
     val flights = remember(
@@ -91,129 +90,163 @@ fun RecordsScreen(
             .distinct()
     }
     var showDatePicker by remember { mutableStateOf(false) }
+    var showFilterMenu by remember { mutableStateOf(false) }
+    var deleteTarget by remember { mutableStateOf<Flight?>(null) }
 
-    val pendingDeletions by viewModel.pendingDeletions.collectAsStateWithLifecycle()
-    val currentPendingDeletion = pendingDeletions.firstOrNull()
+    val hasActiveFilter = viewModel.selectedTag != null || viewModel.startDate != null
 
-    LaunchedEffect(currentPendingDeletion?.id, snackbarHostState) {
-        if (currentPendingDeletion != null) {
-            val result = snackbarHostState.showLiquidSnackbar(
-                message = "已删除记录",
-                actionLabel = "撤销",
-                tone = LiquidSnackbarTone.UNDO
-            )
-            if (result == SnackbarResult.ActionPerformed) {
-                viewModel.undoDelete(currentPendingDeletion)
-            } else {
-                viewModel.finalizeDeletion(currentPendingDeletion.id)
-            }
-        }
-    }
+    val bottomSpacing = mainPageBottomSpacing()
 
-    DisposableEffect(Unit) {
-        onDispose {
-            snackbarHostState.currentSnackbarData?.dismiss()
-            viewModel.clearPendingDeletions()
-        }
-    }
+    val deletedMessage = stringResource(R.string.records_deleted)
+    val undoAction = stringResource(R.string.action_undo)
 
-    Scaffold { padding ->
-        Column(
+    val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    Column(modifier = Modifier.fillMaxSize()) {
+        Box(
             modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 20.dp, vertical = 16.dp)
-        ) {
-            Text(
-                text = "记录",
-                style = MaterialTheme.typography.headlineLarge.copy(
-                    fontSize = 30.sp,
-                    fontWeight = FontWeight.SemiBold
-                ),
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.horizontalScroll(rememberScrollState())
-            ) {
-                FilterChip(
-                    onClick = { viewModel.filterByTag(null) },
-                    label = { Text("全部标签") },
-                    selected = viewModel.selectedTag == null
+                .fillMaxWidth()
+                .padding(
+                    start = 20.dp,
+                    top = statusBarTop + 16.dp,
+                    end = 20.dp,
+                    bottom = 16.dp
                 )
-                availableTagNames.forEach { tag ->
-                    FilterChip(
-                        onClick = { viewModel.filterByTag(tag) },
-                        label = { Text(tag) },
-                        selected = viewModel.selectedTag == tag
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = stringResource(R.string.records_title),
+                    style = MiuixTheme.textStyles.title1.copy(
+                        fontSize = 30.sp,
+                        fontWeight = FontWeight.SemiBold
+                    ),
+                    color = MiuixTheme.colorScheme.onSurface,
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(onClick = { showFilterMenu = true }) {
+                    Icon(
+                        AppIcons.Filter,
+                        contentDescription = stringResource(R.string.records_filter),
+                        tint =
+                            if (hasActiveFilter) MiuixTheme.colorScheme.primary
+                            else MiuixTheme.colorScheme.onSurfaceVariantActions
                     )
                 }
-                FilterChip(
-                    onClick = { showDatePicker = true },
-                    label = {
-                        Text(
-                            if (viewModel.startDate == null) "日期范围"
-                            else "${viewModel.startDate} 至 ${viewModel.endDate}"
+            }
+            OverlayListPopup(
+                show = showFilterMenu,
+                onDismissRequest = { showFilterMenu = false },
+                alignment = PopupPositionProvider.Align.End
+            ) {
+                ListPopupColumn {
+                    FilterMenuRow(
+                        label = stringResource(R.string.records_filter_all_tags),
+                        icon = AppIcons.List,
+                        selected = viewModel.selectedTag == null,
+                        onClick = {
+                            viewModel.filterByTag(null)
+                            showFilterMenu = false
+                        }
+                    )
+                    availableTagNames.forEach { tag ->
+                        FilterMenuRow(
+                            label = tag,
+                            icon = AppIcons.LocalOffer,
+                            selected = viewModel.selectedTag == tag,
+                            onClick = {
+                                viewModel.filterByTag(tag)
+                                showFilterMenu = false
+                            }
                         )
-                    },
-                    leadingIcon = { Icon(Icons.Default.CalendarMonth, null) },
-                    selected = viewModel.startDate != null
-                )
-                if (viewModel.startDate != null) {
-                    TextButton(onClick = { viewModel.setDateRange(null, null) }) {
-                        Text("清除日期")
+                    }
+                    FilterMenuRow(
+                        label =
+                            if (viewModel.startDate == null) {
+                                stringResource(R.string.records_pick_date_range)
+                            } else {
+                                stringResource(
+                                    R.string.records_date_range_format,
+                                    viewModel.startDate.toString(),
+                                    viewModel.endDate.toString()
+                                )
+                            },
+                        icon = AppIcons.CalendarMonth,
+                        selected = viewModel.startDate != null,
+                        onClick = {
+                            showDatePicker = true
+                            showFilterMenu = false
+                        }
+                    )
+                    if (hasActiveFilter) {
+                    FilterMenuRow(
+                        label = stringResource(R.string.records_clear_filter),
+                        icon = AppIcons.Close,
+                            onClick = {
+                                viewModel.filterByTag(null)
+                                viewModel.setDateRange(null, null)
+                                showFilterMenu = false
+                            }
+                        )
                     }
                 }
             }
+        }
 
-            Spacer(modifier = Modifier.height(12.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
-            val grouped = remember(flights) { groupByDate(flights) }
-            if (grouped.isEmpty()) {
-                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            Icons.Default.FlightTakeoff,
-                            contentDescription = null,
-                            modifier = Modifier.size(64.dp),
-                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
+        val todayLabel = stringResource(R.string.records_today)
+        val yesterdayLabel = stringResource(R.string.records_yesterday)
+        val grouped = remember(flights, viewModel.userZoneId, todayLabel, yesterdayLabel) {
+            groupByDate(flights, viewModel.userZoneId, todayLabel, yesterdayLabel)
+        }
+        if (grouped.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        AppIcons.FlightTakeoff,
+                        contentDescription = null,
+                        modifier = Modifier.size(64.dp),
+                        tint = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.2f)
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Text(
+                        stringResource(R.string.records_empty),
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                    )
+                }
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.weight(1f),
+                contentPadding = PaddingValues(start = 20.dp, end = 20.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                grouped.forEach { group ->
+                    item(key = group.header) {
                         Text(
-                            "暂无符合条件的起飞记录",
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                            group.header,
+                            fontSize = MiuixTheme.textStyles.body1.fontSize,
+                            fontWeight = FontWeight.Medium,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            modifier = Modifier.padding(vertical = 4.dp)
+                        )
+                    }
+                    items(group.items, key = Flight::id) { flight ->
+                        FlightCard(
+                            flight = flight,
+                            zoneId = viewModel.userZoneId,
+                            onClick = {
+                                navigator.push(Route.RecordDetail(flight.id))
+                            },
+                            onLongClick = {
+                                deleteTarget = flight
+                            }
                         )
                     }
                 }
-            } else {
-                LazyColumn(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    grouped.forEach { group ->
-                        item(key = group.header) {
-                            Text(
-                                group.header,
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(vertical = 4.dp)
-                            )
-                        }
-                        items(group.items, key = Flight::id) { flight ->
-                            FlightCard(
-                                flight = flight,
-                                onClick = {
-                                    navController.navigate(
-                                        Screen.RecordDetail.createRoute(flight.id)
-                                    )
-                                },
-                                onDelete = { viewModel.delete(flight) }
-                            )
-                        }
-                    }
-                    item { Spacer(modifier = Modifier.height(80.dp)) }
-                }
+                item { Spacer(modifier = Modifier.height(bottomSpacing)) }
             }
         }
     }
@@ -227,84 +260,137 @@ fun RecordsScreen(
             }
         )
     }
+
+    deleteTarget?.let { target ->
+        LiquidAlertDialog(
+            onDismissRequest = { deleteTarget = null },
+            title = { Text(stringResource(R.string.record_detail_delete_dialog_title)) },
+            text = { Text(stringResource(R.string.record_detail_delete_dialog_message)) },
+            confirmButton = {
+                TextButton(
+                    text = stringResource(R.string.action_delete),
+                    onClick = {
+                        deleteTarget = null
+                        viewModel.delete(target)
+                        // Launched on the stable MainAppContent scope so the
+                        // undo Snackbar survives navigation to detail/edit.
+                        snackbarScope.launch {
+                            val result = snackbarHostState.showLiquidSnackbar(
+                                message = deletedMessage,
+                                actionLabel = undoAction,
+                                tone = LiquidSnackbarTone.UNDO
+                            )
+                            if (result == SnackbarResult.ActionPerformed) {
+                                viewModel.undoDelete(target)
+                            } else {
+                                viewModel.finalizeDeletion(target.id)
+                            }
+                        }
+                    },
+                    colors = ButtonDefaults.textButtonColors(
+                        color = androidx.compose.ui.graphics.Color.Transparent,
+                        disabledColor = androidx.compose.ui.graphics.Color.Transparent,
+                        textColor = MiuixTheme.colorScheme.error,
+                        disabledTextColor = MiuixTheme.colorScheme.error
+                    )
+                )
+            },
+            dismissButton = {
+                TextButton(
+                    text = stringResource(R.string.action_cancel),
+                    onClick = { deleteTarget = null },
+                    colors = liquidDialogCancelButtonColors()
+                )
+            }
+        )
+    }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun FilterMenuRow(
+    label: String,
+    icon: ImageVector,
+    selected: Boolean = false,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Icon(
+            icon,
+            contentDescription = null,
+            modifier = Modifier.size(20.dp),
+            tint =
+                if (selected) MiuixTheme.colorScheme.primary
+                else MiuixTheme.colorScheme.onSurfaceVariantActions
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+        Text(
+            text = label,
+            fontSize = MiuixTheme.textStyles.body1.fontSize,
+            color =
+                if (selected) MiuixTheme.colorScheme.primary
+                else MiuixTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
+            maxLines = 1
+        )
+        if (selected) {
+            Icon(
+                AppIcons.Check,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+                tint = MiuixTheme.colorScheme.primary
+            )
+        }
+    }
+}
+
 @Composable
 private fun FlightCard(
     flight: Flight,
+    zoneId: ZoneId,
     onClick: () -> Unit,
-    onDelete: () -> Unit
+    onLongClick: (() -> Unit)? = null
 ) {
-    var showDeleteConfirm by remember { mutableStateOf(false) }
-    val dismissState = rememberSwipeToDismissBoxState(
-        confirmValueChange = { value ->
-            if (value == SwipeToDismissBoxValue.EndToStart) showDeleteConfirm = true
-            false
-        },
-        positionalThreshold = { distance -> distance * 0.4f }
-    )
-
-    SwipeToDismissBox(
-        state = dismissState,
-        enableDismissFromStartToEnd = false,
-        backgroundContent = {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(
-                        if (
-                            dismissState.targetValue == SwipeToDismissBoxValue.EndToStart ||
-                            dismissState.currentValue == SwipeToDismissBoxValue.EndToStart
-                        ) {
-                            MaterialTheme.colorScheme.errorContainer
-                        } else {
-                            androidx.compose.ui.graphics.Color.Transparent
-                        }
-                    )
-                    .padding(end = 20.dp),
-                contentAlignment = Alignment.CenterEnd
-            ) {
-                Icon(
-                    Icons.Default.Delete,
-                    contentDescription = "删除",
-                    tint = MaterialTheme.colorScheme.onErrorContainer
-                )
-            }
-        }
+    RiseCard(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = onClick,
+        onLongClick = onLongClick
     ) {
-        RiseCard(
-            modifier = Modifier.fillMaxWidth().clickable(onClick = onClick)
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier.padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = DATE_TIME_FORMAT.format(
-                            Instant.ofEpochMilli(flight.startTime)
-                                .atZone(ZoneId.systemDefault())
-                        ),
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        StatItem(Icons.Default.Timer, formatDuration(flight.durationSeconds))
-                        StatItem(
-                            Icons.Default.WaterDrop,
-                            if (
-                                RecordVolumeMode.fromStoredValue(flight.volumeInputMode) ==
-                                RecordVolumeMode.SPURTS
-                            ) {
-                                "${flight.spurtCount ?: 0}股"
-                            } else {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = DATE_TIME_FORMAT.format(
+                        Instant.ofEpochMilli(flight.startTime)
+                            .atZone(zoneId)
+                    ),
+                    fontSize = MiuixTheme.textStyles.body2.fontSize,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    StatItem(AppIcons.Timer, formatDuration(flight.durationSeconds))
+                    StatItem(
+                        AppIcons.WaterDrop,
+                        if (
+                            RecordVolumeMode.fromStoredValue(flight.volumeInputMode) ==
+                            RecordVolumeMode.SPURTS
+                        ) {
+                            stringResource(R.string.records_spurts_format, flight.spurtCount ?: 0)
+                        } else {
                                 "${flight.semenVolumeMl ?: 0f}ml"
                             }
                         )
                         flight.ejaculationDistanceCm?.let {
-                            StatItem(Icons.Default.Straighten, "${it}cm")
+                            StatItem(AppIcons.Straighten, "${it}cm")
                         }
                     }
                     val tags = TagJson.decode(flight.methodTags)
@@ -315,52 +401,27 @@ private fun FlightCard(
                             modifier = Modifier.horizontalScroll(rememberScrollState())
                         ) {
                             tags.forEach { tag ->
-                                SuggestionChip(
-                                    onClick = {},
-                                    label = { Text(tag) },
-                                    modifier = Modifier.height(28.dp)
-                                )
+                                DetailTagChip(tag)
                             }
                         }
                     }
                 }
-                IconButton(onClick = { showDeleteConfirm = true }) {
-                    Icon(
-                        Icons.Default.Delete,
-                        contentDescription = "删除",
-                        tint = MaterialTheme.colorScheme.error
-                    )
-                }
+                Icon(
+                    AppIcons.ChevronRight,
+                    contentDescription = null,
+                    modifier = Modifier.size(20.dp),
+                    tint = MiuixTheme.colorScheme.onSurfaceVariantActions
+                )
             }
         }
     }
 
-    if (showDeleteConfirm) {
-        LiquidAlertDialog(
-            onDismissRequest = { showDeleteConfirm = false },
-            title = { Text("确认删除") },
-            text = { Text("确认删除这条记录吗？") },
-            confirmButton = {
-                TextButton(
-                    onClick = {
-                        showDeleteConfirm = false
-                        onDelete()
-                    }
-                ) { Text("删除", color = MaterialTheme.colorScheme.error) }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDeleteConfirm = false }) { Text("取消") }
-            }
-        )
-    }
-}
-
 @Composable
 private fun StatItem(icon: ImageVector, text: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, null, modifier = Modifier.size(14.dp))
+        Icon(icon, null, modifier = Modifier.size(15.dp))
         Spacer(modifier = Modifier.width(2.dp))
-        Text(text, style = MaterialTheme.typography.bodySmall)
+        Text(text, fontSize = MiuixTheme.textStyles.body1.fontSize)
     }
 }
 
@@ -369,8 +430,13 @@ private fun formatDuration(seconds: Int): String =
 
 private data class DateGroup(val header: String, val items: List<Flight>)
 
-private fun groupByDate(flights: List<Flight>): List<DateGroup> {
-    val zone = ZoneId.systemDefault()
+private fun groupByDate(
+    flights: List<Flight>,
+    zoneId: ZoneId,
+    todayLabel: String,
+    yesterdayLabel: String
+): List<DateGroup> {
+    val zone = zoneId
     val today = LocalDate.now(zone)
     return flights
         .groupBy { Instant.ofEpochMilli(it.startTime).atZone(zone).toLocalDate() }
@@ -378,8 +444,8 @@ private fun groupByDate(flights: List<Flight>): List<DateGroup> {
         .sortedByDescending { it.key }
         .map { (date, items) ->
             val header = when (date) {
-                today -> "今天"
-                today.minusDays(1) -> "昨天"
+                today -> todayLabel
+                today.minusDays(1) -> yesterdayLabel
                 else -> date.toString()
             }
             DateGroup(header, items.sortedByDescending(Flight::startTime))

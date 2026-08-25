@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
@@ -62,6 +63,32 @@ import com.kyant.backdrop.highlight.Highlight
 import com.kyant.capsule.ContinuousCapsule
 import com.kyant.capsule.ContinuousRoundedRectangle
 import com.risediary.app.ui.theme.LocalRiseDarkTheme
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.TextButtonColors
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+
+/**
+ * 玻璃弹窗按钮配色：
+ * 确认钮的蓝底白字由 LiquidDialogActions 的蓝色胶囊层提供，按钮本体保持透明；
+ * 取消钮透明底中性文字。
+ */
+@Composable
+fun liquidDialogConfirmButtonColors(): TextButtonColors =
+    ButtonDefaults.textButtonColors(
+        color = Color.Transparent,
+        disabledColor = Color.Transparent,
+        textColor = Color.White,
+        disabledTextColor = Color.White.copy(alpha = 0.5f)
+    )
+
+@Composable
+fun liquidDialogCancelButtonColors(): TextButtonColors =
+    ButtonDefaults.textButtonColors(
+        color = Color.Transparent,
+        disabledColor = Color.Transparent,
+        textColor = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+        disabledTextColor = MiuixTheme.colorScheme.disabledOnSecondaryVariant
+    )
 
 /**
  * Backdrop shared by the page and its glass controls.
@@ -163,7 +190,7 @@ fun LiquidDialogHost(
         else Color(0xFF29293A).copy(alpha = 0.23f)
     val interactionSource = remember { MutableInteractionSource() }
 
-    BackHandler(enabled = visible) {
+    BackHandler(enabled = retainedEntry != null) {
         currentEntry?.onDismissRequest?.value?.invoke()
     }
 
@@ -321,6 +348,7 @@ private fun SolidDialogSurface(
         modifier = Modifier
             .fillMaxSize()
             .navigationBarsPadding()
+            .imePadding()
             .padding(horizontal = 40.dp, vertical = 24.dp),
         contentAlignment = alignment
     ) {
@@ -364,6 +392,7 @@ private fun LiquidDialogSurface(
         modifier = Modifier
             .fillMaxSize()
             .navigationBarsPadding()
+            .imePadding()
             .padding(horizontal = 40.dp, vertical = 24.dp),
         contentAlignment = alignment
     ) {

@@ -22,10 +22,14 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -39,6 +43,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -54,6 +60,8 @@ import com.risediary.app.ui.components.LiquidAlertDialog
 import com.risediary.app.ui.components.LiquidDialogHost
 import com.risediary.app.ui.components.ProvideLiquidDialogHost
 import com.risediary.app.ui.components.WheelColumn
+import com.risediary.app.ui.components.liquidDialogCancelButtonColors
+import com.risediary.app.ui.components.liquidDialogConfirmButtonColors
 import com.risediary.app.ui.components.rememberLiquidDialogHostState
 import com.risediary.app.ui.lock.AppLockScreen
 import com.risediary.app.ui.lock.LockMode
@@ -175,12 +183,16 @@ fun OnboardingScreen(
         if (finishing) return
         finishing = true
         onboardingScope.launch {
-            settingsViewModel.awaitOnboardingWrites()
-            viewModel.finish(
-                firstRun = mode == OnboardingMode.FIRST_RUN,
-                reminderTime = reminderTimeDraft.takeIf { saveReminderTime }
-            )
-            onDone()
+            try {
+                settingsViewModel.awaitOnboardingWrites()
+                viewModel.finish(
+                    firstRun = mode == OnboardingMode.FIRST_RUN,
+                    reminderTime = reminderTimeDraft.takeIf { saveReminderTime }
+                )
+                onDone()
+            } finally {
+                finishing = false
+            }
         }
     }
 
@@ -188,48 +200,58 @@ fun OnboardingScreen(
         if (page > WELCOME_PAGE) page-- else onDone()
     }
 
-    if (showLockSetup) {
-        AppLockScreen(
-            mode = LockMode.CREATE,
-            onDone = {
-                settingsViewModel.applyOnboardingLockDefaults()
-                showLockSetup = false
-                if (settingsViewModel.biometricAvailable) {
-                    settingsViewModel.requestBiometricUnlock(true, activity)
-                }
-            },
-            onCancel = { showLockSetup = false }
-        )
-        return
-    }
-
     // The draft is the source of truth while the flow is open. Persisted settings may
     // still be catching up after saving the theme, which previously caused a brief light
     // flash on the following pages.
     val previewTheme = resolveOnboardingPreviewTheme(themeDraft, persistedTheme)
-    val previewDark = when (previewTheme) {
-        "light" -> false
-        "dark" -> true
-        else -> systemDark
+
+    if (showLockSetup) {
+        RiseDiaryTheme(themeMode = previewTheme) {
+            AppLockScreen(
+                mode = LockMode.CREATE,
+                onDone = {
+                    settingsViewModel.applyOnboardingLockDefaults()
+                    showLockSetup = false
+                    if (settingsViewModel.biometricAvailable) {
+                        settingsViewModel.requestBiometricUnlock(true, activity)
+                    }
+                },
+                onCancel = { showLockSetup = false }
+            )
+        }
+        return
     }
 
-    RiseDiaryTheme(darkTheme = previewDark) {
+    RiseDiaryTheme(themeMode = previewTheme) {
         val backdrop = rememberLayerBackdrop()
         val dialogHostState = rememberLiquidDialogHostState()
+        val density = LocalDensity.current
+        val cockpitTopInsetPx = with(density) {
+            if (mode == OnboardingMode.FIRST_RUN) {
+                0f
+            } else {
+                WindowInsets.statusBars
+                    .asPaddingValues()
+                    .calculateTopPadding()
+                    .toPx()
+            }
+        }
+        val cockpitWindowHeightPx = LocalView.current.height.toFloat()
         ProvideLiquidDialogHost(dialogHostState) {
             Box(modifier = Modifier.fillMaxSize()) {
-                CockpitBackdrop(modifier = Modifier.layerBackdrop(backdrop))
+                CockpitBackdrop(
+                    topInsetPx = cockpitTopInsetPx,
+                    windowHeightPx = cockpitWindowHeightPx,
+                    modifier = Modifier.layerBackdrop(backdrop)
+                )
 
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .then(
-                        if (mode == OnboardingMode.FIRST_RUN) {
-                            Modifier.statusBarsPadding()
-                        } else {
-                            Modifier
-                        }
-                    )
+                    // Both modes keep content inside the system bars; the cockpit
+                    // backdrop still draws edge-to-edge behind them (immersive).
+                    .statusBarsPadding()
+                    .navigationBarsPadding()
                     .imePadding()
                     .padding(horizontal = 20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
@@ -423,6 +445,7 @@ fun OnboardingScreen(
                 },
                 confirmButton = {
                     TextButton(
+                        text = stringResource(R.string.action_confirm),
                         onClick = {
                             reminderTimeDirty = true
                             reminderTimeDraft = String.format(
@@ -438,13 +461,16 @@ fun OnboardingScreen(
                                 )
                             }
                             showTimePicker = false
-                        }
-                    ) { Text(stringResource(R.string.action_confirm)) }
+                        },
+                        colors = liquidDialogConfirmButtonColors()
+                    )
                 },
                 dismissButton = {
-                    TextButton(onClick = { showTimePicker = false }) {
-                        Text(stringResource(R.string.action_cancel))
-                    }
+                    TextButton(
+                        text = stringResource(R.string.action_cancel),
+                        onClick = { showTimePicker = false },
+                        colors = liquidDialogCancelButtonColors()
+                    )
                 }
             )
                 }
@@ -456,16 +482,20 @@ fun OnboardingScreen(
                 text = { Text(stringResource(R.string.settings_notification_blocked_message)) },
                 confirmButton = {
                     TextButton(
+                        text = stringResource(R.string.settings_open_system_settings),
                         onClick = {
                             showNotificationBlockedDialog = false
                             openReminderNotificationSettings(context)
-                        }
-                    ) { Text(stringResource(R.string.settings_open_system_settings)) }
+                        },
+                        colors = liquidDialogConfirmButtonColors()
+                    )
                 },
                 dismissButton = {
-                    TextButton(onClick = { showNotificationBlockedDialog = false }) {
-                        Text(stringResource(R.string.action_cancel))
-                    }
+                    TextButton(
+                        text = stringResource(R.string.action_cancel),
+                        onClick = { showNotificationBlockedDialog = false },
+                        colors = liquidDialogCancelButtonColors()
+                    )
                 }
             )
                 }
@@ -477,16 +507,20 @@ fun OnboardingScreen(
                 text = { Text(stringResource(R.string.settings_exact_alarm_dialog_message)) },
                 confirmButton = {
                     TextButton(
+                        text = stringResource(R.string.settings_open_system_settings),
                         onClick = {
                             showExactAlarmDialog = false
                             openExactAlarmSettings(context)
-                        }
-                    ) { Text(stringResource(R.string.settings_open_system_settings)) }
+                        },
+                        colors = liquidDialogConfirmButtonColors()
+                    )
                 },
                 dismissButton = {
-                    TextButton(onClick = { showExactAlarmDialog = false }) {
-                        Text(stringResource(R.string.action_cancel))
-                    }
+                    TextButton(
+                        text = stringResource(R.string.action_cancel),
+                        onClick = { showExactAlarmDialog = false },
+                        colors = liquidDialogCancelButtonColors()
+                    )
                 }
             )
                 }

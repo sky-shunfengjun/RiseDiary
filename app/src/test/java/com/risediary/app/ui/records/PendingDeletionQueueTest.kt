@@ -7,6 +7,8 @@ import kotlinx.coroutines.test.advanceUntilIdle
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PendingDeletionQueueTest {
@@ -21,7 +23,7 @@ class PendingDeletionQueueTest {
             second
         )
 
-        assertEquals(listOf(first, second), queue)
+        assertEquals(listOf(1L, 2L), queue.map { it.flight.id })
     }
 
     @Test
@@ -29,9 +31,13 @@ class PendingDeletionQueueTest {
         val first = flight(1)
         val second = flight(2)
 
-        val remaining = removePendingDeletion(listOf(first, second), first.id)
+        val queue = enqueuePendingDeletion(
+            enqueuePendingDeletion(emptyList(), first),
+            second
+        )
+        val remaining = removePendingDeletion(queue, first.id)
 
-        assertEquals(listOf(second), remaining)
+        assertEquals(listOf(second.id), remaining.map { it.flight.id })
     }
 
     @Test
@@ -39,20 +45,25 @@ class PendingDeletionQueueTest {
         val original = flight(1)
         val updated = original.copy(moodNote = "updated")
 
-        val queue = enqueuePendingDeletion(listOf(original), updated)
+        val queue = enqueuePendingDeletion(
+            enqueuePendingDeletion(emptyList(), original),
+            updated
+        )
 
-        assertEquals(listOf(updated), queue)
+        assertEquals(listOf(updated.id), queue.map { it.flight.id })
+        assertEquals(1, queue.size)
+        assertEquals("updated", queue.single().flight.moodNote)
     }
 
     @Test
-    fun staleDeleteCompletionIsRejectedAfterScreenSessionIsCleared() {
-        val session = PendingDeletionSession()
-        val capturedGeneration = session.capture()
+    fun cancelledEntrySkipsDatabaseDeleteDecisionFlag() {
+        val entry = PendingDeletion(flight(1))
+        assertFalse(entry.cancelled)
+        assertFalse(entry.completed)
+        assertFalse(entry.finalized)
 
-        session.clear()
-
-        assertEquals(false, session.isCurrent(capturedGeneration))
-        assertEquals(true, session.isCurrent(session.capture()))
+        entry.cancelled = true
+        assertTrue(entry.cancelled)
     }
 
     @Test

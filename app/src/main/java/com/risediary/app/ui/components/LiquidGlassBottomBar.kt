@@ -24,9 +24,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
@@ -62,7 +65,6 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastCoerceIn
-import androidx.compose.ui.util.fastCoerceAtMost
 import androidx.compose.ui.util.fastRoundToInt
 import androidx.compose.ui.util.lerp
 import com.kyant.backdrop.Backdrop
@@ -88,6 +90,24 @@ import kotlin.math.sign
 
 private val LocalLiquidBottomTabScale =
     staticCompositionLocalOf { { 1f } }
+
+/**
+ * 主三页（首页/记录/设置）内容底部与玻璃底栏之间的安全间距：
+ * 导航栏高度 + 底栏(8dp 边距 + 64dp 高) + ~16dp 呼吸空间。
+ * 底栏 top 位于 navBar + 72dp，此处取 navBar + 88dp，保证约 16dp 空隙。
+ */
+@Composable
+fun mainPageBottomSpacing(): Dp =
+    WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 88.dp
+
+/**
+ * 捕获层（隐藏采样 Row）标记：该层只画实心图标供玻璃胶囊采样，
+ * 可见层始终画空心图标，选中实心只通过胶囊覆盖区域渐显。
+ */
+internal val LocalLiquidBottomTabSampling =
+    staticCompositionLocalOf { false }
+
+internal fun originalLiquidSelectionPressedScale(): Float = 78f / 56f
 
 internal data class CompactLensMaskBounds(
     val left: Float,
@@ -218,7 +238,7 @@ internal fun LiquidBottomTabs(
                 valueRange = 0f..(tabsCount - 1).toFloat(),
                 visibilityThreshold = 0.001f,
                 initialScale = 1f,
-                pressedScale = 78f / 56f,
+                pressedScale = originalLiquidSelectionPressedScale(),
                 onDragStarted = {},
                 onDragStopped = {
                     val targetIndex =
@@ -393,7 +413,8 @@ internal fun LiquidBottomTabs(
                     1.2f,
                     dampedDragAnimation.pressProgress
                 )
-            }
+            },
+            LocalLiquidBottomTabSampling provides true
         ) {
             Row(
                 Modifier

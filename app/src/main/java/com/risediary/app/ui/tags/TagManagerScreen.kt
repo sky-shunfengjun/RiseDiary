@@ -9,6 +9,7 @@ import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,19 +21,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.DragHandle
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -50,31 +38,45 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.toColorInt
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavController
+import com.risediary.app.R
+import com.risediary.app.ui.navigation3.LocalNavigator
+import com.risediary.app.ui.navigation3.Route
 import com.risediary.app.data.entity.Tag
 import com.risediary.app.ui.components.LiquidAddButton
 import com.risediary.app.ui.components.LiquidAlertDialog
+import com.risediary.app.ui.components.liquidDialogCancelButtonColors
+import com.risediary.app.ui.components.liquidDialogConfirmButtonColors
 import com.risediary.app.ui.components.SecondaryPageScaffold
 import com.risediary.app.ui.components.reorderByDragOffset
 import com.risediary.app.ui.theme.RiseCard
 import com.risediary.app.ui.theme.backgroundBrush
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.basic.TextField
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import com.risediary.app.ui.icons.AppIcons
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TagManagerScreen(
-    navController: NavController,
     viewModel: TagManagerViewModel = hiltViewModel()
 ) {
+    val navigator = LocalNavigator.current
     val tags by viewModel.tags.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
+    val isSaving by viewModel.isSaving.collectAsStateWithLifecycle()
     var editingTag by remember { mutableStateOf<Tag?>(null) }
     var showEditor by remember { mutableStateOf(false) }
     var deleteTarget by remember { mutableStateOf<Tag?>(null) }
@@ -122,8 +124,8 @@ fun TagManagerScreen(
     }
 
     SecondaryPageScaffold(
-        title = "管理方式标签",
-        onBack = { navController.navigateUp() },
+        title = stringResource(R.string.settings_manage_tags),
+        onBack = { navigator.pop() },
         floatingActionButton = { backdrop ->
             LiquidAddButton(
                 onClick = {
@@ -131,25 +133,32 @@ fun TagManagerScreen(
                     showEditor = true
                 },
                 backdrop = backdrop,
-                contentDescription = "添加标签"
+                contentDescription = stringResource(R.string.tag_manager_add_tag)
             )
         }
     ) { padding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(padding)
-        ) {
+        Column(modifier = Modifier.fillMaxSize()) {
             Text(
-                "长按左侧拖动柄调整顺序，松手后自动保存。",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = 4.dp)
+                stringResource(R.string.tag_manager_instructions),
+                style = MiuixTheme.textStyles.body1,
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                modifier = Modifier.padding(
+                    start = padding.calculateLeftPadding(LayoutDirection.Ltr) + 4.dp,
+                    top = padding.calculateTopPadding(),
+                    end = padding.calculateRightPadding(LayoutDirection.Ltr) + 4.dp
+                )
             )
             Spacer(modifier = Modifier.height(16.dp))
 
             LazyColumn(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
+                contentPadding = PaddingValues(
+                    start = padding.calculateLeftPadding(LayoutDirection.Ltr),
+                    end = padding.calculateRightPadding(LayoutDirection.Ltr),
+                    bottom = padding.calculateBottomPadding()
+                ),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 itemsIndexed(displayedTags, key = { _, tag -> tag.id }) { index, tag ->
@@ -182,7 +191,7 @@ fun TagManagerScreen(
                             modifier = Modifier
                                 .size(44.dp)
                                 .background(
-                                    MaterialTheme.colorScheme.primary.copy(alpha = 0.09f),
+                                    MiuixTheme.colorScheme.primary.copy(alpha = 0.09f),
                                     CircleShape
                                 )
                                 .pointerInput(tag.id) {
@@ -208,9 +217,9 @@ fun TagManagerScreen(
                             contentAlignment = Alignment.Center
                         ) {
                             Icon(
-                                Icons.Default.DragHandle,
-                                contentDescription = "按住并上下拖动排序",
-                                tint = MaterialTheme.colorScheme.primary
+                                AppIcons.DragHandle,
+                                contentDescription = stringResource(R.string.cd_drag_reorder),
+                                tint = MiuixTheme.colorScheme.primary
                             )
                         }
                         Spacer(modifier = Modifier.width(12.dp))
@@ -223,13 +232,13 @@ fun TagManagerScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
                                 tag.name,
-                                style = MaterialTheme.typography.titleMedium,
+                                style = MiuixTheme.textStyles.title4,
                                 fontWeight = FontWeight.SemiBold
                             )
                             Text(
-                                "排序 ${index + 1}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                                stringResource(R.string.tag_manager_sort_order, index + 1),
+                                style = MiuixTheme.textStyles.body2,
+                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                             )
                         }
                         IconButton(
@@ -238,13 +247,13 @@ fun TagManagerScreen(
                                 showEditor = true
                             }
                         ) {
-                            Icon(Icons.Default.Edit, contentDescription = "编辑")
+                            Icon(AppIcons.Edit, contentDescription = stringResource(R.string.action_edit))
                         }
                         IconButton(onClick = { deleteTarget = tag }) {
                             Icon(
-                                Icons.Default.Delete,
-                                contentDescription = "删除",
-                                tint = MaterialTheme.colorScheme.error
+                                AppIcons.Delete,
+                                contentDescription = stringResource(R.string.action_delete),
+                                tint = MiuixTheme.colorScheme.error
                             )
                         }
                         }
@@ -259,9 +268,13 @@ fun TagManagerScreen(
         TagEditorDialog(
             tag = editingTag,
             error = error,
+            isSaving = isSaving,
             onDismiss = { showEditor = false },
             onSave = { name, color ->
-                viewModel.save(editingTag, name, color) { showEditor = false }
+                viewModel.save(editingTag, name, color) {
+                    pendingOrderIds = null
+                    showEditor = false
+                }
             }
         )
     }
@@ -269,18 +282,37 @@ fun TagManagerScreen(
     deleteTarget?.let { target ->
         LiquidAlertDialog(
             onDismissRequest = { deleteTarget = null },
-            title = { Text("删除标签") },
-            text = { Text("历史记录会保留“${target.name}”，它只会从以后可选标签中移除。") },
+            title = { Text(stringResource(R.string.tag_manager_delete_dialog_title)) },
+            text = {
+                Text(
+                    stringResource(
+                        R.string.tag_manager_delete_dialog_message,
+                        target.name
+                    )
+                )
+            },
             confirmButton = {
                 TextButton(
+                    text = stringResource(R.string.action_delete),
                     onClick = {
+                        pendingOrderIds = null
                         viewModel.delete(target)
                         deleteTarget = null
-                    }
-                ) { Text("删除", color = MaterialTheme.colorScheme.error) }
+                    },
+                    colors = ButtonDefaults.textButtonColors(
+                        color = Color.Transparent,
+                        textColor = MiuixTheme.colorScheme.error,
+                        disabledColor = Color.Transparent,
+                        disabledTextColor = MiuixTheme.colorScheme.error
+                    )
+                )
             },
             dismissButton = {
-                TextButton(onClick = { deleteTarget = null }) { Text("取消") }
+                TextButton(
+                    text = stringResource(R.string.action_cancel),
+                    onClick = { deleteTarget = null },
+                    colors = liquidDialogCancelButtonColors()
+                )
             }
         )
     }
@@ -290,6 +322,7 @@ fun TagManagerScreen(
 private fun TagEditorDialog(
     tag: Tag?,
     error: String?,
+    isSaving: Boolean,
     onDismiss: () -> Unit,
     onSave: (String, String) -> Unit
 ) {
@@ -298,13 +331,21 @@ private fun TagEditorDialog(
 
     LiquidAlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (tag == null) "添加标签" else "编辑标签") },
+        title = {
+            Text(
+                if (tag == null) {
+                    stringResource(R.string.tag_manager_add_tag)
+                } else {
+                    stringResource(R.string.tag_manager_edit_tag)
+                }
+            )
+        },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
+                TextField(
                     value = name,
                     onValueChange = { name = it.take(20) },
-                    label = { Text("标签名称") },
+                    label = stringResource(R.string.tag_manager_name_label),
                     singleLine = true
                 )
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -325,15 +366,24 @@ private fun TagEditorDialog(
                     }
                 }
                 if (error != null) {
-                    Text(error, color = MaterialTheme.colorScheme.error)
+                    Text(error, color = MiuixTheme.colorScheme.error)
                 }
             }
         },
         confirmButton = {
-            TextButton(onClick = { onSave(name, color) }) { Text("保存") }
+            TextButton(
+                text = stringResource(R.string.action_save),
+                enabled = !isSaving,
+                onClick = { onSave(name, color) },
+                colors = liquidDialogConfirmButtonColors()
+            )
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("取消") }
+            TextButton(
+                text = stringResource(R.string.action_cancel),
+                onClick = onDismiss,
+                colors = liquidDialogCancelButtonColors()
+            )
         }
     )
 }

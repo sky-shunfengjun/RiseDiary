@@ -27,6 +27,10 @@ class RecordsViewModel @Inject constructor(
     private val reminderScheduler: ReminderScheduler
 ) : ViewModel() {
 
+    /** User timezone used for both filtering and grouping so they never disagree. */
+    val userZoneId: ZoneId
+        get() = zoneId
+
     val allFlights: StateFlow<List<Flight>> = flightRepo.allFlights
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
@@ -36,9 +40,8 @@ class RecordsViewModel @Inject constructor(
     var selectedTag by mutableStateOf<String?>(null)
     var startDate by mutableStateOf<LocalDate?>(null)
     var endDate by mutableStateOf<LocalDate?>(null)
-    private val _pendingDeletions = MutableStateFlow<List<Flight>>(emptyList())
-    val pendingDeletions: StateFlow<List<Flight>> = _pendingDeletions.asStateFlow()
-    private val deletionSession = PendingDeletionSession()
+    private val _pendingDeletions = MutableStateFlow<List<PendingDeletion>>(emptyList())
+    internal val pendingDeletions: StateFlow<List<PendingDeletion>> = _pendingDeletions.asStateFlow()
     private val deletionOperations = PendingDeletionOperations()
 
     fun filterByTag(tagName: String?) {
@@ -50,13 +53,24 @@ class RecordsViewModel @Inject constructor(
         endDate = end
     }
 
+    /**
+     * Registers the deletion synchronously (so the undo entry exists before the
+     * Snackbar appears) and deletes from the database behind the serialized
+     * operations mutex. Undo/finalize flip flags on the same entry, also under
+     * the mutex, so delete and undo can never interleave on the same record.
+     */
     fun delete(flight: Flight) {
-        val session = deletionSession.capture()
+        _pendingDeletions.update { enqueuePendingDeletion(it, flight) }
         viewModelScope.launch {
             deletionOperations.run {
-                flightRepo.delete(flight)
-                if (deletionSession.isCurrent(session)) {
-                    _pendingDeletions.update { enqueuePendingDeletion(it, flight) }
+                val entry = _pendingDeletions.value.firstOrNull { it.flight.id == flight.id }
+                    ?: return@run
+                if (!entry.cancelled && !entry.completed) {
+                    flightRepo.delete(flight)
+                    entry.completed = true
+                }
+                if (entry.finalized && entry.completed) {
+                    removePendingDeletion(flight.id)
                 }
             }
             runCatching { reminderScheduler.onFlightDataChanged() }
@@ -65,19 +79,35 @@ class RecordsViewModel @Inject constructor(
 
     fun undoDelete(flight: Flight) {
         viewModelScope.launch {
-            if (_pendingDeletions.value.none { it.id == flight.id }) return@launch
-            flightRepo.insert(flight)
-            removePendingDeletion(flight.id)
+            deletionOperations.run {
+                val entry = _pendingDeletions.value.firstOrNull { it.flight.id == flight.id }
+                    ?: return@run
+                if (entry.finalized) return@run
+                if (entry.completed) {
+                    flightRepo.insert(flight)
+                } else {
+                    entry.cancelled = true
+                }
+                removePendingDeletion(flight.id)
+            }
             runCatching { reminderScheduler.onFlightDataChanged() }
         }
     }
 
     fun finalizeDeletion(flightId: Long) {
-        removePendingDeletion(flightId)
+        viewModelScope.launch {
+            deletionOperations.run {
+                val entry = _pendingDeletions.value.firstOrNull { it.flight.id == flightId }
+                    ?: return@run
+                entry.finalized = true
+                if (entry.completed) {
+                    removePendingDeletion(flightId)
+                }
+            }
+        }
     }
 
     fun clearPendingDeletions() {
-        deletionSession.clear()
         _pendingDeletions.value = emptyList()
     }
 
@@ -96,24 +126,29 @@ class RecordsViewModel @Inject constructor(
     }
 }
 
-internal fun enqueuePendingDeletion(current: List<Flight>, flight: Flight): List<Flight> =
-    current.filterNot { it.id == flight.id } + flight
-
-internal fun removePendingDeletion(current: List<Flight>, flightId: Long): List<Flight> =
-    current.filterNot { it.id == flightId }
-
-internal class PendingDeletionSession {
-    private var generation = 0L
-
-    fun capture(): Long = generation
-
-    fun clear() {
-        generation++
-    }
-
-    fun isCurrent(capturedGeneration: Long): Boolean =
-        capturedGeneration == generation
+/**
+ * A deletion awaiting undo. [cancelled] is flipped by undo before the database
+ * delete has run (delete then skips the DB), [completed] after the row is gone
+ * (undo then re-inserts), [finalized] once the Snackbar expired (undo becomes
+ * a no-op). All three flags are only mutated under [PendingDeletionOperations].
+ */
+internal class PendingDeletion(val flight: Flight) {
+    var cancelled = false
+    var completed = false
+    var finalized = false
 }
+
+internal fun enqueuePendingDeletion(
+    current: List<PendingDeletion>,
+    flight: Flight
+): List<PendingDeletion> =
+    current.filterNot { it.flight.id == flight.id } + PendingDeletion(flight)
+
+internal fun removePendingDeletion(
+    current: List<PendingDeletion>,
+    flightId: Long
+): List<PendingDeletion> =
+    current.filterNot { it.flight.id == flightId }
 
 internal class PendingDeletionOperations {
     private val mutex = Mutex()

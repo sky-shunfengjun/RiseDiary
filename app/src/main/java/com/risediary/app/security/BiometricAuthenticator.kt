@@ -5,6 +5,7 @@ import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.Lifecycle
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -19,9 +20,10 @@ enum class BiometricAuthResult {
 class BiometricAuthenticator @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
-    fun isAvailable(): Boolean =
+    fun isAvailable(): Boolean = safeBiometricAvailability {
         BiometricManager.from(context).canAuthenticate(AUTHENTICATORS) ==
             BiometricManager.BIOMETRIC_SUCCESS
+    }
 
     fun authenticate(
         activity: FragmentActivity,
@@ -31,12 +33,17 @@ class BiometricAuthenticator @Inject constructor(
         onResult: (BiometricAuthResult) -> Unit,
         onFailedAttempt: () -> Unit = {},
     ) {
-        if (!isAvailable()) {
+        if (
+            !isAvailable() ||
+            activity.isFinishing ||
+            activity.isDestroyed ||
+            !activity.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
+        ) {
             onResult(BiometricAuthResult.Error)
             return
         }
-        val executor = ContextCompat.getMainExecutor(activity)
         runCatching {
+            val executor = ContextCompat.getMainExecutor(activity)
             val promptInfo = BiometricPrompt.PromptInfo.Builder()
                 .setTitle(title)
                 .setSubtitle(subtitle)
@@ -80,3 +87,10 @@ class BiometricAuthenticator @Inject constructor(
         const val AUTHENTICATORS = BiometricManager.Authenticators.BIOMETRIC_STRONG
     }
 }
+
+internal fun safeBiometricAvailability(check: () -> Boolean): Boolean =
+    try {
+        check()
+    } catch (_: Exception) {
+        false
+    }

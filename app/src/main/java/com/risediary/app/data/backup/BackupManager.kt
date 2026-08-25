@@ -246,31 +246,7 @@ class BackupManager @Inject constructor(
     }
 
     private suspend fun applySettings(settings: SettingsSnapshot) {
-        preferences.setUsername(settings.username)
-        preferences.setMlPerSpurt(settings.mlPerSpurt)
-        preferences.setDefaultVolumeMode(settings.defaultVolumeMode)
-        preferences.setDailyReminder(
-            settings.dailyReminderEnabled,
-            settings.dailyReminderTime
-        )
-        preferences.setInactiveReminder(
-            settings.inactiveReminderEnabled,
-            settings.inactiveReminderDays,
-            settings.inactiveReminderTime
-        )
-        preferences.setMonthlyLengthReminder(
-            settings.monthlyLengthReminderEnabled,
-            settings.monthlyLengthReminderDay,
-            settings.monthlyLengthReminderTime
-        )
-        preferences.setReminderSound(settings.reminderSound)
-        preferences.setReminderVibration(settings.reminderVibration)
-        preferences.setBackgroundAutoLockEnabled(settings.backgroundAutoLockEnabled)
-        preferences.setBackgroundLockMode(settings.backgroundLockMode)
-        preferences.setThemeMode(settings.themeMode)
-        preferences.setHomeCardOrder(settings.homeCardOrder)
-        preferences.setHomeCardVisibility(settings.homeCardVisibility)
-        preferences.setOnboardingCompleted(settings.onboardingCompleted)
+        preferences.applySettingsSnapshot(settings)
     }
 
     private fun writeBackup(output: OutputStream, data: BackupData) {
@@ -286,14 +262,40 @@ class BackupManager @Inject constructor(
                 zip.closeEntry()
             }
 
-            writeEntry(FLIGHTS, BackupJsonCodec.flightsToJson(data.flights).toString(2))
-            writeEntry(LENGTHS, BackupJsonCodec.lengthsToJson(data.lengthRecords).toString(2))
-            writeEntry(TAGS, BackupJsonCodec.tagsToJson(data.tags).toString(2))
-            writeEntry(
+            // Streams an array entry item by item so peak memory stays bounded by
+            // the largest single record instead of the whole database dump.
+            // Entry accounting uses the uncompressed UTF-8 bytes, matching the
+            // decompressed limits enforced on import.
+            fun writeArrayEntry(name: String, items: List<JSONObject>) {
+                zip.putNextEntry(ZipEntry(name))
+                var entryBytes = 0L
+
+                fun writeChunk(bytes: ByteArray) {
+                    entryBytes += bytes.size
+                    require(entryBytes <= MAX_ENTRY_BYTES) { "$name 超过 5 MB" }
+                    zip.write(bytes)
+                }
+
+                writeChunk("[".toByteArray(Charsets.UTF_8))
+                items.forEachIndexed { index, item ->
+                    if (index > 0) writeChunk(",".toByteArray(Charsets.UTF_8))
+                    writeChunk(item.toString().toByteArray(Charsets.UTF_8))
+                }
+                writeChunk("]".toByteArray(Charsets.UTF_8))
+
+                totalBytes += entryBytes
+                require(totalBytes <= MAX_TOTAL_BYTES) { "备份内容超过 20 MB" }
+                zip.closeEntry()
+            }
+
+            writeArrayEntry(FLIGHTS, data.flights.map(BackupJsonCodec::flightToJson))
+            writeArrayEntry(LENGTHS, data.lengthRecords.map(BackupJsonCodec::lengthToJson))
+            writeArrayEntry(TAGS, data.tags.map(BackupJsonCodec::tagToJson))
+            writeArrayEntry(
                 ACHIEVEMENTS,
-                BackupJsonCodec.achievementsToJson(data.achievements).toString(2)
+                data.achievements.map(BackupJsonCodec::achievementToJson)
             )
-            writeEntry(SETTINGS, BackupJsonCodec.settingsToJson(data.settings).toString(2))
+            writeEntry(SETTINGS, BackupJsonCodec.settingsToJson(data.settings).toString())
         }
     }
 
@@ -400,7 +402,10 @@ class BackupManager @Inject constructor(
             data.achievements.size) { "成就键重复" }
         data.achievements.forEach {
             require(it.id >= 0L) { "成就 ID 无效" }
-            require(it.achievementKey in KNOWN_ACHIEVEMENTS) { "包含未知成就" }
+            require(
+                it.achievementKey in KNOWN_ACHIEVEMENTS ||
+                    it.achievementKey.startsWith("first_of_month_")
+            ) { "包含未知成就" }
             require(it.unlockedAt > 0L) { "成就时间无效" }
         }
 

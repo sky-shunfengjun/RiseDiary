@@ -20,19 +20,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.VolumeUp
-import androidx.compose.material.icons.filled.BatteryAlert
-import androidx.compose.material.icons.filled.CalendarMonth
-import androidx.compose.material.icons.filled.CleaningServices
-import androidx.compose.material.icons.filled.EventRepeat
-import androidx.compose.material.icons.filled.NotificationsActive
-import androidx.compose.material.icons.filled.Schedule
-import androidx.compose.material.icons.filled.Timer
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -44,30 +31,31 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavController
+import com.risediary.app.ui.navigation3.LocalNavigator
+import com.risediary.app.ui.navigation3.Route
 import com.risediary.app.R
 import com.risediary.app.reminder.ReminderType
 import com.risediary.app.ui.components.LiquidAlertDialog
 import com.risediary.app.ui.components.SecondaryPageScaffold
 import com.risediary.app.ui.components.WheelColumn
 import com.risediary.app.ui.theme.RiseCard
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.time.LocalTime
 import java.util.Locale
 import kotlinx.coroutines.delay
+import com.risediary.app.ui.icons.AppIcons
 
 @Composable
 fun ReminderSettingsScreen(
-    navController: NavController,
     vm: SettingsViewModel = hiltViewModel()
 ) {
+    val navigator = LocalNavigator.current
     val context = LocalContext.current
     var notificationsAvailable by remember {
         mutableStateOf(reminderNotificationsAvailable(context))
@@ -100,7 +88,7 @@ fun ReminderSettingsScreen(
         if (granted && notificationsAvailable) {
             target?.let {
                 vm.setReminderEnabled(it, true)
-                if (!exactAlarmsAllowed) showExactAlarmDialog = true
+                if (!exactAlarmsAllowed) showNotificationBlockedDialog = false; showExactAlarmDialog = true
             }
             if (shouldTest) testSent = vm.sendTestNotification()
             if (shouldScheduleBackgroundTest) {
@@ -108,11 +96,11 @@ fun ReminderSettingsScreen(
                     backgroundTestScheduled = vm.scheduleBackgroundReminderTest()
                 } else {
                     scheduleTestAfterExactGrant = true
-                    showExactAlarmDialog = true
+                    showNotificationBlockedDialog = false; showExactAlarmDialog = true
                 }
             }
         } else {
-            showNotificationBlockedDialog = true
+            showExactAlarmDialog = false; showNotificationBlockedDialog = true
         }
     }
 
@@ -158,7 +146,7 @@ fun ReminderSettingsScreen(
             pendingBackgroundTest = backgroundTest
             notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
         } else {
-            showNotificationBlockedDialog = true
+            showExactAlarmDialog = false; showNotificationBlockedDialog = true
         }
     }
 
@@ -170,7 +158,7 @@ fun ReminderSettingsScreen(
         notificationsAvailable = reminderNotificationsAvailable(context)
         if (notificationsAvailable) {
             vm.setReminderEnabled(type, true)
-            if (!exactAlarmsAllowed) showExactAlarmDialog = true
+            if (!exactAlarmsAllowed) showNotificationBlockedDialog = false; showExactAlarmDialog = true
         } else {
             requestPermission(type = type)
         }
@@ -180,7 +168,7 @@ fun ReminderSettingsScreen(
         notificationsAvailable = reminderNotificationsAvailable(context)
         if (notificationsAvailable) {
             testSent = vm.sendTestNotification()
-            if (!testSent) showNotificationBlockedDialog = true
+            if (!testSent) showExactAlarmDialog = false; showNotificationBlockedDialog = true
         } else {
             requestPermission(immediateTest = true)
         }
@@ -197,19 +185,19 @@ fun ReminderSettingsScreen(
             requestPermission(backgroundTest = true)
         } else if (!exactAlarmsAllowed) {
             scheduleTestAfterExactGrant = true
-            showExactAlarmDialog = true
+            showNotificationBlockedDialog = false; showExactAlarmDialog = true
         } else {
             backgroundTestScheduled = vm.scheduleBackgroundReminderTest()
             if (!backgroundTestScheduled) {
                 exactAlarmsAllowed = vm.exactAlarmsAllowed()
-                if (!exactAlarmsAllowed) showExactAlarmDialog = true
+                if (!exactAlarmsAllowed) showNotificationBlockedDialog = false; showExactAlarmDialog = true
             }
         }
     }
 
     SecondaryPageScaffold(
         title = stringResource(R.string.settings_reminder_settings),
-        onBack = { navController.popBackStack() }
+        onBack = { navigator.pop() }
     ) { contentPadding ->
         Column(
             modifier = Modifier
@@ -239,7 +227,7 @@ fun ReminderSettingsScreen(
                     SettingsDivider()
                 }
                 SettingsToggleItem(
-                    icon = Icons.Default.NotificationsActive,
+                    icon = AppIcons.NotificationsActive,
                     title = stringResource(R.string.settings_daily_reminder),
                     subtitle = stringResource(
                         R.string.settings_daily_reminder_summary,
@@ -253,7 +241,7 @@ fun ReminderSettingsScreen(
                 if (dailyEnabled) {
                     SettingsDivider()
                     SettingsNavItem(
-                        icon = Icons.Default.Schedule,
+                        icon = AppIcons.Schedule,
                         title = stringResource(R.string.settings_reminder_time),
                         subtitle = dailyTime,
                         onClick = { editingReminderTime = ReminderType.DAILY }
@@ -261,7 +249,7 @@ fun ReminderSettingsScreen(
                 }
                 SettingsDivider()
                 SettingsToggleItem(
-                    icon = Icons.Default.EventRepeat,
+                    icon = AppIcons.EventRepeat,
                     title = stringResource(R.string.settings_inactive_reminder),
                     subtitle = stringResource(
                         R.string.settings_inactive_reminder_summary,
@@ -281,7 +269,7 @@ fun ReminderSettingsScreen(
                     )
                     SettingsDivider()
                     SettingsNavItem(
-                        icon = Icons.Default.Schedule,
+                        icon = AppIcons.Schedule,
                         title = stringResource(R.string.settings_reminder_time),
                         subtitle = inactiveTime,
                         onClick = { editingReminderTime = ReminderType.INACTIVE }
@@ -289,7 +277,7 @@ fun ReminderSettingsScreen(
                 }
                 SettingsDivider()
                 SettingsToggleItem(
-                    icon = Icons.Default.CalendarMonth,
+                    icon = AppIcons.CalendarMonth,
                     title = stringResource(R.string.settings_monthly_length_reminder),
                     subtitle = stringResource(
                         R.string.settings_monthly_length_reminder_summary,
@@ -304,7 +292,7 @@ fun ReminderSettingsScreen(
                 if (monthlyEnabled) {
                     SettingsDivider()
                     SettingsNavItem(
-                        icon = Icons.Default.CalendarMonth,
+                        icon = AppIcons.CalendarMonth,
                         title = stringResource(R.string.settings_monthly_reminder_day),
                         subtitle = stringResource(
                             R.string.settings_monthly_reminder_day_value,
@@ -314,7 +302,7 @@ fun ReminderSettingsScreen(
                     )
                     SettingsDivider()
                     SettingsNavItem(
-                        icon = Icons.Default.Schedule,
+                        icon = AppIcons.Schedule,
                         title = stringResource(R.string.settings_reminder_time),
                         subtitle = monthlyTime,
                         onClick = {
@@ -329,7 +317,7 @@ fun ReminderSettingsScreen(
             SettingsGroupHeader(stringResource(R.string.settings_group_notification_delivery))
             RiseCard(modifier = Modifier.fillMaxWidth()) {
                 SettingsNavItem(
-                    icon = Icons.Default.Schedule,
+                    icon = AppIcons.Schedule,
                     title = stringResource(
                         if (exactAlarmsAllowed) {
                             R.string.settings_exact_alarm_allowed
@@ -348,19 +336,19 @@ fun ReminderSettingsScreen(
                         }
                     ),
                     titleColor = if (exactAlarmsAllowed) {
-                        MaterialTheme.colorScheme.onSurface
+                        MiuixTheme.colorScheme.onSurface
                     } else {
-                        MaterialTheme.colorScheme.error
+                        MiuixTheme.colorScheme.error
                     },
                     onClick = {
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                            showExactAlarmDialog = true
+                            showNotificationBlockedDialog = false; showExactAlarmDialog = true
                         }
                     }
                 )
                 SettingsDivider()
                 SettingsNavItem(
-                    icon = Icons.Default.NotificationsActive,
+                    icon = AppIcons.NotificationsActive,
                     title = stringResource(R.string.settings_notification_test),
                     subtitle = stringResource(
                         if (testSent) {
@@ -373,7 +361,7 @@ fun ReminderSettingsScreen(
                 )
                 SettingsDivider()
                 SettingsNavItem(
-                    icon = Icons.Default.Timer,
+                    icon = AppIcons.Timer,
                     title = stringResource(
                         if (backgroundTestScheduled) {
                             R.string.settings_background_test_cancel
@@ -392,7 +380,7 @@ fun ReminderSettingsScreen(
                 )
                 SettingsDivider()
                 SettingsNavItem(
-                    icon = Icons.AutoMirrored.Filled.VolumeUp,
+                    icon = AppIcons.VolumeUp,
                     title = stringResource(R.string.settings_reminder_sound_vibration),
                     subtitle =
                         stringResource(R.string.settings_reminder_sound_vibration_summary),
@@ -400,7 +388,7 @@ fun ReminderSettingsScreen(
                 )
                 SettingsDivider()
                 SettingsNavItem(
-                    icon = Icons.Default.BatteryAlert,
+                    icon = AppIcons.BatteryAlert,
                     title = stringResource(
                         if (backgroundRestricted) {
                             R.string.settings_background_restricted
@@ -416,9 +404,9 @@ fun ReminderSettingsScreen(
                         }
                     ),
                     titleColor = if (backgroundRestricted) {
-                        MaterialTheme.colorScheme.error
+                        MiuixTheme.colorScheme.error
                     } else {
-                        MaterialTheme.colorScheme.onSurface
+                        MiuixTheme.colorScheme.onSurface
                     },
                     onClick = { openApplicationSettings(context) }
                 )

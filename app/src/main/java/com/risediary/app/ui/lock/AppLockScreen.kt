@@ -18,10 +18,6 @@ import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.Backspace
-import androidx.compose.material.icons.filled.Fingerprint
-import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -31,18 +27,30 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.withResumed
 import com.kyant.backdrop.Backdrop
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.risediary.app.R
 import com.risediary.app.ui.components.LiquidGlassButton
 import com.risediary.app.ui.theme.CardBlue
+import com.risediary.app.ui.theme.SystemBarIconOverride
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import com.risediary.app.ui.icons.AppIcons
 
 private fun Context.findActivity(): Activity? {
     var context = this
@@ -61,6 +69,7 @@ fun AppLockScreen(
     onCancel: (() -> Unit)? = null,  // null = no cancel button
     vm: AppLockViewModel = hiltViewModel()
 ) {
+    SystemBarIconOverride(forceLightIcons = true)
     LaunchedEffect(mode) { vm.init(mode) }
 
     val pin by vm.pin.collectAsStateWithLifecycle()
@@ -72,10 +81,11 @@ fun AppLockScreen(
     val biometricEnabled by vm.biometricUnlockEnabled.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val activity = context.findActivity() as? FragmentActivity
+    val lifecycleOwner = LocalLifecycleOwner.current
     var autoBiometricRequested by remember(mode) { mutableStateOf(false) }
     val lockBackground = Brush.verticalGradient(
         colors = listOf(
-            MaterialTheme.colorScheme.primary.copy(alpha = 0.98f),
+            MiuixTheme.colorScheme.primary.copy(alpha = 0.98f),
             Color(0xFF315B91),
             Color(0xFF14223E)
         )
@@ -100,17 +110,21 @@ fun AppLockScreen(
         }
     }
 
-    LaunchedEffect(ready, biometricEnabled, mode, activity) {
+    LaunchedEffect(ready, biometricEnabled, mode, activity, lifecycleOwner) {
+        val resumedActivity = activity ?: return@LaunchedEffect
         if (
             ready &&
             biometricEnabled &&
             mode == LockMode.VERIFY &&
             vm.biometricAvailable &&
-            activity != null &&
             !autoBiometricRequested
         ) {
-            autoBiometricRequested = true
-            vm.authenticateWithBiometric(activity)
+            lifecycleOwner.lifecycle.withResumed {
+                if (!autoBiometricRequested) {
+                    autoBiometricRequested = true
+                    vm.authenticateWithBiometric(resumedActivity)
+                }
+            }
         }
     }
 
@@ -128,7 +142,9 @@ fun AppLockScreen(
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center,
-            modifier = Modifier.padding(32.dp)
+            modifier = Modifier
+                .padding(32.dp)
+                .systemBarsPadding()
         ) {
             // Cancel button (top-right, for onboarding skip)
             if (onCancel != null) {
@@ -136,9 +152,16 @@ fun AppLockScreen(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.End
                 ) {
-                    TextButton(onClick = onCancel) {
-                        Text("取消", color = Color.White.copy(alpha = 0.78f))
-                    }
+                    TextButton(
+                        text = stringResource(R.string.action_cancel),
+                        onClick = onCancel,
+                        colors = ButtonDefaults.textButtonColors(
+                            color = Color.Transparent,
+                            disabledColor = Color.Transparent,
+                            textColor = Color.White.copy(alpha = 0.78f),
+                            disabledTextColor = Color.White.copy(alpha = 0.4f)
+                        )
+                    )
                 }
             }
 
@@ -158,7 +181,7 @@ fun AppLockScreen(
             // Title
             Text(
                 text = title,
-                style = MaterialTheme.typography.headlineSmall,
+                fontSize = MiuixTheme.textStyles.title2.fontSize,
                 fontWeight = FontWeight.SemiBold,
                 color = Color.White
             )
@@ -169,9 +192,9 @@ fun AppLockScreen(
             if (lockout > 0) {
                 // Lockout countdown
                 Text(
-                    text = "请等待 ${lockout} 秒",
-                    style = MaterialTheme.typography.titleMedium,
-                    color = MaterialTheme.colorScheme.error
+                    text = stringResource(R.string.app_lock_wait_seconds, lockout),
+                    fontSize = MiuixTheme.textStyles.title4.fontSize,
+                    color = MiuixTheme.colorScheme.error
                 )
             } else {
                 PinDots(
@@ -186,8 +209,8 @@ fun AppLockScreen(
                 Spacer(modifier = Modifier.height(12.dp))
                 Text(
                     text = error.orEmpty(),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error
+                    fontSize = MiuixTheme.textStyles.body2.fontSize,
+                    color = MiuixTheme.colorScheme.error
                 )
             }
 
@@ -221,16 +244,16 @@ fun AppLockScreen(
                     modifier = Modifier.size(56.dp)
                 ) {
                     Icon(
-                        Icons.Default.Fingerprint,
-                        contentDescription = "指纹验证",
+                        AppIcons.Fingerprint,
+                        contentDescription = stringResource(R.string.app_lock_biometric),
                         modifier = Modifier.size(40.dp),
                         tint = Color.White
                     )
                 }
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    "指纹验证",
-                    style = MaterialTheme.typography.labelSmall,
+                    stringResource(R.string.app_lock_biometric),
+                    fontSize = MiuixTheme.textStyles.footnote1.fontSize,
                     color = Color.White.copy(alpha = 0.72f)
                 )
             }
@@ -250,7 +273,7 @@ private fun PinDots(count: Int, filled: Int, isError: Boolean) {
         repeat(count) { i ->
             val filledState = i < filled
             val dotColor = when {
-                isError -> MaterialTheme.colorScheme.error
+                isError -> MiuixTheme.colorScheme.error
                 filledState -> Color.White
                 else -> Color.White.copy(alpha = 0.28f)
             }
@@ -277,7 +300,7 @@ private fun PinDots(count: Int, filled: Int, isError: Boolean) {
                         modifier = Modifier
                             .size(8.dp)
                             .clip(CircleShape)
-                            .background(MaterialTheme.colorScheme.primary)
+                            .background(MiuixTheme.colorScheme.primary)
                     )
                 }
             }
@@ -316,8 +339,8 @@ private fun NumericKeypad(
                                 label = "",
                                 icon = {
                                     Icon(
-                                        Icons.AutoMirrored.Filled.Backspace,
-                                        contentDescription = "删除",
+                                        AppIcons.Backspace,
+                                        contentDescription = stringResource(R.string.action_delete),
                                         modifier = Modifier.size(26.dp),
                                         tint = Color.White
                                     )
@@ -341,7 +364,6 @@ private fun NumericKeypad(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun KeyButton(
     label: String,

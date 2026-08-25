@@ -88,6 +88,7 @@ fun LiquidSlider(
         (valueRange.endInclusive - valueRange.start) / intervalCount.coerceAtLeast(1)
     fun snap(raw: Float): Float {
         if (steps <= 0) return raw.coerceIn(valueRange)
+        if (interval <= 0f) return raw.coerceIn(valueRange)
         val position = (raw - valueRange.start) / interval
         return (valueRange.start + round(position) * interval).coerceIn(valueRange)
     }

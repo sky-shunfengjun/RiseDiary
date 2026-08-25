@@ -20,7 +20,7 @@
     <string name="notification_timer_limit_text">计时已停止，点按填写本次记录</string>
 
     <string name="home_status_today">今日状态</string>
-    <string name="home_status_ready">准备出发</string>
+    <string name="home_status_ready">准备起飞</string>
     <string name="home_last_record_today">上次记录：今天</string>
     <string name="home_last_record_yesterday">上次记录：昨天</string>
     <string name="home_last_record_days">上次记录：%1$d 天前</string>
@@ -43,9 +43,9 @@
     <string name="home_achievement_empty">还没有解锁成就，完成记录后会显示在这里</string>
     <string name="home_tip_label">记录小贴士</string>
     <string name="home_today_recorded">今日已起飞 %1$d 次</string>
-    <string name="home_today_ready">今天还没有记录，准备好时再开始</string>
+    <string name="home_today_ready">今天还没有记录</string>
     <string name="home_week_summary_empty">本周还没有起飞记录</string>
-    <string name="home_week_summary_recorded">本周已起飞 %1$d 次，仅供个人回顾</string>
+    <string name="home_week_summary_recorded">本周已起飞 %1$d 次</string>
     <string name="home_recording_tip_1">每个人的性欲、频率和体验都不同，没有统一的次数标准</string>
     <string name="home_recording_tip_2">记录用于回顾个人变化，不代表健康评估</string>
     <string name="home_recording_tip_3">睡眠、压力和情绪可能影响当下体验，可以按自己的感受记录</string>
@@ -176,6 +176,7 @@
     <string name="time_day">日</string>
     <string name="action_confirm">确定</string>
     <string name="action_cancel">取消</string>
+    <string name="action_undo">撤销</string>
     <string name="settings_app_lock">应用锁</string>
     <string name="settings_app_lock_on">使用 PIN 码保护</string>
     <string name="settings_app_lock_off">未开启</string>
@@ -218,6 +219,7 @@
     <string name="about_qq_group_title">加入QQ群组</string>
     <string name="about_qq_group_url">https://qm.qq.com/q/Z3XTPXXEEW</string>
     <string name="about_qq_group_content_description">打开起飞日记 QQ 群组</string>
+    <string name="about_libraries_title">第三方库</string>
     <string name="about_privacy_content">所有记录仅存储在本地，不上传至任何服务器；检查更新时只读取 GitHub Release 信息。</string>
     <string name="update_check_button">检查更新</string>
     <string name="update_checking">正在检查…</string>
@@ -230,4 +232,289 @@
     <string name="update_latest_message">当前版本 %1$s 已是最新的正式版本。</string>
     <string name="update_failed_title">检查更新失败</string>
     <string name="update_failed_message">暂时无法连接 GitHub，请检查网络后重试。</string>
+
+    <string name="mode_select_title">选择起飞方式</string>
+    <string name="mode_select_timer">开始计时</string>
+    <string name="mode_select_timer_summary">实时计时，自动记录用时</string>
+    <string name="mode_select_manual">我已起飞</string>
+    <string name="mode_select_manual_summary">跳过计时，直接填写记录</string>
+
+    <string name="records_title">记录</string>
+    <string name="records_filter">筛选</string>
+    <string name="records_filter_all_tags">全部标签</string>
+    <string name="records_pick_date_range">选择日期范围</string>
+    <string name="records_date_range_format">%1$s 至 %2$s</string>
+    <string name="records_clear_filter">清除筛选</string>
+    <string name="records_empty">暂无符合条件的起飞记录</string>
+    <string name="records_deleted">记录已删除</string>
+    <string name="records_spurts_format">%1$d股</string>
+    <string name="records_today">今天</string>
+    <string name="records_yesterday">昨天</string>
+
+    <string name="action_edit">编辑</string>
+    <string name="action_delete">删除</string>
+    <string name="action_save">保存</string>
+    <string name="action_back">返回</string>
+    <string name="action_show">显示</string>
+    <string name="action_hide">隐藏</string>
+    <string name="cd_drag_reorder">按住并上下拖动排序</string>
+
+    <string-array name="weekday_labels">
+        <item>一</item>
+        <item>二</item>
+        <item>三</item>
+        <item>四</item>
+        <item>五</item>
+        <item>六</item>
+        <item>日</item>
+    </string-array>
+
+    <string name="about_title">关于</string>
+    <string name="about_data_privacy">数据隐私</string>
+
+    <string name="achievement_wall_title">成就墙</string>
+    <string name="achievement_locked_content_description">尚未解锁</string>
+    <string name="achievement_unlocked_on">已解锁 · %1$s</string>
+    <string name="achievement_name_milestone_1">首次起飞</string>
+    <string name="achievement_description_milestone_1">完成第一次飞行记录</string>
+    <string name="achievement_name_milestone_10">两位数</string>
+    <string name="achievement_description_milestone_10">累计完成 10 次飞行</string>
+    <string name="achievement_name_milestone_50">半百飞将</string>
+    <string name="achievement_description_milestone_50">累计完成 50 次飞行</string>
+    <string name="achievement_short_milestone_50">半百</string>
+    <string name="achievement_name_milestone_100">百飞成就</string>
+    <string name="achievement_description_milestone_100">累计完成 100 次飞行</string>
+    <string name="achievement_short_milestone_100">百飞</string>
+    <string name="achievement_name_milestone_500">五百飞王</string>
+    <string name="achievement_description_milestone_500">累计完成 500 次飞行</string>
+    <string name="achievement_short_milestone_500">五百飞</string>
+    <string name="achievement_name_record_distance_30">三十厘米射手</string>
+    <string name="achievement_description_record_distance_30">单次射精距离 ≥ 30cm</string>
+    <string name="achievement_short_record_distance_30">30cm</string>
+    <string name="achievement_name_record_distance_80">八十厘米炮手</string>
+    <string name="achievement_description_record_distance_80">单次射精距离 ≥ 80cm</string>
+    <string name="achievement_short_record_distance_80">80cm</string>
+    <string name="achievement_name_record_duration_30">半小时选手</string>
+    <string name="achievement_description_record_duration_30">单次时长 ≥ 30 分钟</string>
+    <string name="achievement_short_record_duration_30">30分</string>
+    <string name="achievement_name_record_duration_60">一小时耐力</string>
+    <string name="achievement_description_record_duration_60">单次时长 ≥ 60 分钟</string>
+    <string name="achievement_short_record_duration_60">60分</string>
+    <string name="achievement_name_record_volume_high">充沛输出</string>
+    <string name="achievement_description_record_volume_high">单次 ≥ 15 股 或 ≥ 30ml</string>
+    <string name="achievement_short_record_volume_high">充沛</string>
+    <string name="achievement_name_marathon">马拉松选手</string>
+    <string name="achievement_description_marathon">单次时长 ≥ 90 分钟</string>
+    <string name="achievement_short_marathon">马拉松</string>
+    <string name="achievement_name_speedster">快枪手</string>
+    <string name="achievement_description_speedster">单次时长 ≤ 3 分钟</string>
+    <string name="achievement_name_streak_7">连续一周</string>
+    <string name="achievement_description_streak_7">连续 7 天有飞行记录</string>
+    <string name="achievement_short_streak_7">连7天</string>
+    <string name="achievement_name_streak_30">月度全勤</string>
+    <string name="achievement_description_streak_30">连续 30 天有飞行记录</string>
+    <string name="achievement_short_streak_30">连30天</string>
+    <string name="achievement_name_streak_90">季度霸主</string>
+    <string name="achievement_description_streak_90">连续 90 天有飞行记录</string>
+    <string name="achievement_short_streak_90">连90天</string>
+    <string name="achievement_name_volume_100ml">百毫升俱乐部</string>
+    <string name="achievement_description_volume_100ml">累计射精量 ≥ 100ml</string>
+    <string name="achievement_short_volume_100ml">100ml</string>
+    <string name="achievement_name_volume_500ml">半升级</string>
+    <string name="achievement_description_volume_500ml">累计射精量 ≥ 500ml</string>
+    <string name="achievement_short_volume_500ml">500ml</string>
+    <string name="achievement_name_tag_5_types">标签探索者</string>
+    <string name="achievement_description_tag_5_types">使用过 5 种以上标签</string>
+    <string name="achievement_short_tag_5_types">标签</string>
+    <string name="achievement_name_length_first">初次测量</string>
+    <string name="achievement_description_length_first">首次记录长度测量</string>
+    <string name="achievement_short_length_first">初测</string>
+    <string name="achievement_name_length_growth_2cm">增长见证</string>
+    <string name="achievement_description_length_growth_2cm">勃起长度增长 ≥ 2cm</string>
+    <string name="achievement_short_length_growth_2cm">+2cm</string>
+    <string name="achievement_name_special_30day_record">月度之星</string>
+    <string name="achievement_description_special_30day_record">连续记录达到 30 天</string>
+    <string name="achievement_short_special_30day_record">月度星</string>
+
+    <string name="backup_export_section">导出备份</string>
+    <string name="backup_export_description">将所有记录和设置导出为 ZIP 文件，保存到 Downloads 文件夹。</string>
+    <string name="backup_exporting">导出中...</string>
+    <string name="backup_confirm_export_title">确认导出</string>
+    <string name="backup_confirm_export_message">将导出所有记录和设置到 Downloads 文件夹。文件名为 RiseDiary_backup_日期.zip。</string>
+    <string name="backup_restore_section">恢复备份</string>
+    <string name="backup_restore_description">从 ZIP 备份文件恢复数据。当前数据将被覆盖。</string>
+    <string name="backup_restoring">恢复中...</string>
+    <string name="backup_select_file">选择备份文件</string>
+    <string name="backup_confirm_restore_title">确认恢复</string>
+    <string name="backup_confirm_restore_message">当前所有数据将被备份中的内容覆盖，此操作不可撤销。确定要继续吗？</string>
+    <string name="backup_clear_section">清除数据</string>
+    <string name="backup_clear_description">删除所有飞行记录、标签、成就和设置。此操作不可恢复，建议先导出备份。</string>
+    <string name="backup_clear_all">清除所有数据</string>
+    <string name="backup_clear_danger_title">危险操作</string>
+    <string name="backup_clear_danger_message">此操作将永久删除所有数据。请输入「确认删除」以继续：</string>
+    <string name="backup_clear_confirmation_text">确认删除</string>
+    <string name="backup_clear_confirm_button">确认清除</string>
+    <string name="backup_processing">正在处理…</string>
+
+    <string name="bottom_tab_home">首页</string>
+    <string name="bottom_tab_records">记录</string>
+    <string name="bottom_tab_settings">设置</string>
+    <string name="bottom_tab_start_flight">开始起飞</string>
+
+    <string name="calendar_month_format">%1$d年%2$d月</string>
+    <string name="calendar_pick_date">选择日期</string>
+    <string name="calendar_pick_start_date">选择开始日期</string>
+    <string name="calendar_pick_end_date">选择结束日期</string>
+    <string name="calendar_range_selected">已选择日期范围</string>
+    <string name="calendar_previous_month">上个月</string>
+    <string name="calendar_next_month">下个月</string>
+
+    <string name="card_order_title">首页卡片排序</string>
+    <string name="card_order_instructions">长按左侧拖动柄调整顺序，右侧按钮控制首页显示。</string>
+    <string name="card_order_visible">显示在首页</string>
+    <string name="card_order_hidden">已隐藏</string>
+    <string name="card_order_checkin">打卡</string>
+    <string name="card_order_overview">数据概览</string>
+    <string name="card_order_trend">趋势图</string>
+    <string name="card_order_length">长度追踪</string>
+    <string name="card_order_achievement">成就</string>
+
+    <string name="checkin_title">打卡</string>
+    <string name="checkin_week">本周</string>
+    <string name="checkin_month">本月</string>
+    <string name="checkin_vs_last_week">较上周 %1$s %2$d%%</string>
+
+    <string name="duration_picker_title">选择用时</string>
+    <string name="duration_picker_hint">表单按分钟和秒记录，最长 120 分钟</string>
+    <string name="duration_picker_minute_format">%1$02d分</string>
+    <string name="duration_picker_second_format">%1$02d秒</string>
+
+    <string name="form_new_record">新建记录</string>
+    <string name="form_edit_record">编辑记录</string>
+    <string name="form_saving">正在保存</string>
+    <string name="form_save_record">保存记录</string>
+    <string name="form_time_section">时间与用时</string>
+    <string name="form_time_section_subtitle">确认开始时间和本次用时</string>
+    <string name="form_data_section">记录数据</string>
+    <string name="form_volume_label">精液量</string>
+    <string name="form_spurt_count_label">射出股数</string>
+    <string name="form_spurt_suffix">股</string>
+    <string name="form_volume_ml_label">精液量（毫升）</string>
+    <string name="form_max_distance_label">最远射出距离</string>
+    <string name="form_distance_label">距离（厘米，可不填）</string>
+    <string name="form_extra_section">补充信息</string>
+    <string name="form_extra_section_subtitle">标签和备注可按需填写</string>
+    <string name="form_method_tags_label">方式标签（可选）</string>
+    <string name="form_no_tags">暂无标签，可在设置中添加</string>
+    <string name="form_note_label">备注与心情</string>
+    <string name="form_pick_start_time">选择开始时间</string>
+    <string name="form_hour_format">%1$02d时</string>
+    <string name="form_minute_format">%1$02d分</string>
+    <string name="form_got_it">知道了</string>
+    <string name="form_achievement_unlocked">成就解锁</string>
+    <string name="form_duration_label">用时</string>
+    <string name="form_change_duration">修改用时</string>
+    <string name="form_legacy_duration_note">这是旧记录的原始用时；调整后最长可选 120 分钟。</string>
+    <string name="form_volume_mode_ml">按毫升</string>
+    <string name="form_volume_mode_spurts">按股数</string>
+    <string name="form_date_with_weekday">%1$d月%2$d日 %3$s</string>
+    <string name="form_weekday_format">周%1$s</string>
+    <string name="form_error_record_missing">记录不存在或已被删除</string>
+    <string name="form_error_end_before_start">结束时间必须晚于开始时间</string>
+    <string name="form_error_save_failed">保存失败：%1$s</string>
+    <string name="form_error_unknown">未知错误</string>
+
+    <string name="home_date_pattern" translatable="false">yyyy年M月d日 EEEE</string>
+    <string name="home_refresh_pull">下拉刷新</string>
+    <string name="home_refresh_release">松开刷新</string>
+    <string name="home_refresh_refreshing">正在刷新</string>
+    <string name="home_refresh_done">刷新成功</string>
+    <string name="home_greeting_morning">早上好，%1$s</string>
+    <string name="home_greeting_noon">中午好，%1$s</string>
+    <string name="home_greeting_afternoon">下午好，%1$s</string>
+    <string name="home_greeting_evening">晚上好，%1$s</string>
+    <string name="home_interval_days">%1$.1f天</string>
+
+    <string name="length_add_record">新增长度记录</string>
+    <string name="length_empty">暂无长度记录</string>
+    <string name="length_add_first">添加第一条记录</string>
+    <string name="length_measurement_records">测量记录</string>
+    <string name="length_delete_dialog_title">删除长度记录</string>
+    <string name="length_delete_dialog_message">确认删除这次测量吗？</string>
+    <string name="length_edit_record">编辑长度记录</string>
+    <string name="length_flaccid_label">疲软长度（cm）</string>
+    <string name="length_erect_label">勃起长度（cm）</string>
+    <string name="length_note_label">备注（可选）</string>
+    <string name="length_legend_erect">勃起长度</string>
+    <string name="length_legend_flaccid">松弛长度</string>
+    <string name="length_record_summary">勃起 %1$scm · 疲软 %2$scm</string>
+    <string name="length_chart_marker">勃起 %1$s cm\n疲软 %2$s cm</string>
+    <string name="length_error_range">长度需要在 0.1 到 100 厘米之间</string>
+
+    <string name="app_lock_wait_seconds">请等待 %1$d 秒</string>
+    <string name="app_lock_biometric">指纹验证</string>
+    <string name="app_lock_error_pin_mismatch">两次 PIN 不一致，请重试</string>
+    <string name="app_lock_error_old_pin">旧 PIN 码错误</string>
+    <string name="app_lock_error_pin">PIN 码错误</string>
+    <string name="app_lock_error_lockout">错误次数过多，请等待 30 秒</string>
+    <string name="app_lock_error_attempts_left">%1$s，还剩 %2$d 次</string>
+    <string name="app_lock_error_security">设备安全模块暂时不可用，请稍后重试</string>
+    <string name="app_lock_title_create">设置 PIN 码</string>
+    <string name="app_lock_title_confirm">再次输入 PIN 码</string>
+    <string name="app_lock_title_verify">输入 PIN 码</string>
+    <string name="app_lock_title_change_old">请输入旧 PIN 码</string>
+    <string name="app_lock_title_change_new">设置新 PIN 码</string>
+    <string name="app_lock_title_change_confirm">再次输入新 PIN 码</string>
+    <string name="app_lock_title_disable">输入当前 PIN 以关闭应用锁</string>
+    <string name="app_lock_biometric_title">验证身份</string>
+    <string name="app_lock_biometric_subtitle">使用指纹解锁起飞日记</string>
+    <string name="app_lock_biometric_negative">使用 PIN 码</string>
+    <string name="app_lock_biometric_error">暂时无法使用指纹，请输入 PIN 码</string>
+    <string name="app_lock_biometric_retry">指纹识别失败，请重试</string>
+
+    <string name="settings_biometric_enable_title">开启指纹解锁</string>
+    <string name="settings_biometric_enable_subtitle">验证指纹后，打开起飞日记时可优先使用指纹</string>
+
+    <string name="record_detail_title">记录详情</string>
+    <string name="record_detail_delete_dialog_title">删除记录</string>
+    <string name="record_detail_delete_dialog_message">这条记录将被永久删除。</string>
+    <string name="record_detail_missing">记录不存在或已被删除</string>
+    <string name="record_detail_start_time">开始时间</string>
+    <string name="record_detail_end_time">结束时间</string>
+    <string name="record_detail_duration">用时</string>
+    <string name="record_detail_volume">射精量</string>
+    <string name="record_detail_volume_value">%1$s ml / %2$s 股</string>
+    <string name="record_detail_distance">射精距离</string>
+    <string name="record_detail_method_tags">方式标签</string>
+    <string name="record_detail_note">备注</string>
+
+    <string name="tag_manager_add_tag">添加标签</string>
+    <string name="tag_manager_instructions">长按左侧拖动柄调整顺序，松手后自动保存。</string>
+    <string name="tag_manager_edit_tag">编辑标签</string>
+    <string name="tag_manager_name_label">标签名称</string>
+    <string name="tag_manager_sort_order">排序 %1$d</string>
+    <string name="tag_manager_delete_dialog_title">删除标签</string>
+    <string name="tag_manager_delete_dialog_message">历史记录会保留“%1$s”，它只会从以后可选标签中移除。</string>
+    <string name="tag_manager_error_name_length">标签名称需要 1 到 20 个字符</string>
+    <string name="tag_manager_error_color">请选择有效颜色</string>
+    <string name="tag_manager_error_duplicate">已经有同名标签</string>
+    <string name="tag_manager_error_save_failed">标签保存失败，请重试</string>
+
+    <string name="timer_title">计时</string>
+    <string name="timer_end_timing">结束计时</string>
+    <string name="timer_finish_dialog_message">结束后可以继续填写本次记录。</string>
+    <string name="timer_confirm_end">确认结束</string>
+    <string name="timer_continue_timing">继续计时</string>
+    <string name="timer_leave_dialog_title">离开计时页面？</string>
+    <string name="timer_leave_dialog_message">计时会在后台继续，你可以从应用或通知栏返回。</string>
+    <string name="timer_leave_confirm">后台继续</string>
+    <string name="timer_leave_cancel">留在这里</string>
+    <string name="timer_status_idle">准备开始</string>
+    <string name="timer_status_running">正在计时</string>
+    <string name="timer_status_finished">计时已结束</string>
+    <string name="timer_track_caption">当前分钟 · 最长 120 分钟</string>
+    <string name="timer_resume">继续</string>
+    <string name="timer_pause">暂停</string>
+    <string name="timer_restart">重新计时</string>
+    <string name="timer_fill_record">填写记录</string>
 </resources>

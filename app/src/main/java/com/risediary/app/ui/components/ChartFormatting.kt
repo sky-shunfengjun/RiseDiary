@@ -85,8 +85,8 @@ private fun formatChartValue(value: Double): String =
 internal fun formatTrendMarkerValue(value: Double, unit: String): String =
     "${formatChartValue(value)} $unit"
 
-internal fun formatLengthMarkerValue(erect: Double, flaccid: Double): String =
-    "勃起 ${formatChartValue(erect)} cm\n疲软 ${formatChartValue(flaccid)} cm"
+internal fun formatLengthMarkerValue(format: String, erect: Double, flaccid: Double): String =
+    String.format(format, formatChartValue(erect), formatChartValue(flaccid))
 
 private fun formatChartAxisValue(value: Double, step: Double): String {
     val decimals = when {
@@ -97,6 +97,6 @@ private fun formatChartAxisValue(value: Double, step: Double): String {
     return "%.${decimals}f".format(Locale.getDefault(), value)
 }
 
-/** Achievement key → (icon, short name) map used across HomeScreen. */
+/** Achievement key → (icon, short name resource) map used across HomeScreen. */
 val ACHIEVEMENT_ICONS = com.risediary.app.ui.achievement.AchievementCatalog.definitions
-    .associate { it.key to (it.icon to it.shortName) }
+    .associate { it.key to (it.icon to it.shortNameRes) }

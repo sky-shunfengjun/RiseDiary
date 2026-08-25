@@ -16,13 +16,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronLeft
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -32,11 +25,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.stringArrayResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import java.time.LocalDate
 import java.time.YearMonth
+import com.risediary.app.R
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import com.risediary.app.ui.icons.AppIcons
 
 @Composable
 fun LiquidSingleDatePickerDialog(
@@ -52,14 +54,22 @@ fun LiquidSingleDatePickerDialog(
     LiquidDatePickerDialog(
         onDismissRequest = onDismissRequest,
         dismissButton = {
-            TextButton(onClick = onDismissRequest) { Text("取消") }
+            TextButton(
+                text = stringResource(R.string.action_cancel),
+                onClick = onDismissRequest,
+                colors = liquidDialogCancelButtonColors()
+            )
         },
         confirmButton = {
-            TextButton(onClick = { onConfirm(selectedDate) }) { Text("确定") }
+            TextButton(
+                text = stringResource(R.string.action_confirm),
+                onClick = { onConfirm(selectedDate) },
+                colors = liquidDialogConfirmButtonColors()
+            )
         }
     ) {
         CompactCalendar(
-            title = "选择日期",
+            title = stringResource(R.string.calendar_pick_date),
             visibleMonth = visibleMonth,
             onVisibleMonthChange = { visibleMonth = it },
             selectedStart = selectedDate,
@@ -82,25 +92,31 @@ fun LiquidDateRangePickerDialog(
     LiquidDatePickerDialog(
         onDismissRequest = onDismissRequest,
         dismissButton = {
-            TextButton(onClick = onDismissRequest) { Text("取消") }
+            TextButton(
+                text = stringResource(R.string.action_cancel),
+                onClick = onDismissRequest,
+                colors = liquidDialogCancelButtonColors()
+            )
         },
         confirmButton = {
             TextButton(
+                text = stringResource(R.string.action_confirm),
                 enabled = selectedStart != null,
                 onClick = {
-                    val start = selectedStart ?: return@TextButton
-                    onConfirm(start, selectedEnd ?: start)
-                }
-            ) {
-                Text("确定")
-            }
+                    val start = selectedStart
+                    if (start != null) {
+                        onConfirm(start, selectedEnd ?: start)
+                    }
+                },
+                colors = liquidDialogConfirmButtonColors()
+            )
         }
     ) {
         CompactCalendar(
             title = when {
-                selectedStart == null -> "选择开始日期"
-                selectedEnd == null -> "选择结束日期"
-                else -> "已选择日期范围"
+                selectedStart == null -> stringResource(R.string.calendar_pick_start_date)
+                selectedEnd == null -> stringResource(R.string.calendar_pick_end_date)
+                else -> stringResource(R.string.calendar_range_selected)
             },
             visibleMonth = visibleMonth,
             onVisibleMonthChange = { visibleMonth = it },
@@ -134,7 +150,7 @@ private fun CompactCalendar(
     selectedEnd: LocalDate?,
     onDateSelected: (LocalDate) -> Unit
 ) {
-    val weekdays = remember { listOf("一", "二", "三", "四", "五", "六", "日") }
+    val weekdays = stringArrayResource(R.array.weekday_labels)
     val firstOffset = visibleMonth.atDay(1).dayOfWeek.value - 1
     val dayCells = remember(visibleMonth) {
         List(42) { cellIndex ->
@@ -149,9 +165,9 @@ private fun CompactCalendar(
     ) {
         Text(
             text = title,
-            style = MaterialTheme.typography.titleLarge,
+            style = MiuixTheme.textStyles.title3,
             fontWeight = FontWeight.SemiBold,
-            color = MaterialTheme.colorScheme.onSurface,
+            color = MiuixTheme.colorScheme.onSurface,
             modifier = Modifier.padding(horizontal = 6.dp)
         )
         Row(
@@ -159,32 +175,36 @@ private fun CompactCalendar(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "${visibleMonth.year}年${visibleMonth.monthValue}月",
-                style = MaterialTheme.typography.titleMedium,
+                text = stringResource(
+                    R.string.calendar_month_format,
+                    visibleMonth.year,
+                    visibleMonth.monthValue
+                ),
+                style = MiuixTheme.textStyles.title4,
                 fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onSurface,
+                color = MiuixTheme.colorScheme.onSurface,
                 modifier = Modifier.weight(1f)
             )
             CalendarNavButton(
-                contentDescription = "上个月",
+                contentDescription = stringResource(R.string.calendar_previous_month),
                 onClick = { onVisibleMonthChange(visibleMonth.minusMonths(1)) }
             ) {
-                Icon(Icons.Default.ChevronLeft, "上个月")
+                Icon(AppIcons.ChevronLeft, stringResource(R.string.calendar_previous_month))
             }
             Spacer(Modifier.width(6.dp))
             CalendarNavButton(
-                contentDescription = "下个月",
+                contentDescription = stringResource(R.string.calendar_next_month),
                 onClick = { onVisibleMonthChange(visibleMonth.plusMonths(1)) }
             ) {
-                Icon(Icons.Default.ChevronRight, "下个月")
+                Icon(AppIcons.ChevronRight, stringResource(R.string.calendar_next_month))
             }
         }
         Row(Modifier.fillMaxWidth()) {
             weekdays.forEach { weekday ->
                 Text(
                     text = weekday,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    style = MiuixTheme.textStyles.footnote2,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.weight(1f)
                 )
@@ -239,13 +259,13 @@ private fun CalendarDay(
             .clip(shape)
             .then(
                 when {
-                    isSelected -> Modifier.background(MaterialTheme.colorScheme.primary)
+                    isSelected -> Modifier.background(MiuixTheme.colorScheme.primary)
                     isInRange -> Modifier.background(
-                        MaterialTheme.colorScheme.primary.copy(alpha = 0.13f)
+                        MiuixTheme.colorScheme.primary.copy(alpha = 0.13f)
                     )
                     isToday -> Modifier.border(
                         1.dp,
-                        MaterialTheme.colorScheme.primary,
+                        MiuixTheme.colorScheme.primary,
                         CircleShape
                     )
                     else -> Modifier
@@ -260,9 +280,9 @@ private fun CalendarDay(
     ) {
         Text(
             text = date.dayOfMonth.toString(),
-            style = MaterialTheme.typography.bodyMedium,
+            style = MiuixTheme.textStyles.body1,
             fontWeight = if (isSelected || isToday) FontWeight.SemiBold else FontWeight.Normal,
-            color = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurface
+            color = if (isSelected) Color.White else MiuixTheme.colorScheme.onSurface
         )
     }
 }
@@ -277,7 +297,7 @@ private fun CalendarNavButton(
         modifier = Modifier
             .size(38.dp)
             .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.onSurface.copy(alpha = 0.055f))
+            .background(MiuixTheme.colorScheme.onSurface.copy(alpha = 0.055f))
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center
     ) {

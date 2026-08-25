@@ -1,15 +1,21 @@
 package com.risediary.app.ui.lock
 
+import android.content.Context
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import android.os.SystemClock
+import com.risediary.app.R
 import com.risediary.app.data.UserPreferences
 import com.risediary.app.security.BiometricAuthResult
 import com.risediary.app.security.BiometricAuthenticator
 import com.risediary.app.security.PinSecurity
 import com.risediary.app.security.PinVerification
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -18,6 +24,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.time.Clock
 import javax.inject.Inject
 
@@ -37,6 +44,7 @@ class AppLockViewModel @Inject constructor(
     private val pinSecurity: PinSecurity,
     private val biometricAuthenticator: BiometricAuthenticator,
     private val clock: Clock,
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _pin = MutableStateFlow("")
@@ -54,7 +62,7 @@ class AppLockViewModel @Inject constructor(
     private val _lockoutRemaining = MutableStateFlow(0)
     val lockoutRemaining: StateFlow<Int> = _lockoutRemaining.asStateFlow()
 
-    private val _title = MutableStateFlow("输入 PIN 码")
+    private val _title = MutableStateFlow(context.getString(R.string.app_lock_title_verify))
     val title: StateFlow<String> = _title.asStateFlow()
 
     private val _done = MutableStateFlow(false)
@@ -72,6 +80,9 @@ class AppLockViewModel @Inject constructor(
     private var savedCredential = ""
     private var loadJob: Job? = null
     private var countdownJob: Job? = null
+    private var biometricRequestInProgress = false
+    private var verifyInFlight = false
+    private var lockoutDeadlineElapsed: Long = 0L
 
     val biometricAvailable: Boolean
         get() = biometricAuthenticator.isAvailable()
@@ -134,12 +145,12 @@ class AppLockViewModel @Inject constructor(
             }
             LockMode.CREATE_CONFIRM -> {
                 if (entered == firstPin) saveAndDone(entered)
-                else restartCreation(LockMode.CREATE, "两次 PIN 不一致，请重试")
+                else restartCreation(LockMode.CREATE, R.string.app_lock_error_pin_mismatch)
             }
             LockMode.CHANGE_OLD -> verifySavedPin(
                 entered = entered,
                 onSuccess = { advanceTo(LockMode.CHANGE_NEW) },
-                error = "旧 PIN 码错误"
+                errorRes = R.string.app_lock_error_old_pin
             )
             LockMode.CHANGE_NEW -> {
                 firstPin = entered
@@ -147,43 +158,62 @@ class AppLockViewModel @Inject constructor(
             }
             LockMode.CHANGE_CONFIRM -> {
                 if (entered == firstPin) saveAndDone(entered)
-                else restartCreation(LockMode.CHANGE_NEW, "两次 PIN 不一致，请重试")
+                else restartCreation(LockMode.CHANGE_NEW, R.string.app_lock_error_pin_mismatch)
             }
             LockMode.VERIFY -> verifySavedPin(
                 entered = entered,
                 onSuccess = { _done.value = true },
-                error = "PIN 码错误"
+                errorRes = R.string.app_lock_error_pin
             )
             LockMode.DISABLE_VERIFY -> verifySavedPin(
                 entered = entered,
                 onSuccess = ::clearLock,
-                error = "PIN 码错误"
+                errorRes = R.string.app_lock_error_pin
             )
         }
     }
 
-    private fun verifySavedPin(entered: String, onSuccess: () -> Unit, error: String) {
+    private fun verifySavedPin(entered: String, onSuccess: () -> Unit, errorRes: Int) {
+        if (verifyInFlight) return
+        verifyInFlight = true
         viewModelScope.launch {
-            when (pinSecurity.verify(entered, savedCredential)) {
-                PinVerification.MATCH -> {
-                    clearFailures()
-                    onSuccess()
+            try {
+                val verification = try {
+                    withContext(Dispatchers.Default) {
+                        pinSecurity.verify(entered, savedCredential)
+                    }
+                } catch (cancelled: CancellationException) {
+                    throw cancelled
+                } catch (_: Exception) {
+                    showSecurityError()
+                    return@launch
                 }
-                PinVerification.LEGACY_MATCH -> {
-                    savedCredential = pinSecurity.createCredential(entered)
-                    preferences.setAppLock(enabled = true, pin = savedCredential)
-                    clearFailures()
-                    onSuccess()
+
+                when (verification) {
+                    PinVerification.MATCH -> {
+                        clearFailures()
+                        onSuccess()
+                    }
+                    PinVerification.LEGACY_MATCH -> {
+                        val upgradedCredential = createCredentialOrNull(entered) ?: return@launch
+                        if (!saveAppLockCredential(upgradedCredential)) return@launch
+                        savedCredential = upgradedCredential
+                        clearFailures()
+                        onSuccess()
+                    }
+                    PinVerification.NO_MATCH -> onMismatch(errorRes)
                 }
-                PinVerification.NO_MATCH -> onMismatch(error)
+            } finally {
+                verifyInFlight = false
             }
         }
     }
 
     private fun saveAndDone(pin: String) {
         viewModelScope.launch {
-            savedCredential = pinSecurity.createCredential(pin)
-            preferences.setAppLock(enabled = true, pin = savedCredential)
+            val credential = createCredentialOrNull(pin) ?: return@launch
+            if (!saveAppLockCredential(credential)) return@launch
+            savedCredential = credential
             clearFailures()
             _done.value = true
         }
@@ -191,32 +221,52 @@ class AppLockViewModel @Inject constructor(
 
     private fun clearLock() {
         viewModelScope.launch {
-            preferences.setAppLock(enabled = false, pin = "")
+            try {
+                preferences.setAppLock(enabled = false, pin = "")
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                showSecurityError()
+                return@launch
+            }
             savedCredential = ""
             _done.value = true
         }
     }
 
-    private suspend fun onMismatch(message: String) {
+    private suspend fun onMismatch(messageRes: Int) {
         val attempts = _attempts.value + 1
         _pin.value = ""
         if (attempts >= MAX_ATTEMPTS) {
             val lockoutUntil = clock.millis() + LOCKOUT_MILLIS
             _attempts.value = MAX_ATTEMPTS
-            preferences.setAppLockFailureState(MAX_ATTEMPTS, lockoutUntil)
-            _errorMessage.value = "错误次数过多，请等待 30 秒"
+            _errorMessage.value = context.getString(R.string.app_lock_error_lockout)
+            // Enforce the in-memory countdown even if persisting the failure
+            // state fails; a silent DataStore failure must not disable the gate.
+            lockoutDeadlineElapsed = SystemClock.elapsedRealtime() + LOCKOUT_MILLIS
             startCountdownIfNeeded(lockoutUntil)
+            saveFailureState(MAX_ATTEMPTS, lockoutUntil)
         } else {
             _attempts.value = attempts
-            preferences.setAppLockFailureState(attempts, 0L)
-            _errorMessage.value = "$message，还剩 ${MAX_ATTEMPTS - attempts} 次"
+            _errorMessage.value = context.getString(
+                R.string.app_lock_error_attempts_left,
+                context.getString(messageRes),
+                MAX_ATTEMPTS - attempts
+            )
+            saveFailureState(attempts, 0L)
         }
     }
 
     private fun startCountdownIfNeeded(lockoutUntil: Long) {
         countdownJob?.cancel()
-        val remainingMillis = lockoutUntil - clock.millis()
-        if (remainingMillis <= 0) {
+        if (lockoutDeadlineElapsed == 0L) {
+            // Restored after process death: derive the deadline from the persisted
+            // wall-clock value once, then count down monotonically.
+            lockoutDeadlineElapsed = SystemClock.elapsedRealtime() +
+                (lockoutUntil - clock.millis()).coerceAtLeast(0L)
+        }
+        if (SystemClock.elapsedRealtime() >= lockoutDeadlineElapsed) {
+            lockoutDeadlineElapsed = 0L
             _lockoutRemaining.value = 0
             if (_attempts.value >= MAX_ATTEMPTS) {
                 viewModelScope.launch { clearFailures() }
@@ -225,11 +275,13 @@ class AppLockViewModel @Inject constructor(
         }
 
         countdownJob = viewModelScope.launch {
-            while (clock.millis() < lockoutUntil) {
+            while (SystemClock.elapsedRealtime() < lockoutDeadlineElapsed) {
                 _lockoutRemaining.value =
-                    ((lockoutUntil - clock.millis() + 999L) / 1000L).toInt()
+                    ((lockoutDeadlineElapsed - SystemClock.elapsedRealtime() + 999L) / 1000L)
+                        .toInt()
                 delay(250L)
             }
+            lockoutDeadlineElapsed = 0L
             clearFailures()
             _errorMessage.value = null
         }
@@ -238,7 +290,49 @@ class AppLockViewModel @Inject constructor(
     private suspend fun clearFailures() {
         _attempts.value = 0
         _lockoutRemaining.value = 0
-        preferences.clearAppLockFailures()
+        try {
+            preferences.clearAppLockFailures()
+        } catch (cancelled: CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            showSecurityError()
+        }
+    }
+
+    private suspend fun createCredentialOrNull(pin: String): String? = try {
+        withContext(Dispatchers.Default) {
+            pinSecurity.createCredential(pin)
+        }
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Exception) {
+        showSecurityError()
+        null
+    }
+
+    private suspend fun saveAppLockCredential(credential: String): Boolean = try {
+        preferences.setAppLock(enabled = true, pin = credential)
+        true
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Exception) {
+        showSecurityError()
+        false
+    }
+
+    private suspend fun saveFailureState(attempts: Int, lockoutUntil: Long): Boolean = try {
+        preferences.setAppLockFailureState(attempts, lockoutUntil)
+        true
+    } catch (cancelled: CancellationException) {
+        throw cancelled
+    } catch (_: Exception) {
+        showSecurityError()
+        false
+    }
+
+    private fun showSecurityError() {
+        _pin.value = ""
+        _errorMessage.value = context.getString(R.string.app_lock_error_security)
     }
 
     private fun advanceTo(nextMode: LockMode) {
@@ -247,23 +341,23 @@ class AppLockViewModel @Inject constructor(
         updateTitle()
     }
 
-    private fun restartCreation(mode: LockMode, message: String) {
+    private fun restartCreation(mode: LockMode, messageRes: Int) {
         firstPin = ""
         _mode.value = mode
         _pin.value = ""
-        _errorMessage.value = message
+        _errorMessage.value = context.getString(messageRes)
         updateTitle()
     }
 
     private fun updateTitle() {
         _title.value = when (_mode.value) {
-            LockMode.CREATE -> "设置 PIN 码"
-            LockMode.CREATE_CONFIRM -> "再次输入 PIN 码"
-            LockMode.VERIFY -> "输入 PIN 码"
-            LockMode.CHANGE_OLD -> "请输入旧 PIN 码"
-            LockMode.CHANGE_NEW -> "设置新 PIN 码"
-            LockMode.CHANGE_CONFIRM -> "再次输入新 PIN 码"
-            LockMode.DISABLE_VERIFY -> "输入当前 PIN 以关闭应用锁"
+            LockMode.CREATE -> context.getString(R.string.app_lock_title_create)
+            LockMode.CREATE_CONFIRM -> context.getString(R.string.app_lock_title_confirm)
+            LockMode.VERIFY -> context.getString(R.string.app_lock_title_verify)
+            LockMode.CHANGE_OLD -> context.getString(R.string.app_lock_title_change_old)
+            LockMode.CHANGE_NEW -> context.getString(R.string.app_lock_title_change_new)
+            LockMode.CHANGE_CONFIRM -> context.getString(R.string.app_lock_title_change_confirm)
+            LockMode.DISABLE_VERIFY -> context.getString(R.string.app_lock_title_disable)
         }
     }
 
@@ -272,29 +366,35 @@ class AppLockViewModel @Inject constructor(
             !_ready.value ||
             _mode.value != LockMode.VERIFY ||
             !biometricUnlockEnabled.value ||
-            !biometricAuthenticator.isAvailable()
+            !biometricAuthenticator.isAvailable() ||
+            biometricRequestInProgress
         ) return
+        biometricRequestInProgress = true
         biometricAuthenticator.authenticate(
                 activity = activity,
-                title = "验证身份",
-                subtitle = "使用指纹解锁起飞日记",
-                negativeButtonText = "使用 PIN 码",
+                title = context.getString(R.string.app_lock_biometric_title),
+                subtitle = context.getString(R.string.app_lock_biometric_subtitle),
+                negativeButtonText = context.getString(R.string.app_lock_biometric_negative),
                 onResult = { result ->
                     when (result) {
                         BiometricAuthResult.Success -> {
+                            biometricRequestInProgress = false
                             viewModelScope.launch {
                                 clearFailures()
                                 _done.value = true
                             }
                         }
                         BiometricAuthResult.Error -> {
-                            _errorMessage.value = "暂时无法使用指纹，请输入 PIN 码"
+                            biometricRequestInProgress = false
+                            _errorMessage.value = context.getString(R.string.app_lock_biometric_error)
                         }
-                        BiometricAuthResult.Cancelled -> Unit
+                        BiometricAuthResult.Cancelled -> {
+                            biometricRequestInProgress = false
+                        }
                     }
                 },
                 onFailedAttempt = {
-                    _errorMessage.value = "指纹识别失败，请重试"
+                    _errorMessage.value = context.getString(R.string.app_lock_biometric_retry)
                 }
             )
     }

@@ -12,57 +12,57 @@ import org.json.JSONObject
 import kotlin.math.abs
 
 internal object BackupJsonCodec {
+    fun flightToJson(value: Flight) = JSONObject().apply {
+        put("id", value.id)
+        put("startTime", value.startTime)
+        put("endTime", value.endTime)
+        put("durationSeconds", value.durationSeconds)
+        put("spurtCount", value.spurtCount ?: JSONObject.NULL)
+        put("semenVolumeMl", value.semenVolumeMl ?: JSONObject.NULL)
+        put("volumeInputMode", value.volumeInputMode)
+        put("ejaculationDistanceCm", value.ejaculationDistanceCm ?: JSONObject.NULL)
+        put("methodTags", value.methodTags)
+        put("moodNote", value.moodNote)
+        put("createdAt", value.createdAt)
+        put("updatedAt", value.updatedAt)
+    }
+
+    fun lengthToJson(value: LengthRecord) = JSONObject().apply {
+        put("id", value.id)
+        put("recordDate", value.recordDate)
+        put("flaccidLengthCm", value.flaccidLengthCm)
+        put("erectLengthCm", value.erectLengthCm)
+        put("note", value.note)
+    }
+
+    fun tagToJson(value: Tag) = JSONObject().apply {
+        put("id", value.id)
+        put("name", value.name)
+        put("color", value.color)
+        put("sortOrder", value.sortOrder)
+    }
+
+    fun achievementToJson(value: Achievement) = JSONObject().apply {
+        put("id", value.id)
+        put("achievementKey", value.achievementKey)
+        put("unlockedAt", value.unlockedAt)
+        put("notified", if (value.notified) 1 else 0)
+    }
+
     fun flightsToJson(values: List<Flight>) = JSONArray().apply {
-        values.forEach { value ->
-            put(JSONObject().apply {
-                put("id", value.id)
-                put("startTime", value.startTime)
-                put("endTime", value.endTime)
-                put("durationSeconds", value.durationSeconds)
-                put("spurtCount", value.spurtCount ?: JSONObject.NULL)
-                put("semenVolumeMl", value.semenVolumeMl ?: JSONObject.NULL)
-                put("volumeInputMode", value.volumeInputMode)
-                put("ejaculationDistanceCm", value.ejaculationDistanceCm ?: JSONObject.NULL)
-                put("methodTags", value.methodTags)
-                put("moodNote", value.moodNote)
-                put("createdAt", value.createdAt)
-                put("updatedAt", value.updatedAt)
-            })
-        }
+        values.forEach { put(flightToJson(it)) }
     }
 
     fun lengthsToJson(values: List<LengthRecord>) = JSONArray().apply {
-        values.forEach { value ->
-            put(JSONObject().apply {
-                put("id", value.id)
-                put("recordDate", value.recordDate)
-                put("flaccidLengthCm", value.flaccidLengthCm)
-                put("erectLengthCm", value.erectLengthCm)
-                put("note", value.note)
-            })
-        }
+        values.forEach { put(lengthToJson(it)) }
     }
 
     fun tagsToJson(values: List<Tag>) = JSONArray().apply {
-        values.forEach { value ->
-            put(JSONObject().apply {
-                put("id", value.id)
-                put("name", value.name)
-                put("color", value.color)
-                put("sortOrder", value.sortOrder)
-            })
-        }
+        values.forEach { put(tagToJson(it)) }
     }
 
     fun achievementsToJson(values: List<Achievement>) = JSONArray().apply {
-        values.forEach { value ->
-            put(JSONObject().apply {
-                put("id", value.id)
-                put("achievementKey", value.achievementKey)
-                put("unlockedAt", value.unlockedAt)
-                put("notified", if (value.notified) 1 else 0)
-            })
-        }
+        values.forEach { put(achievementToJson(it)) }
     }
 
     fun settingsToJson(value: SettingsSnapshot) = JSONObject().apply {
