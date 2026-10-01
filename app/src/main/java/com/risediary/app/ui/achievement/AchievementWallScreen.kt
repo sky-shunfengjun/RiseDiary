@@ -1,5 +1,7 @@
 package com.risediary.app.ui.achievement
 
+import com.risediary.app.ui.components.rememberTopBlurProgress
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -61,11 +63,15 @@ fun AchievementWallScreen(
     val unlockedKeys = unlocked.map { it.achievementKey }.toSet()
     val unlockedMap = unlocked.associateBy { it.achievementKey }
 
+    val listState = rememberLazyGridState()
+
     SecondaryPageScaffold(
+        topBlurProgress = rememberTopBlurProgress(listState),
         title = stringResource(R.string.achievement_wall_title),
         onBack = { navigator.pop() }
     ) { innerPadding ->
         LazyVerticalGrid(
+            state = listState,
             columns = GridCells.Fixed(2),
             modifier = Modifier
                 .fillMaxSize()

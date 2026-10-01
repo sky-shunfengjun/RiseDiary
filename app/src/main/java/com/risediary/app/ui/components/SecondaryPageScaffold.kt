@@ -64,6 +64,7 @@ fun SecondaryPageScaffold(
     bottomAction: (@Composable (Backdrop) -> Unit)? = null,
     reserveBottomActionSpace: Boolean = true,
     titleAlpha: (() -> Float)? = null,
+    topBlurProgress: () -> Float = { 0f },
     content: @Composable (PaddingValues) -> Unit
 ) {
     val statusBarTopDp = WindowInsets.statusBars
@@ -92,10 +93,47 @@ fun SecondaryPageScaffold(
     }
 
     ProvidePageBackdrop(backdrop) {
-        Box(
+        PageTopBlurLayout(
+            progress = topBlurProgress,
+            topBarHeight = 60.dp,
+            fadeHeight = 24.dp,
             modifier = modifier
                 .fillMaxSize()
-                .background(pageBackground)
+                .background(pageBackground),
+            overlay = {
+                snackbarHost()
+
+                PageTopBar(
+                    title = title,
+                    onBack = guardedBack,
+                    backdrop = backdrop,
+                    actions = actions,
+                    titleAlpha = titleAlpha
+                )
+
+                if (floatingActionButton != null) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomEnd)
+                            .navigationBarsPadding()
+                            .padding(end = 20.dp, bottom = 20.dp)
+                    ) {
+                        floatingActionButton(backdrop)
+                    }
+                }
+
+                if (bottomAction != null) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .navigationBarsPadding()
+                            .imePadding()
+                            .padding(horizontal = 20.dp, vertical = 12.dp)
+                    ) {
+                        bottomAction(backdrop)
+                    }
+                }
+            }
         ) {
             Box(
                 modifier = Modifier
@@ -109,50 +147,11 @@ fun SecondaryPageScaffold(
                         end = 20.dp,
                         bottom = navigationBarBottomDp +
                             if (
-                                (
-                                    floatingActionButton != null &&
-                                        reserveFloatingActionButtonSpace
-                                    ) || (bottomAction != null && reserveBottomActionSpace)
-                            ) {
-                                104.dp
-                            } else {
-                                20.dp
-                            }
+                                (floatingActionButton != null && reserveFloatingActionButtonSpace) ||
+                                (bottomAction != null && reserveBottomActionSpace)
+                            ) 104.dp else 20.dp
                     )
                 )
-            }
-
-            snackbarHost()
-
-            PageTopBar(
-                title = title,
-                onBack = guardedBack,
-                backdrop = backdrop,
-                actions = actions,
-                titleAlpha = titleAlpha
-            )
-
-            if (floatingActionButton != null) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .navigationBarsPadding()
-                        .padding(end = 20.dp, bottom = 20.dp)
-                ) {
-                    floatingActionButton(backdrop)
-                }
-            }
-
-            if (bottomAction != null) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .navigationBarsPadding()
-                        .imePadding()
-                        .padding(horizontal = 20.dp, vertical = 12.dp)
-                ) {
-                    bottomAction(backdrop)
-                }
             }
         }
     }

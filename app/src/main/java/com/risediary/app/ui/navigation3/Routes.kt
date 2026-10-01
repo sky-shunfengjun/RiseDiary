@@ -7,69 +7,69 @@
  */
 package com.risediary.app.ui.navigation3
 
-import android.os.Parcelable
-import androidx.navigation3.runtime.NavKey
-import kotlinx.parcelize.Parcelize
+import top.yukonga.miuix.kmp.nav.core.NavKey
+import kotlinx.serialization.Serializable
 
-sealed interface Route : NavKey, Parcelable {
-    @Parcelize
+@Serializable
+sealed interface Route : NavKey {
+    @Serializable
     data object Main : Route
 
-    @Parcelize
+    @Serializable
     data object ModeSelect : Route
 
-    @Parcelize
+    @Serializable
     data object Timer : Route
 
-    @Parcelize
+    @Serializable
     data class RecordForm(
         val isTimer: Boolean,
         val duration: Long,
         val startTime: Long,
     ) : Route
 
-    @Parcelize
+    @Serializable
     data class RecordDetail(val flightId: Long) : Route
 
-    @Parcelize
+    @Serializable
     data class RecordEdit(val flightId: Long) : Route
 
-    @Parcelize
+    @Serializable
     data object TagManager : Route
 
-    @Parcelize
+    @Serializable
     data object AchievementWall : Route
 
-    @Parcelize
+    @Serializable
     data object About : Route
 
-    @Parcelize
+    @Serializable
     data object ThirdPartyLibs : Route
 
-    @Parcelize
+    @Serializable
     data object CardOrder : Route
 
-    @Parcelize
+    @Serializable
     data object BackupRestore : Route
 
-    @Parcelize
+    @Serializable
     data object LengthHistory : Route
 
-    @Parcelize
+    @Serializable
     data object ReminderSettings : Route
 
-    @Parcelize
+    @Serializable
     data object AppLockSettings : Route
 
-    @Parcelize
+    @Serializable
     data object LockSetup : Route
 
-    @Parcelize
+    @Serializable
     data object LockChange : Route
 
-    @Parcelize
+    @Serializable
     data object LockDisable : Route
 
-    @Parcelize
+    @Serializable
     data object OnboardingReview : Route
 }

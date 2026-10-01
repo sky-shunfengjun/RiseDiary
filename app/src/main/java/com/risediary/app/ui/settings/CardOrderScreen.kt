@@ -1,6 +1,9 @@
 package com.risediary.app.ui.settings
 
-import androidx.activity.compose.BackHandler
+import com.risediary.app.ui.components.rememberTopBlurProgress
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.LazyListState
+import com.risediary.app.ui.components.PageBackHandler as BackHandler
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.tween
@@ -58,39 +61,26 @@ fun CardOrderScreen(
     }
     BackHandler(enabled = !isClosing, onBack = closeScreen)
 
+    val listState = rememberLazyListState()
+
     SecondaryPageScaffold(
+        topBlurProgress = rememberTopBlurProgress(listState),
         title = stringResource(R.string.card_order_title),
         onBack = closeScreen
     ) { innerPadding ->
-        Column(modifier = Modifier.fillMaxSize()) {
-            Text(
-                stringResource(R.string.card_order_instructions),
-                fontSize = MiuixTheme.textStyles.body1.fontSize,
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                modifier = Modifier.padding(
-                    start = innerPadding.calculateLeftPadding(LayoutDirection.Ltr) + 4.dp,
-                    top = innerPadding.calculateTopPadding(),
-                    end = innerPadding.calculateRightPadding(LayoutDirection.Ltr) + 4.dp
-                )
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-
-            CardOrderList(
-                vm = vm,
-                modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(
-                    start = innerPadding.calculateLeftPadding(LayoutDirection.Ltr),
-                    end = innerPadding.calculateRightPadding(LayoutDirection.Ltr),
-                    bottom = innerPadding.calculateBottomPadding()
-                )
-            )
-        }
+        CardOrderList(
+            vm = vm,
+            listState = listState,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = innerPadding
+        )
     }
 }
 
 @Composable
 private fun CardOrderList(
     vm: CardOrderViewModel,
+    listState: LazyListState,
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues()
 ) {
@@ -119,12 +109,23 @@ private fun CardOrderList(
         }
     }
 
-LazyColumn(
-verticalArrangement = Arrangement.spacedBy(12.dp),
-modifier = modifier
-    .fillMaxWidth(),
-contentPadding = contentPadding
-) {
+    LazyColumn(
+        state = listState,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = modifier.fillMaxWidth(),
+        contentPadding = contentPadding
+    ) {
+        item(key = "instructions") {
+            Column {
+                Text(
+                    stringResource(R.string.card_order_instructions),
+                    fontSize = MiuixTheme.textStyles.body1.fontSize,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    modifier = Modifier.padding(horizontal = 4.dp)
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+            }
+        }
         itemsIndexed(
             items = vm.orderedIds,
             key = { _, id -> id }

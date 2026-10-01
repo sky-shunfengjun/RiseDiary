@@ -1,5 +1,7 @@
 package com.risediary.app.ui.records
 
+import com.risediary.app.ui.components.rememberTopBlurProgress
+import androidx.compose.foundation.ScrollState
 import com.risediary.app.util.formatNaturalDuration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -66,7 +68,10 @@ fun RecordDetailScreen(
         if (deleted) navigator.pop()
     }
 
+    val scrollState = rememberScrollState()
+
     SecondaryPageScaffold(
+        topBlurProgress = if (!loading && flight != null) rememberTopBlurProgress(scrollState) else { { 0f } },
         title = stringResource(R.string.record_detail_title),
         onBack = { navigator.pop() },
         actions = {
@@ -105,7 +110,8 @@ fun RecordDetailScreen(
             }
             else -> DetailContent(
                 flight = checkNotNull(flight),
-                contentPadding = padding
+                contentPadding = padding,
+                scrollState = scrollState
             )
         }
     }
@@ -144,12 +150,13 @@ fun RecordDetailScreen(
 @Composable
 private fun DetailContent(
     flight: Flight,
-    contentPadding: androidx.compose.foundation.layout.PaddingValues
+    contentPadding: androidx.compose.foundation.layout.PaddingValues,
+    scrollState: ScrollState
 ) {
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState)
             .padding(contentPadding)
             .padding(vertical = 4.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)

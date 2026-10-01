@@ -1,5 +1,6 @@
 package com.risediary.app.ui.backup
 
+import com.risediary.app.ui.components.rememberTopBlurProgress
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -97,14 +98,17 @@ fun BackupRestoreScreen(
         }
     }
 
+    val scrollState = rememberScrollState()
+
     SecondaryPageScaffold(
+        topBlurProgress = rememberTopBlurProgress(scrollState),
         title = stringResource(R.string.settings_backup),
         onBack = { navigator.pop() },
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scrollState)
                 .padding(padding),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {

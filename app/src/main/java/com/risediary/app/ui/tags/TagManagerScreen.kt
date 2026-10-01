@@ -1,5 +1,7 @@
 package com.risediary.app.ui.tags
 
+import com.risediary.app.ui.components.rememberTopBlurProgress
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.tween
@@ -123,7 +125,10 @@ fun TagManagerScreen(
         }
     }
 
+    val listState = rememberLazyListState()
+
     SecondaryPageScaffold(
+        topBlurProgress = rememberTopBlurProgress(listState),
         title = stringResource(R.string.settings_manage_tags),
         onBack = { navigator.pop() },
         floatingActionButton = { backdrop ->
@@ -137,130 +142,123 @@ fun TagManagerScreen(
             )
         }
     ) { padding ->
-        Column(modifier = Modifier.fillMaxSize()) {
-            Text(
-                stringResource(R.string.tag_manager_instructions),
-                style = MiuixTheme.textStyles.body1,
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                modifier = Modifier.padding(
-                    start = padding.calculateLeftPadding(LayoutDirection.Ltr) + 4.dp,
-                    top = padding.calculateTopPadding(),
-                    end = padding.calculateRightPadding(LayoutDirection.Ltr) + 4.dp
-                )
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-
-            LazyColumn(
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth(),
-                contentPadding = PaddingValues(
-                    start = padding.calculateLeftPadding(LayoutDirection.Ltr),
-                    end = padding.calculateRightPadding(LayoutDirection.Ltr),
-                    bottom = padding.calculateBottomPadding()
-                ),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                itemsIndexed(displayedTags, key = { _, tag -> tag.id }) { index, tag ->
-                    val isDragged = tag.id == draggedTagId
-                    val placementModifier =
-                        if (isDragged) Modifier else Modifier.animateItem()
-                    RiseCard(
+        LazyColumn(
+            state = listState,
+            modifier = Modifier
+                .fillMaxSize(),
+            contentPadding = padding,
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            item(key = "instructions") {
+                Column {
+                    Text(
+                        stringResource(R.string.tag_manager_instructions),
+                        style = MiuixTheme.textStyles.body1,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                        modifier = Modifier.padding(horizontal = 4.dp)
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                }
+            }
+            itemsIndexed(displayedTags, key = { _, tag -> tag.id }) { index, tag ->
+                val isDragged = tag.id == draggedTagId
+                val placementModifier =
+                    if (isDragged) Modifier else Modifier.animateItem()
+                RiseCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .then(placementModifier)
+                        .onGloballyPositioned { coordinates ->
+                            itemExtentPx = coordinates.size.height.toFloat() +
+                                with(density) { 12.dp.toPx() }
+                        }
+                        .zIndex(if (isDragged) 1f else 0f)
+                        .graphicsLayer {
+                            if (isDragged) {
+                                translationY = dragOffsetY
+                                scaleX = 1.01f
+                                scaleY = 1.01f
+                                shadowElevation = 6.dp.toPx()
+                            }
+                        }
+                ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
                         modifier = Modifier
-                            .fillMaxWidth()
-                            .then(placementModifier)
-                            .onGloballyPositioned { coordinates ->
-                                itemExtentPx = coordinates.size.height.toFloat() +
-                                    with(density) { 12.dp.toPx() }
-                            }
-                            .zIndex(if (isDragged) 1f else 0f)
-                            .graphicsLayer {
-                                if (isDragged) {
-                                    translationY = dragOffsetY
-                                    scaleX = 1.01f
-                                    scaleY = 1.01f
-                                    shadowElevation = 6.dp.toPx()
-                                }
-                            }
-                    ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(16.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Box(
-                            modifier = Modifier
-                                .size(44.dp)
-                                .background(
-                                    MiuixTheme.colorScheme.primary.copy(alpha = 0.09f),
-                                    CircleShape
+                            .size(44.dp)
+                            .background(
+                                MiuixTheme.colorScheme.primary.copy(alpha = 0.09f),
+                                CircleShape
+                            )
+                            .pointerInput(tag.id) {
+                                detectDragGesturesAfterLongPress(
+                                    onDragStart = {
+                                        settleJob?.cancel()
+                                        draggedTagId = tag.id
+                                        dragOffsetY = 0f
+                                    },
+                                    onDrag = { change, amount ->
+                                        change.consume()
+                                        dragOffsetY = reorderByDragOffset(
+                                            items = displayedTags,
+                                            draggedItem = tag,
+                                            dragOffsetY = dragOffsetY + amount.y,
+                                            itemExtentPx = itemExtentPx
+                                        )
+                                    },
+                                    onDragEnd = ::finishDragging,
+                                    onDragCancel = ::finishDragging
                                 )
-                                .pointerInput(tag.id) {
-                                    detectDragGesturesAfterLongPress(
-                                        onDragStart = {
-                                            settleJob?.cancel()
-                                            draggedTagId = tag.id
-                                            dragOffsetY = 0f
-                                        },
-                                        onDrag = { change, amount ->
-                                            change.consume()
-                                            dragOffsetY = reorderByDragOffset(
-                                                items = displayedTags,
-                                                draggedItem = tag,
-                                                dragOffsetY = dragOffsetY + amount.y,
-                                                itemExtentPx = itemExtentPx
-                                            )
-                                        },
-                                        onDragEnd = ::finishDragging,
-                                        onDragCancel = ::finishDragging
-                                    )
-                                },
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Icon(
-                                AppIcons.DragHandle,
-                                contentDescription = stringResource(R.string.cd_drag_reorder),
-                                tint = MiuixTheme.colorScheme.primary
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Box(
-                            modifier = Modifier
-                                .size(22.dp)
-                                .background(tag.color.toComposeColor(), CircleShape)
+                            },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            AppIcons.DragHandle,
+                            contentDescription = stringResource(R.string.cd_drag_reorder),
+                            tint = MiuixTheme.colorScheme.primary
                         )
-                        Spacer(modifier = Modifier.width(12.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                tag.name,
-                                style = MiuixTheme.textStyles.title4,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Text(
-                                stringResource(R.string.tag_manager_sort_order, index + 1),
-                                style = MiuixTheme.textStyles.body2,
-                                color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                            )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Box(
+                        modifier = Modifier
+                            .size(22.dp)
+                            .background(tag.color.toComposeColor(), CircleShape)
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            tag.name,
+                            style = MiuixTheme.textStyles.title4,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            stringResource(R.string.tag_manager_sort_order, index + 1),
+                            style = MiuixTheme.textStyles.body2,
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                        )
+                    }
+                    IconButton(
+                        onClick = {
+                            editingTag = tag
+                            showEditor = true
                         }
-                        IconButton(
-                            onClick = {
-                                editingTag = tag
-                                showEditor = true
-                            }
-                        ) {
-                            Icon(AppIcons.Edit, contentDescription = stringResource(R.string.action_edit))
-                        }
-                        IconButton(onClick = { deleteTarget = tag }) {
-                            Icon(
-                                AppIcons.Delete,
-                                contentDescription = stringResource(R.string.action_delete),
-                                tint = MiuixTheme.colorScheme.error
-                            )
-                        }
-                        }
+                    ) {
+                        Icon(AppIcons.Edit, contentDescription = stringResource(R.string.action_edit))
+                    }
+                    IconButton(onClick = { deleteTarget = tag }) {
+                        Icon(
+                            AppIcons.Delete,
+                            contentDescription = stringResource(R.string.action_delete),
+                            tint = MiuixTheme.colorScheme.error
+                        )
+                    }
                     }
                 }
-                item { Spacer(modifier = Modifier.height(80.dp)) }
             }
+            item { Spacer(modifier = Modifier.height(80.dp)) }
         }
     }
 

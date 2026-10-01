@@ -5,6 +5,8 @@
  */
 package com.risediary.app.ui.about
 
+import com.risediary.app.ui.components.rememberTopBlurProgress
+import com.risediary.app.ui.components.PageTopBlurLayout
 import android.os.Build
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
@@ -112,7 +114,19 @@ fun AboutScreen(
     val enableShader = isRuntimeShaderSupported()
     val effectBackground = enableShader && Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    PageTopBlurLayout(
+        progress = rememberTopBlurProgress(lazyListState),
+        topBarHeight = 60.dp,
+        fadeHeight = 24.dp,
+        overlay = {
+            PageTopBar(
+                title = stringResource(R.string.about_title),
+                onBack = { navigator.pop() },
+                backdrop = pageBackdrop,
+                titleAlpha = { titleAlpha }
+            )
+        }
+    ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -268,12 +282,7 @@ fun AboutScreen(
             }
         }
 
-        PageTopBar(
-            title = stringResource(R.string.about_title),
-            onBack = { navigator.pop() },
-            backdrop = pageBackdrop,
-            titleAlpha = { titleAlpha }
-        )
+
 
         Box(
             modifier = Modifier

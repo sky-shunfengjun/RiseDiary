@@ -1,5 +1,6 @@
 package com.risediary.app.ui.settings
 
+import com.risediary.app.ui.components.rememberTopBlurProgress
 import android.content.Context
 import android.content.ContextWrapper
 import androidx.compose.foundation.layout.Arrangement
@@ -54,14 +55,17 @@ fun AppLockSettingsScreen(
     val backgroundLockMode by vm.backgroundLockMode.collectAsStateWithLifecycle()
     var showDisableDialog by remember { mutableStateOf(false) }
 
+    val scrollState = rememberScrollState()
+
     SecondaryPageScaffold(
+        topBlurProgress = rememberTopBlurProgress(scrollState),
         title = stringResource(R.string.settings_app_lock),
         onBack = { navigator.pop() }
     ) { contentPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scrollState)
                 .padding(contentPadding),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {

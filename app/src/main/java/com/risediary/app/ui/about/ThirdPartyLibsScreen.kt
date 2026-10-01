@@ -5,6 +5,8 @@
  */
 package com.risediary.app.ui.about
 
+import com.risediary.app.ui.components.rememberTopBlurProgress
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -38,7 +40,9 @@ private val thirdPartyLibs = listOf(
     ThirdPartyLib("Jetpack Compose", "https://developer.android.com/jetpack/compose"),
     ThirdPartyLib("Miuix", "https://github.com/YuKongA/miuix"),
     ThirdPartyLib("AndroidLiquidGlass", "https://github.com/Kyant0/AndroidLiquidGlass"),
-    ThirdPartyLib("Navigation3", "https://developer.android.com/jetpack/androidx/releases/navigation3"),
+    ThirdPartyLib("Miuix Nav", "https://github.com/compose-miuix-ui/miuix"),
+    ThirdPartyLib("HyperIsland", "https://github.com/1812z/HyperIsland"),
+    ThirdPartyLib("kotlinx.serialization", "https://github.com/Kotlin/kotlinx.serialization"),
     ThirdPartyLib("Room", "https://developer.android.com/jetpack/androidx/releases/room"),
     ThirdPartyLib("DataStore", "https://developer.android.com/jetpack/androidx/releases/datastore"),
     ThirdPartyLib("Hilt", "https://dagger.dev/hilt/"),
@@ -54,11 +58,15 @@ fun ThirdPartyLibsScreen() {
     val navigator = LocalNavigator.current
     val uriHandler = LocalUriHandler.current
 
+    val listState = rememberLazyListState()
+
     SecondaryPageScaffold(
+        topBlurProgress = rememberTopBlurProgress(listState),
         title = stringResource(R.string.about_libraries_title),
         onBack = { navigator.pop() }
     ) { padding ->
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxSize()
                 .scrollEndHaptic()

@@ -1,5 +1,7 @@
 package com.risediary.app.ui.onboarding
 
+import androidx.compose.foundation.ScrollState
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -22,7 +24,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -70,6 +71,11 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.text.DecimalFormat
 import com.risediary.app.ui.icons.AppIcons
+
+internal val LocalOnboardingScrollState = staticCompositionLocalOf<ScrollState> {
+    error("Onboarding scroll state not provided")
+}
+internal val LocalOnboardingContentTop = staticCompositionLocalOf { 0.dp }
 
 @Composable
 internal fun CockpitBackdrop(
@@ -231,7 +237,8 @@ internal fun SetupPage(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(LocalOnboardingScrollState.current)
+            .padding(top = LocalOnboardingContentTop.current)
             .padding(horizontal = 4.dp, vertical = 14.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(14.dp)

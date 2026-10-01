@@ -1,5 +1,7 @@
 package com.risediary.app.ui.length
 
+import com.risediary.app.ui.components.rememberTopBlurProgress
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -71,7 +73,10 @@ fun LengthHistoryScreen(
     var showEditor by remember { mutableStateOf(false) }
     var deleteTarget by remember { mutableStateOf<LengthRecord?>(null) }
 
+    val listState = rememberLazyListState()
+
     SecondaryPageScaffold(
+        topBlurProgress = rememberTopBlurProgress(listState),
         title = stringResource(R.string.home_length_title),
         onBack = { navigator.pop() },
         floatingActionButton = { backdrop ->
@@ -87,6 +92,7 @@ fun LengthHistoryScreen(
         reserveFloatingActionButtonSpace = false
     ) { innerPadding ->
         LazyColumn(
+            state = listState,
             modifier = Modifier
                 .fillMaxSize(),
             contentPadding = PaddingValues(

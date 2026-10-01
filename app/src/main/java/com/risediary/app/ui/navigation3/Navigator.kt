@@ -8,13 +8,13 @@
 package com.risediary.app.ui.navigation3
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.saveable.Saver
-import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.navigation3.runtime.NavKey
+import top.yukonga.miuix.kmp.nav.core.NavBackStack
+import top.yukonga.miuix.kmp.nav.core.navBackStackOf
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.Json
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
@@ -23,46 +23,52 @@ import kotlinx.coroutines.flow.SharedFlow
  * Simple navigation helper that owns a back stack.
  */
 class Navigator(
-    initialKey: NavKey
+    initialKey: Route
 ) {
-    val backStack: SnapshotStateList<NavKey> = mutableStateListOf(initialKey)
+    val backStack: NavBackStack = navBackStackOf(initialKey)
 
     private val resultBus = mutableMapOf<String, MutableSharedFlow<Any>>()
 
-    fun push(key: NavKey) {
-        // Guard against double-tap pushing the exact same destination twice.
-        if (backStack.lastOrNull() == key) return
-        backStack.add(key)
-    }
-
-    fun replace(key: NavKey) {
-        if (backStack.isNotEmpty()) {
-            backStack[backStack.lastIndex] = key
+    fun push(key: Route) {
+        val existingIndex = backStack.indexOf(key)
+        if (existingIndex >= 0) {
+            // miuix-nav keys identify saved state and ViewModels. Reuse that
+            // entry instead of creating a second page with the same identity.
+            while (backStack.lastIndex > existingIndex) backStack.removeAt(backStack.lastIndex)
         } else {
             backStack.add(key)
         }
     }
 
-    fun replaceAll(keys: List<NavKey>) {
-        if (keys.isEmpty()) return
-        if (backStack.isNotEmpty()) {
-            backStack.clear()
-            backStack.addAll(keys)
+    fun replace(key: Route) {
+        if (backStack.contains(key)) {
+            push(key)
+            return
         }
+        if (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
+        push(key)
+    }
+
+    fun replaceAll(keys: List<Route>) {
+        if (keys.isEmpty()) return
+        val root = backStack.first() as Route
+        val uniqueKeys = (listOf(root) + keys).distinct()
+        backStack.clear()
+        backStack.addAll(uniqueKeys)
     }
 
     fun pop() {
-        backStack.removeLastOrNull()
+        if (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
     }
 
-    fun popUntil(predicate: (NavKey) -> Boolean) {
-        while (backStack.isNotEmpty() && !predicate(backStack.last())) {
+    fun popUntil(predicate: (Route) -> Boolean) {
+        while (backStack.size > 1 && !predicate(backStack.last() as Route)) {
             backStack.removeAt(backStack.lastIndex)
         }
     }
 
-    fun current(): NavKey? {
-        return backStack.lastOrNull()
+    fun current(): Route {
+        return backStack.last() as Route
     }
 
     fun backStackSize(): Int {
@@ -88,20 +94,22 @@ class Navigator(
     }
 
     companion object {
-        val Saver: Saver<Navigator, Any> = listSaver(save = { navigator ->
-            navigator.backStack.toList()
-        }, restore = { savedList ->
-            val initialKey = savedList.firstOrNull() ?: Route.Main
-            val navigator = Navigator(initialKey)
-            navigator.backStack.clear()
-            navigator.backStack.addAll(savedList)
-            navigator
-        })
+        private val json = Json { ignoreUnknownKeys = true }
+        private val routesSerializer = ListSerializer(Route.serializer())
+        val Saver: Saver<Navigator, String> = Saver(
+            save = { navigator ->
+                json.encodeToString(routesSerializer, navigator.backStack.map { it as Route })
+            },
+            restore = { encoded ->
+                val routes = json.decodeFromString(routesSerializer, encoded)
+                Navigator(Route.Main).apply { replaceAll(routes) }
+            }
+        )
     }
 }
 
 @Composable
-fun rememberNavigator(startRoute: NavKey): Navigator {
+fun rememberNavigator(startRoute: Route): Navigator {
     return rememberSaveable(startRoute, saver = Navigator.Saver) {
         Navigator(startRoute)
     }

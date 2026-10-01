@@ -1,5 +1,10 @@
 package com.risediary.app.ui.records
 
+import com.risediary.app.ui.components.rememberTopBlurProgress
+import com.risediary.app.ui.components.PageTopBlurLayout
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import com.risediary.app.util.formatNaturalDuration
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -101,108 +106,120 @@ fun RecordsScreen(
     val undoAction = stringResource(R.string.action_undo)
 
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
-    Column(modifier = Modifier.fillMaxSize()) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(
-                    start = 20.dp,
-                    top = statusBarTop + 16.dp,
-                    end = 20.dp,
-                    bottom = 16.dp
-                )
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(
-                    text = stringResource(R.string.records_title),
-                    style = MiuixTheme.textStyles.title1.copy(
-                        fontSize = 30.sp,
-                        fontWeight = FontWeight.SemiBold
-                    ),
-                    color = MiuixTheme.colorScheme.onSurface,
-                    modifier = Modifier.weight(1f)
-                )
-                IconButton(onClick = { showFilterMenu = true }) {
-                    Icon(
-                        AppIcons.Filter,
-                        contentDescription = stringResource(R.string.records_filter),
-                        tint =
-                            if (hasActiveFilter) MiuixTheme.colorScheme.primary
-                            else MiuixTheme.colorScheme.onSurfaceVariantActions
-                    )
-                }
-            }
-            OverlayListPopup(
-                show = showFilterMenu,
-                onDismissRequest = { showFilterMenu = false },
-                alignment = PopupPositionProvider.Align.End
-            ) {
-                ListPopupColumn {
-                    FilterMenuRow(
-                        label = stringResource(R.string.records_filter_all_tags),
-                        icon = AppIcons.List,
-                        selected = viewModel.selectedTag == null,
-                        onClick = {
-                            viewModel.filterByTag(null)
-                            showFilterMenu = false
-                        }
-                    )
-                    availableTagNames.forEach { tag ->
-                        FilterMenuRow(
-                            label = tag,
-                            icon = AppIcons.LocalOffer,
-                            selected = viewModel.selectedTag == tag,
-                            onClick = {
-                                viewModel.filterByTag(tag)
-                                showFilterMenu = false
-                            }
+    val listState = rememberLazyListState()
+    val density = LocalDensity.current
+    var headerHeight by remember(statusBarTop, density) { mutableStateOf(statusBarTop + 84.dp) }
+    val todayLabel = stringResource(R.string.records_today)
+    val yesterdayLabel = stringResource(R.string.records_yesterday)
+    val grouped = remember(flights, viewModel.userZoneId, todayLabel, yesterdayLabel) {
+        groupByDate(flights, viewModel.userZoneId, todayLabel, yesterdayLabel)
+    }
+    val blurProgress = rememberTopBlurProgress(listState)
+    PageTopBlurLayout(
+        progress = { if (grouped.isEmpty()) 0f else blurProgress() },
+        topBarHeight = headerHeight - statusBarTop,
+        fadeHeight = 24.dp,
+        overlay = {
+            Column(Modifier.fillMaxWidth().onSizeChanged {
+                headerHeight = with(density) { it.height.toDp() }
+            }) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            start = 20.dp,
+                            top = statusBarTop + 16.dp,
+                            end = 20.dp,
+                            bottom = 16.dp
                         )
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(
+                            text = stringResource(R.string.records_title),
+                            style = MiuixTheme.textStyles.title1.copy(
+                                fontSize = 30.sp,
+                                fontWeight = FontWeight.SemiBold
+                            ),
+                            color = MiuixTheme.colorScheme.onSurface,
+                            modifier = Modifier.weight(1f)
+                        )
+                        IconButton(onClick = { showFilterMenu = true }) {
+                            Icon(
+                                AppIcons.Filter,
+                                contentDescription = stringResource(R.string.records_filter),
+                                tint =
+                                    if (hasActiveFilter) MiuixTheme.colorScheme.primary
+                                    else MiuixTheme.colorScheme.onSurfaceVariantActions
+                            )
+                        }
                     }
-                    FilterMenuRow(
-                        label =
-                            if (viewModel.startDate == null) {
-                                stringResource(R.string.records_pick_date_range)
-                            } else {
-                                stringResource(
-                                    R.string.records_date_range_format,
-                                    viewModel.startDate.toString(),
-                                    viewModel.endDate.toString()
+                    OverlayListPopup(
+                        show = showFilterMenu,
+                        onDismissRequest = { showFilterMenu = false },
+                        alignment = PopupPositionProvider.Align.End
+                    ) {
+                        ListPopupColumn {
+                            FilterMenuRow(
+                                label = stringResource(R.string.records_filter_all_tags),
+                                icon = AppIcons.List,
+                                selected = viewModel.selectedTag == null,
+                                onClick = {
+                                    viewModel.filterByTag(null)
+                                    showFilterMenu = false
+                                }
+                            )
+                            availableTagNames.forEach { tag ->
+                                FilterMenuRow(
+                                    label = tag,
+                                    icon = AppIcons.LocalOffer,
+                                    selected = viewModel.selectedTag == tag,
+                                    onClick = {
+                                        viewModel.filterByTag(tag)
+                                        showFilterMenu = false
+                                    }
                                 )
-                            },
-                        icon = AppIcons.CalendarMonth,
-                        selected = viewModel.startDate != null,
-                        onClick = {
-                            showDatePicker = true
-                            showFilterMenu = false
-                        }
-                    )
-                    if (hasActiveFilter) {
-                    FilterMenuRow(
-                        label = stringResource(R.string.records_clear_filter),
-                        icon = AppIcons.Close,
-                            onClick = {
-                                viewModel.filterByTag(null)
-                                viewModel.setDateRange(null, null)
-                                showFilterMenu = false
                             }
-                        )
+                            FilterMenuRow(
+                                label =
+                                    if (viewModel.startDate == null) {
+                                        stringResource(R.string.records_pick_date_range)
+                                    } else {
+                                        stringResource(
+                                            R.string.records_date_range_format,
+                                            viewModel.startDate.toString(),
+                                            viewModel.endDate.toString()
+                                        )
+                                    },
+                                icon = AppIcons.CalendarMonth,
+                                selected = viewModel.startDate != null,
+                                onClick = {
+                                    showDatePicker = true
+                                    showFilterMenu = false
+                                }
+                            )
+                            if (hasActiveFilter) {
+                            FilterMenuRow(
+                                label = stringResource(R.string.records_clear_filter),
+                                icon = AppIcons.Close,
+                                    onClick = {
+                                        viewModel.filterByTag(null)
+                                        viewModel.setDateRange(null, null)
+                                        showFilterMenu = false
+                                    }
+                                )
+                            }
+                        }
                     }
                 }
+                Spacer(modifier = Modifier.height(12.dp))
             }
         }
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        val todayLabel = stringResource(R.string.records_today)
-        val yesterdayLabel = stringResource(R.string.records_yesterday)
-        val grouped = remember(flights, viewModel.userZoneId, todayLabel, yesterdayLabel) {
-            groupByDate(flights, viewModel.userZoneId, todayLabel, yesterdayLabel)
-        }
+    ) {
         if (grouped.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Box(modifier = Modifier.fillMaxSize().padding(top = headerHeight), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(
                         AppIcons.FlightTakeoff,
@@ -219,8 +236,9 @@ fun RecordsScreen(
             }
         } else {
             LazyColumn(
-                modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(start = 20.dp, end = 20.dp),
+                state = listState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 20.dp, top = headerHeight, end = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 grouped.forEach { group ->

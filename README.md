@@ -78,8 +78,8 @@
 
 | 类别     | 技术                                                               |
 | -------- | ------------------------------------------------------------------ |
-| 语言     | Kotlin 2.4.10                                                      |
-| UI       | Jetpack Compose（BOM 2026.06.01）+ miuix 0.9.3（HyperOS 风格控件） |
+| 语言     | Kotlin 2.4.20                                                      |
+| UI       | Jetpack Compose（BOM 2026.09.00）+ miuix 0.9.4（HyperOS 风格控件） |
 | 液态玻璃 | Kyant Backdrop 1.0.0 + Capsule 2.1.1                               |
 | 架构     | MVVM（ViewModel + Flow + Repository）                              |
 | 依赖注入 | Hilt 2.60.1                                                        |
@@ -101,7 +101,7 @@
 构建方式：
 
 1. 使用 Android Studio 打开项目根目录，等待 Gradle 同步完成后直接运行；
-2. 或使用命令行（需要 JDK 17 及以上；单元测试任务使用 JDK 26 工具链）：
+2. 或使用命令行（需要 JDK 21；可使用 Android Studio 自带的 JBR，单元测试也使用 Java 21 工具链）：
 
 ```powershell
 # 调试版（包名 com.risediary.app.dev）

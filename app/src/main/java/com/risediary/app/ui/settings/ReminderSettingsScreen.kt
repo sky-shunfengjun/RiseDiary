@@ -1,5 +1,6 @@
 package com.risediary.app.ui.settings
 
+import com.risediary.app.ui.components.rememberTopBlurProgress
 import android.Manifest
 import android.app.ActivityManager
 import android.content.Context
@@ -195,14 +196,17 @@ fun ReminderSettingsScreen(
         }
     }
 
+    val scrollState = rememberScrollState()
+
     SecondaryPageScaffold(
+        topBlurProgress = rememberTopBlurProgress(scrollState),
         title = stringResource(R.string.settings_reminder_settings),
         onBack = { navigator.pop() }
     ) { contentPadding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scrollState)
                 .padding(contentPadding),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {

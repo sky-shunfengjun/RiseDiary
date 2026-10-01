@@ -1,5 +1,6 @@
 package com.risediary.app.ui.form
 
+import com.risediary.app.ui.components.rememberTopBlurProgress
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -133,6 +134,7 @@ fun RecordFormScreen(
     }
 
     SecondaryPageScaffold(
+        topBlurProgress = rememberTopBlurProgress(scrollState),
         title = if (flightId == null) {
             stringResource(R.string.form_new_record)
         } else {
