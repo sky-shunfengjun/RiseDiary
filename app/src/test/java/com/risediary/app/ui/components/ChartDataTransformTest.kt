@@ -10,6 +10,19 @@ import org.junit.Test
 
 class ChartDataTransformTest {
 
+    @Test fun calendarTimezoneControlsBothTrendAndLengthLabels() {
+        val timestamp = java.time.Instant.parse("2026-10-01T18:00:00Z").toEpochMilli()
+        val records = listOf(flight(id = 1, time = timestamp, volume = 2f))
+        val shanghai = java.time.ZoneId.of("Asia/Shanghai")
+        val losAngeles = java.time.ZoneId.of("America/Los_Angeles")
+        assertEquals("10/2", buildTrendChartPoints(records, true, Locale.US, shanghai).single().axisLabel)
+        assertEquals("10/1", buildTrendChartPoints(records, true, Locale.US, losAngeles).single().axisLabel)
+        val lengths = listOf(LengthRecord(1, timestamp, 5f, 10f))
+        assertEquals("10/2", buildLengthChartPoints(lengths, Locale.US, shanghai).single().axisLabel)
+        assertEquals("10/1", buildLengthChartPoints(lengths, Locale.US, losAngeles).single().axisLabel)
+    }
+
+
     @Test
     fun trendPoints_keepZero_sortByTime_andExcludeOnlyMissingOrInvalidValues() {
         val base = localNoon(2026, Calendar.JULY, 25)

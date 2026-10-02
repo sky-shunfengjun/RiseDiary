@@ -9,6 +9,9 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.SystemBarStyle
 import androidx.activity.viewModels
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.CompositionLocalProvider
+import com.risediary.app.util.LocalCalendarContext
+import com.risediary.app.ui.components.LocalCalendarEnvironment
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
@@ -31,6 +34,8 @@ class MainActivity : FragmentActivity() {
 
     @Inject
     lateinit var preferences: UserPreferences
+
+    @Inject lateinit var calendar: LocalCalendarContext
 
     private val appGateViewModel: AppGateViewModel by viewModels()
     private val _notificationDestination =
@@ -75,6 +80,8 @@ class MainActivity : FragmentActivity() {
                     }
                 )
             }
+            val calendarSnapshot by calendar.state.collectAsStateWithLifecycle()
+            CompositionLocalProvider(LocalCalendarEnvironment provides calendarSnapshot) {
             RiseDiaryTheme(themeMode = themeMode) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
@@ -94,8 +101,11 @@ class MainActivity : FragmentActivity() {
         }
     }
 
+    }
+
     override fun onStart() {
         super.onStart()
+        calendar.setForeground(true)
         appGateViewModel.onAppReturnedToForeground()
     }
 
@@ -108,6 +118,7 @@ class MainActivity : FragmentActivity() {
     override fun onStop() {
         if (!isChangingConfigurations) {
             appGateViewModel.onAppMovedToBackground()
+            calendar.setForeground(false)
         }
         super.onStop()
     }

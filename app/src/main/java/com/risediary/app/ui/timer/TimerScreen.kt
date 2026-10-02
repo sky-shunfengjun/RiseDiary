@@ -78,6 +78,7 @@ fun TimerScreen(
     val navigator = LocalNavigator.current
     val context = LocalContext.current
     val session by viewModel.session.collectAsStateWithLifecycle()
+    val persistenceError by viewModel.persistenceError.collectAsStateWithLifecycle()
     var showFinishConfirm by remember { mutableStateOf(false) }
     var showLeaveConfirm by remember { mutableStateOf(false) }
 
@@ -169,6 +170,12 @@ fun TimerScreen(
                 .padding(innerPadding)
                 .background(glowBrush)
         ) {
+            if (persistenceError) {
+                Column(Modifier.align(Alignment.TopCenter), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(stringResource(R.string.timer_error_save), color = MiuixTheme.colorScheme.error)
+                    TextButton(text = stringResource(R.string.action_retry), onClick = viewModel::retryPersistence)
+                }
+            }
             TimerInstrument(
                 session = session,
                 modifier = Modifier

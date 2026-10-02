@@ -57,10 +57,6 @@ import top.yukonga.miuix.kmp.basic.rememberPullToRefreshState
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import com.risediary.app.ui.icons.AppIcons
-import kotlinx.coroutines.delay
-
-/** 返回主页后延迟再刷新，让 pop 转场动画先平稳结束。 */
-private const val RETURN_REFRESH_SETTLE_MILLIS = 250L
 
 @Composable
 fun HomeScreen(
@@ -69,36 +65,19 @@ fun HomeScreen(
     val navigator = LocalNavigator.current
     val scrollState = rememberScrollState()
 
-    // Refresh on first composition (with spinner) and whenever we return to the
-    // main page (silently, after the pop transition settles, so the reload work
-    // does not compete with the animation frame budget).
-    var hasLoadedOnce by rememberSaveable { mutableStateOf(false) }
-    val currentRoute = navigator.current()
-    LaunchedEffect(currentRoute) {
-        if (currentRoute is Route.Main) {
-            if (!hasLoadedOnce) {
-                vm.refresh()
-                hasLoadedOnce = true
-            } else {
-                delay(RETURN_REFRESH_SETTLE_MILLIS)
-                vm.refresh(silent = true)
-            }
-        }
-    }
-
     val username by vm.username.collectAsStateWithLifecycle()
-    val todayCount by vm.todayCount.collectAsStateWithLifecycle()
-    val weekCount by vm.weekCount.collectAsStateWithLifecycle()
-    val monthCount by vm.monthCount.collectAsStateWithLifecycle()
-    val totalCount by vm.totalCount.collectAsStateWithLifecycle()
-    val avgDuration by vm.avgDuration.collectAsStateWithLifecycle()
-    val maxDistance by vm.maxDistance.collectAsStateWithLifecycle()
-    val weekVol by vm.weekVolumeSum.collectAsStateWithLifecycle()
-    val lastWeek by vm.lastWeekCount.collectAsStateWithLifecycle()
+    val stats by vm.statistics.collectAsStateWithLifecycle()
+    val todayCount = stats.todayCount
+    val weekCount = stats.weekCount
+    val monthCount = stats.monthCount
+    val totalCount = stats.totalCount
+    val avgDuration = stats.avgDuration
+    val maxDistance = stats.maxDistance
+    val weekVol = stats.weekVolumeSum
+    val lastWeek = stats.lastWeekCount
     val dailyTipResId by vm.dailyTipResId.collectAsStateWithLifecycle()
-    val lastFlightDaysAgo by vm.lastFlightDaysAgo.collectAsStateWithLifecycle()
-    val averageIntervalDays by vm.averageIntervalDays.collectAsStateWithLifecycle()
-
+    val lastFlightDaysAgo = stats.lastFlightDaysAgo
+    val averageIntervalDays = stats.averageIntervalDays
     // Card ordering
     val cardOrderJson by vm.homeCardOrder.collectAsStateWithLifecycle()
     val cardVisibilityJson by vm.homeCardVisibility.collectAsStateWithLifecycle()
@@ -108,7 +87,7 @@ fun HomeScreen(
     var revealLowerCards by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(Unit) { revealLowerCards = true }
 
-    val todayStatus = remember(todayCount) { vm.getTodayStatus() }
+    val todayStatus = remember(todayCount) { TodayStatus(todayCount) }
     val todayStatusText = if (todayStatus.hasRecords) {
         stringResource(R.string.home_today_recorded, todayStatus.count)
     } else {
@@ -117,7 +96,9 @@ fun HomeScreen(
     val dateStr = SimpleDateFormat(
         stringResource(R.string.home_date_pattern),
         Locale.CHINESE
-    ).format(Date())
+    ).apply { timeZone = TimeZone.getTimeZone(stats.calendar.zoneId) }.format(
+        Date(stats.calendar.date.atStartOfDay(stats.calendar.zoneId).toInstant().toEpochMilli())
+    )
 
     val isRefreshing by vm.isRefreshing.collectAsStateWithLifecycle()
 
@@ -278,7 +259,7 @@ fun HomeScreen(
 
                 // === LOWER SECTION CARDS (dynamic order) ===
 
-                val heatmapData by vm.flightCountsByDay.collectAsStateWithLifecycle()
+                val heatmapData = stats.flightCountsByDay
 
                 orderedCards.forEachIndexed { index, cardId ->
                     AnimatedVisibility(
@@ -347,7 +328,7 @@ fun HomeScreen(
                             }
                         }
                         "length" -> {
-                            val lengthData by vm.lengthRecords.collectAsStateWithLifecycle()
+                            val lengthData = stats.lengthRecords
                             RiseCard(
                                 modifier = Modifier.fillMaxWidth(),
                                 onClick = { navigator.push(Route.LengthHistory) }
@@ -378,7 +359,7 @@ fun HomeScreen(
                             }
                         }
                         "trend", "distance" -> {
-                            val trendFlights by vm.trendFlights.collectAsStateWithLifecycle()
+                            val trendFlights = stats.trendFlights
                             val selectedTrend by vm.selectedTrend.collectAsStateWithLifecycle()
                             val isVolume = selectedTrend == "volume"
 

@@ -52,7 +52,8 @@ data class DownloadRecord(
     val release: GitHubRelease,
     val asset: GitHubAsset,
     val channel: UpdateChannel,
-    val verificationFailed: Boolean = false
+    val verificationFailed: Boolean = false,
+    val authorization: DownloadAuthorization? = null
 )
 
 sealed interface DownloadState {
@@ -66,7 +67,8 @@ sealed interface DownloadState {
 }
 
 enum class UpdateError {
-    CHECK, SETTINGS, DOWNLOAD, STORAGE, FILE_MISSING, INTEGRITY, INSTALL, PERMISSION, LINK
+    CHECK, SETTINGS, DOWNLOAD, STORAGE, FILE_MISSING, INTEGRITY, INSTALL, PERMISSION, LINK,
+    APK_UNAVAILABLE, RECHECK_REQUIRED
 }
 
 internal fun DownloadState.recordOrNull(): DownloadRecord? = when (this) {

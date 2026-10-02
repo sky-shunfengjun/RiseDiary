@@ -47,6 +47,8 @@ import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 import java.text.SimpleDateFormat
 import java.util.Date
+import java.util.TimeZone
+import com.risediary.app.ui.components.LocalCalendarEnvironment
 import java.util.Locale
 import com.risediary.app.ui.icons.AppIcons
 
@@ -114,7 +116,10 @@ private fun AchievementCard(
     accentColor: Color
 ) {
     val locale = LocalConfiguration.current.locales[0]
-    val dateFormat = remember(locale) { SimpleDateFormat("yyyy/MM/dd", locale) }
+    val calendar = LocalCalendarEnvironment.current
+    val dateFormat = remember(locale, calendar.zoneId) {
+        SimpleDateFormat("yyyy/MM/dd", locale).apply { timeZone = TimeZone.getTimeZone(calendar.zoneId) }
+    }
     Card(
         modifier = Modifier.fillMaxWidth(),
         cornerRadius = 24.dp,

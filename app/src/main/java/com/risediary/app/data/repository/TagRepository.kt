@@ -6,6 +6,7 @@ import com.risediary.app.data.dao.TagDao
 import com.risediary.app.data.entity.Tag
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
+import com.risediary.app.data.DataMaintenanceGate
 
 interface TagRepository {
     val allTags: Flow<List<Tag>>
@@ -22,11 +23,12 @@ interface TagRepository {
 
 class RoomTagRepository @Inject constructor(
     private val dao: TagDao,
-    private val database: AppDatabase
+    private val database: AppDatabase,
+    private val maintenanceGate: DataMaintenanceGate = DataMaintenanceGate()
 ) : TagRepository {
     override val allTags: Flow<List<Tag>> = dao.getAllFlow()
-    override suspend fun insert(tag: Tag): Long = dao.insert(tag)
-    override suspend fun update(tag: Tag) {
+    override suspend fun insert(tag: Tag): Long = maintenanceGate.write { dao.insert(tag) }
+    override suspend fun update(tag: Tag) = maintenanceGate.write {
         database.withTransaction {
             val previous = dao.getById(tag.id)
             dao.update(tag)
@@ -39,8 +41,11 @@ class RoomTagRepository @Inject constructor(
             }
         }
     }
-    override suspend fun updateAll(tags: List<Tag>) = dao.updateAll(tags)
-    override suspend fun delete(tag: Tag) = dao.delete(tag)
+    override suspend fun updateAll(tags: List<Tag>) = maintenanceGate.write { dao.updateAll(tags) }
+    override suspend fun delete(tag: Tag) = maintenanceGate.write {
+        maintenanceGate.requireCurrent(tag, dao.getById(tag.id))
+        dao.delete(tag)
+    }
     override suspend fun getAll(): List<Tag> = dao.getAll()
     override suspend fun getById(id: Long): Tag? = dao.getById(id)
     override suspend fun getByName(name: String): Tag? = dao.getByName(name)

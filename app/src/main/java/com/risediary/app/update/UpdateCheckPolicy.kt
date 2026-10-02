@@ -3,6 +3,7 @@ package com.risediary.app.update
 import java.io.IOException
 import java.time.Instant
 
+@kotlinx.serialization.Serializable
 enum class ReleaseChannel { STABLE, PREVIEW }
 internal data class UpdateCheckPolicy(val force: Boolean, val channel: ReleaseChannel)
 internal fun UpdateSettings.checkPolicy() = UpdateCheckPolicy(forceCheck, releaseChannel)

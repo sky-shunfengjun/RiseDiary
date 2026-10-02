@@ -7,6 +7,9 @@ import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import androidx.room.withTransaction
+import androidx.datastore.preferences.core.Preferences
+import com.risediary.app.data.HomeCardOrderPolicy
+import com.risediary.app.util.RecordValidation
 import com.risediary.app.data.AppDatabase
 import com.risediary.app.data.BackgroundLockMode
 import com.risediary.app.data.DefaultVolumeMode
@@ -72,13 +75,6 @@ data class SettingsSnapshot(
     val onboardingCompleted: Boolean
 )
 
-private data class AppLockSnapshot(
-    val enabled: Boolean,
-    val credential: String,
-    val attempts: Int,
-    val lockoutUntil: Long
-)
-
 @Singleton
 class BackupManager @Inject constructor(
     @ApplicationContext private val context: Context,
@@ -90,7 +86,7 @@ class BackupManager @Inject constructor(
         get() = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q
 
     fun defaultFilename(): String =
-        "RiseDiary_backup_${LocalDate.now(clock)}.zip"
+        "RiseDiary_backup_${LocalDate.now(clock.withZone(java.time.ZoneId.systemDefault()))}.zip"
 
     suspend fun exportToDownloads(): BackupResult = withContext(Dispatchers.IO) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
@@ -132,72 +128,78 @@ class BackupManager @Inject constructor(
         }.getOrElse { BackupResult.Failure("导出失败：${it.readableMessage()}", it) }
     }
 
-    suspend fun restoreFromUri(uri: Uri): BackupResult = withContext(Dispatchers.IO) {
-        val oldData = runCatching { snapshot() }.getOrElse {
-            return@withContext BackupResult.Failure("读取现有数据失败：${it.readableMessage()}", it)
-        }
-        val imported = runCatching {
-            val input = context.contentResolver.openInputStream(uri)
-                ?: error("无法读取所选文件")
-            input.use(::readBackup)
-        }.getOrElse {
-            return@withContext BackupResult.Failure("备份无效：${it.readableMessage()}", it)
-        }
+    private data class Preimage(val data: BackupData, val preferences: Preferences)
+    private var recoveryPreimage: Preimage? = null
+    val maintenanceState get() = preferences.maintenanceGate.state
 
-        try {
-            replaceDatabase(imported)
-            try {
-                applySettings(imported.settings)
-            } catch (settingsError: Throwable) {
-                replaceDatabase(oldData)
-                runCatching { applySettings(oldData.settings) }
-                throw IllegalStateException("设置恢复失败，原数据已还原", settingsError)
-            }
-            BackupResult.Success("数据恢复成功")
-        } catch (error: Throwable) {
-            BackupResult.Failure("恢复失败：${error.readableMessage()}", error)
-        }
+    suspend fun restoreFromUri(uri: Uri): BackupResult = withContext(Dispatchers.IO) {
+        val imported = runCatching {
+            val input = context.contentResolver.openInputStream(uri) ?: error("无法读取所选文件")
+            input.use(::readBackup)
+        }.getOrElse { return@withContext BackupResult.Failure("备份无效：${it.readableMessage()}", it) }
+        replaceAll(imported, clearLock = false)
     }
 
     suspend fun clearAll(): BackupResult = withContext(Dispatchers.IO) {
-        val oldData = runCatching { snapshot() }.getOrElse {
-            return@withContext BackupResult.Failure("读取现有数据失败：${it.readableMessage()}", it)
-        }
-        val oldAppLock = runCatching { readAppLock() }.getOrElse {
-            return@withContext BackupResult.Failure("读取应用锁设置失败：${it.readableMessage()}", it)
-        }
-        val cleared = BackupData(
-            flights = emptyList(),
-            lengthRecords = emptyList(),
-            tags = SeedData.defaultTags,
-            achievements = emptyList(),
-            settings = defaultSettings()
-        )
-        try {
-            replaceDatabase(cleared)
-            try {
-                applySettings(cleared.settings)
-                preferences.setAppLock(false, "")
-            } catch (settingsError: Throwable) {
-                replaceDatabase(oldData)
-                runCatching { applySettings(oldData.settings) }
-                runCatching { restoreAppLock(oldAppLock) }
-                throw IllegalStateException("设置清除失败，原数据已还原", settingsError)
-            }
-            BackupResult.Success("所有数据已清除")
-        } catch (error: Throwable) {
-            BackupResult.Failure("清除失败：${error.readableMessage()}", error)
-        }
+        replaceAll(BackupData(emptyList(), emptyList(), SeedData.defaultTags, emptyList(), defaultSettings()), true)
     }
 
-    private suspend fun snapshot(): BackupData = BackupData(
-        flights = database.flightDao().getAll(),
-        lengthRecords = database.lengthRecordDao().getAll(),
-        tags = database.tagDao().getAll(),
-        achievements = database.achievementDao().getAll(),
-        settings = readSettings()
-    )
+    private suspend fun replaceAll(replacement: BackupData, clearLock: Boolean): BackupResult = try {
+        preferences.maintenanceGate.maintenance {
+            val raw = preferences.rawSnapshot()
+            val original = Preimage(snapshotLocked(raw), raw)
+            recoveryPreimage = original
+            try {
+                replaceDatabase(replacement)
+                preferences.applySettingsForMaintenance(replacement.settings)
+                if (clearLock) preferences.clearAppLockForMaintenance()
+                recoveryPreimage = null
+                BackupResult.Success(if (clearLock) "所有数据已清除" else "数据恢复成功")
+            } catch (failure: Throwable) {
+                val rollback = runCatching { restorePreimage(original) }
+                if (rollback.isSuccess) {
+                    recoveryPreimage = null
+                    BackupResult.Failure("操作失败，已还原原数据：${failure.readableMessage()}", failure)
+                } else {
+                    preferences.maintenanceGate.requireRecovery()
+                    BackupResult.Failure("操作失败，原数据尚未完整还原。当前暂时只读，请重试还原。", rollback.exceptionOrNull())
+                }
+            }
+        }
+    } catch (failure: Throwable) { BackupResult.Failure("操作未完成：${failure.readableMessage()}", failure) }
 
+    suspend fun retryRecovery(): BackupResult = withContext(Dispatchers.IO) {
+        try {
+            preferences.maintenanceGate.maintenance(recovery = true) {
+                val original = checkNotNull(recoveryPreimage) { "没有待还原的操作" }
+                try {
+                    restorePreimage(original)
+                    recoveryPreimage = null
+                    BackupResult.Success("原数据已完整还原")
+                } catch (failure: Throwable) {
+                    preferences.maintenanceGate.requireRecovery()
+                    BackupResult.Failure("还原尚未完成，请稍后重试。", failure)
+                }
+            }
+        } catch (failure: Throwable) { BackupResult.Failure("还原尚未完成，请稍后重试。", failure) }
+    }
+
+    private suspend fun restorePreimage(original: Preimage) {
+        replaceDatabase(original.data)
+        preferences.restoreRaw(original.preferences)
+    }
+
+    private suspend fun snapshot(): BackupData = preferences.maintenanceGate.write {
+        snapshotLocked(preferences.rawSnapshot())
+    }
+
+    private suspend fun snapshotLocked(raw: Preferences): BackupData = database.withTransaction {
+        BackupData(
+            database.flightDao().getAll(), database.lengthRecordDao().getAll(),
+            database.tagDao().getAll(), database.achievementDao().getAll(),
+            preferences.settingsSnapshot(raw)
+        )
+    }
     private suspend fun replaceDatabase(data: BackupData) {
         database.withTransaction {
             database.flightDao().nuke()
@@ -209,44 +211,6 @@ class BackupManager @Inject constructor(
             data.tags.forEach { database.tagDao().insert(it) }
             data.achievements.forEach { database.achievementDao().insert(it) }
         }
-    }
-
-    private suspend fun readSettings(): SettingsSnapshot = SettingsSnapshot(
-        username = preferences.username.first(),
-        mlPerSpurt = preferences.mlPerSpurt.first(),
-        defaultVolumeMode = preferences.defaultVolumeMode.first(),
-        dailyReminderEnabled = preferences.dailyReminderEnabled.first(),
-        dailyReminderTime = preferences.dailyReminderTime.first(),
-        inactiveReminderEnabled = preferences.inactiveReminderEnabled.first(),
-        inactiveReminderDays = preferences.inactiveReminderDays.first(),
-        inactiveReminderTime = preferences.inactiveReminderTime.first(),
-        monthlyLengthReminderEnabled = preferences.monthlyLengthReminderEnabled.first(),
-        monthlyLengthReminderDay = preferences.monthlyLengthReminderDay.first(),
-        monthlyLengthReminderTime = preferences.monthlyLengthReminderTime.first(),
-        reminderSound = preferences.reminderSound.first(),
-        reminderVibration = preferences.reminderVibration.first(),
-        backgroundAutoLockEnabled = preferences.backgroundAutoLockEnabled.first(),
-        backgroundLockMode = preferences.backgroundLockMode.first(),
-        themeMode = preferences.themeMode.first(),
-        homeCardOrder = preferences.homeCardOrder.first(),
-        homeCardVisibility = preferences.homeCardVisibility.first(),
-        onboardingCompleted = preferences.onboardingCompleted.first()
-    )
-
-    private suspend fun readAppLock() = AppLockSnapshot(
-        enabled = preferences.appLockEnabled.first(),
-        credential = preferences.appLockPin.first(),
-        attempts = preferences.appLockAttempts.first(),
-        lockoutUntil = preferences.appLockoutUntil.first()
-    )
-
-    private suspend fun restoreAppLock(snapshot: AppLockSnapshot) {
-        preferences.setAppLock(snapshot.enabled, snapshot.credential)
-        preferences.setAppLockFailureState(snapshot.attempts, snapshot.lockoutUntil)
-    }
-
-    private suspend fun applySettings(settings: SettingsSnapshot) {
-        preferences.applySettingsSnapshot(settings)
     }
 
     private fun writeBackup(output: OutputStream, data: BackupData) {
@@ -331,7 +295,9 @@ class BackupManager @Inject constructor(
             achievements = BackupJsonCodec.parseAchievements(
                 entries.getValue(ACHIEVEMENTS).toUtf8()
             ),
-            settings = BackupJsonCodec.parseSettings(entries.getValue(SETTINGS).toUtf8())
+            settings = BackupJsonCodec.parseSettings(entries.getValue(SETTINGS).toUtf8()).let { settings ->
+                settings.copy(homeCardOrder = HomeCardOrderPolicy.normalizeStoredOrder(settings.homeCardOrder))
+            }
         ).also(::validate)
     }
 
@@ -348,8 +314,8 @@ class BackupManager @Inject constructor(
             require(
                 abs((flight.endTime - flight.startTime) / 1_000L - flight.durationSeconds) <= 1L
             ) { "飞行记录时间与时长不一致" }
-            require(flight.spurtCount?.let { it in 1..1_000 } != false) { "股数超出范围" }
-            require(flight.semenVolumeMl?.let { it in 0.1f..1_000f } != false) {
+            require(RecordValidation.validateStoredQuantity(flight.spurtCount, flight.semenVolumeMl) == null) { "射精量超出存储范围" }
+            require(flight.semenVolumeMl?.let { it.isFinite() && it > 0f && it <= 100_000f } != false) {
                 "射精量超出范围"
             }
             require(flight.spurtCount != null || flight.semenVolumeMl != null) {
@@ -368,7 +334,7 @@ class BackupManager @Inject constructor(
                     "标签数据无效"
                 }
             }
-            require(flight.moodNote.length <= 10_000) { "备注过长" }
+
             require(flight.createdAt > 0L && flight.updatedAt >= flight.createdAt) {
                 "飞行记录修改时间无效"
             }
@@ -382,7 +348,7 @@ class BackupManager @Inject constructor(
             require(it.recordDate > 0L) { "长度记录日期无效" }
             require(it.flaccidLengthCm in 0.1f..100f) { "疲软长度超出范围" }
             require(it.erectLengthCm in 0.1f..100f) { "勃起长度超出范围" }
-            require(it.note.length <= 10_000) { "长度备注过长" }
+
         }
 
         require(data.tags.map(Tag::id).distinct().size == data.tags.size) { "标签 ID 重复" }
@@ -433,8 +399,8 @@ class BackupManager @Inject constructor(
             "每月长度提醒时间无效"
         }
         require(settings.themeMode in setOf("system", "light", "dark")) { "主题值无效" }
-        JSONArray(settings.homeCardOrder)
-        JSONObject(settings.homeCardVisibility)
+        HomeCardOrderPolicy.normalizeStoredOrder(settings.homeCardOrder)
+        HomeCardOrderPolicy.validateVisibility(settings.homeCardVisibility)
     }
 
     private fun readEntryLimited(input: InputStream, limit: Int): ByteArray {

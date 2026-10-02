@@ -17,9 +17,9 @@ object SeedData {
         Tag(name = "其他", color = "#607D8B", sortOrder = 3),
     )
 
-    suspend fun initializeIfNeeded(tagDao: TagDao, preferences: UserPreferences) {
+    suspend fun initializeIfNeeded(tagDao: TagDao, preferences: UserPreferences) = preferences.maintenanceGate.write {
         val initialized = preferences.defaultTagsInitialized.first()
-        val onboardingCompleted = preferences.onboardingCompleted.first()
+        val onboardingCompleted = preferences.securitySettings.first().onboardingCompleted
         val tagCount = tagDao.count()
         if (shouldSeedDefaultTags(initialized, onboardingCompleted, tagCount)) {
             defaultTags.forEach { tagDao.insert(it) }

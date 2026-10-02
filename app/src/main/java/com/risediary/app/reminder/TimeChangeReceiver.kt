@@ -9,14 +9,18 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import com.risediary.app.util.LocalCalendarContext
 
 @AndroidEntryPoint
 class TimeChangeReceiver : BroadcastReceiver() {
     @Inject
     lateinit var scheduler: ReminderScheduler
+    @Inject
+    lateinit var calendar: LocalCalendarContext
 
     override fun onReceive(context: Context, intent: Intent?) {
         if (!isSupportedTimeChangeAction(intent?.action)) return
+        calendar.onSystemTimeChanged()
         val pendingResult = goAsync()
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {

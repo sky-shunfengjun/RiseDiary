@@ -571,4 +571,13 @@
     <string name="developer_reset_message">关闭强制检查、恢复正式版通道，并关闭开发菜单？</string>
     <string name="developer_reset_cancel">取消</string>
     <string name="developer_reset_confirm">恢复并关闭</string>
+    <string name="action_retry">重试</string>
+    <string name="app_lock_error_read">无法读取应用锁设置。请重试，原数据和设置仍保留。</string>
+    <string name="data_maintenance_readonly">正在恢复或清除数据，可以继续浏览，暂时不能保存。</string>
+    <string name="data_recovery_required">原数据尚未完整还原，暂时只读。请到备份页面重试还原。</string>
+    <string name="data_retry_recovery">重试还原原数据</string>
+    <string name="timer_error_save">计时状态尚未保存，请重试。</string>
+    <string name="update_error_apk_unavailable">此发行没有可确定的安装包，请重新检查或前往 GitHub 查看</string>
+    <string name="update_error_recheck">更新设置已变化或原任务缺少检查信息，请重新检查更新</string>
+    <string name="update_retry_original">重试原版本</string>
 </resources>

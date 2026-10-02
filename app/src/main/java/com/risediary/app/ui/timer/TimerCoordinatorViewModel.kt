@@ -6,7 +6,6 @@ import com.risediary.app.service.TimerController
 import com.risediary.app.service.TimerSession
 import com.risediary.app.service.TimerSessionStore
 import com.risediary.app.service.TimerStateHolder
-import com.risediary.app.service.TimerStatus
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -26,15 +25,11 @@ class TimerCoordinatorViewModel @Inject constructor(
 
     init {
         viewModelScope.launch {
-            val restored = store.load()
-            val current = stateHolder.state.value
-            val effective = if (current.status == TimerStatus.IDLE) {
-                stateHolder.set(restored)
-                restored
-            } else {
-                current
-            }
-            if (effective.isActive) controller.restore()
+            try {
+                val effective = stateHolder.restoreIfIdle(store::load)
+                if (effective.isActive) controller.restore()
+            } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+            catch (_: Exception) { stateHolder.setPersistenceError(true) }
         }
     }
 }

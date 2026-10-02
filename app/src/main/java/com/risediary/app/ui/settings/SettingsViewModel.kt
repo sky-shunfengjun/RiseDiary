@@ -32,6 +32,9 @@ class SettingsViewModel @Inject constructor(
 ) : ViewModel() {
     private var biometricRequestInProgress = false
     private var pendingOnboardingWrite: Job? = null
+    private var pendingOnboardingFailure: Throwable? = null
+    private class OnboardingWrite(val operation: suspend () -> Unit, var completed: Boolean = false)
+    private val onboardingWrites = mutableListOf<OnboardingWrite>()
     private var biometricResetJob: Job? = null
 
     // --- State holders ---
@@ -71,10 +74,10 @@ class SettingsViewModel @Inject constructor(
     val themeMode = prefs.themeMode.stateIn(viewModelScope, sharing, "system")
 
     // --- Setters ---
-    fun setUsername(value: String) = viewModelScope.launch { prefs.setUsername(value) }
-    fun setMlPerSpurt(value: Float) = viewModelScope.launch { prefs.setMlPerSpurt(value) }
+    fun setUsername(value: String) = launchSettingsWrite { prefs.setUsername(value) }
+    fun setMlPerSpurt(value: Float) = launchSettingsWrite { prefs.setMlPerSpurt(value) }
     fun setDefaultVolumeMode(mode: DefaultVolumeMode) =
-        viewModelScope.launch { prefs.setDefaultVolumeMode(mode) }
+        launchSettingsWrite { prefs.setDefaultVolumeMode(mode) }
 
     fun applyRecommendedReminders(enabled: Boolean, time: String = "22:00") =
         queueOnboardingWrite {
@@ -94,9 +97,12 @@ class SettingsViewModel @Inject constructor(
 
     suspend fun awaitOnboardingWrites() {
         pendingOnboardingWrite?.join()
+        if (onboardingWrites.any { !it.completed }) runPendingOnboardingWrites().join()
+        if (onboardingWrites.any { !it.completed }) {
+            throw IllegalStateException("设置未保存，请重试。", pendingOnboardingFailure)
+        }
     }
-
-    fun setReminderEnabled(type: ReminderType, enabled: Boolean) = viewModelScope.launch {
+    fun setReminderEnabled(type: ReminderType, enabled: Boolean) = launchSettingsWrite {
         when (type) {
             ReminderType.DAILY -> prefs.setDailyReminder(enabled)
             ReminderType.INACTIVE -> prefs.setInactiveReminder(enabled)
@@ -111,15 +117,15 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    fun setReminderTime(type: ReminderType, time: String) = viewModelScope.launch {
+    fun setReminderTime(type: ReminderType, time: String) = launchSettingsWrite {
         prefs.setReminderTime(type, time)
     }
 
-    fun setInactiveReminderDays(days: Int) = viewModelScope.launch {
+    fun setInactiveReminderDays(days: Int) = launchSettingsWrite {
         prefs.setInactiveReminderDays(days)
     }
 
-    fun setMonthlyLengthReminderDay(day: Int) = viewModelScope.launch {
+    fun setMonthlyLengthReminderDay(day: Int) = launchSettingsWrite {
         prefs.setMonthlyLengthReminderDay(day)
     }
 
@@ -127,7 +133,7 @@ class SettingsViewModel @Inject constructor(
 
     fun exactAlarmsAllowed(): Boolean = reminderScheduler.exactAlarmsAllowed()
 
-    fun refreshReminderSchedules() = viewModelScope.launch {
+    fun refreshReminderSchedules() = launchSettingsWrite {
         try {
             reminderScheduler.syncAll()
         } catch (cancelled: CancellationException) {
@@ -143,7 +149,7 @@ class SettingsViewModel @Inject constructor(
 
     fun requestBiometricUnlock(enabled: Boolean, activity: FragmentActivity?) {
         if (!enabled) {
-            viewModelScope.launch { prefs.setBiometricUnlockEnabled(false) }
+            launchSettingsWrite { prefs.setBiometricUnlockEnabled(false) }
             return
         }
         if (
@@ -166,25 +172,49 @@ class SettingsViewModel @Inject constructor(
                 biometricResetJob?.cancel()
                 biometricRequestInProgress = false
                 if (result == BiometricAuthResult.Success) {
-                    viewModelScope.launch { prefs.setBiometricUnlockEnabled(true) }
+                    launchSettingsWrite { prefs.setBiometricUnlockEnabled(true) }
                 }
             }
         )
     }
 
     fun setBackgroundAutoLockEnabled(enabled: Boolean) =
-        viewModelScope.launch { prefs.setBackgroundAutoLockEnabled(enabled) }
+        launchSettingsWrite { prefs.setBackgroundAutoLockEnabled(enabled) }
 
     fun setBackgroundLockMode(mode: BackgroundLockMode) =
-        viewModelScope.launch { prefs.setBackgroundLockMode(mode) }
+        launchSettingsWrite { prefs.setBackgroundLockMode(mode) }
 
-    fun setThemeMode(mode: String) = viewModelScope.launch { prefs.setThemeMode(mode) }
+    fun setThemeMode(mode: String) = launchSettingsWrite { prefs.setThemeMode(mode) }
+
+    private fun launchSettingsWrite(block: suspend () -> Unit): Job =
+        prefs.maintenanceGate.launchWrite(viewModelScope) {
+            try { block() }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) {
+                android.widget.Toast.makeText(context, "设置未保存，请重试。", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
 
     private fun queueOnboardingWrite(block: suspend () -> Unit): Job {
+        onboardingWrites.add(OnboardingWrite(block))
+        return runPendingOnboardingWrites()
+    }
+
+    private fun runPendingOnboardingWrites(): Job {
         val previous = pendingOnboardingWrite
-        return viewModelScope.launch {
+        val pending = onboardingWrites.toList()
+        val job = launchSettingsWrite {
             previous?.join()
-            block()
-        }.also { pendingOnboardingWrite = it }
+            pendingOnboardingFailure = null
+            try {
+                pending.filterNot { it.completed }.forEach {
+                    it.operation()
+                    it.completed = true
+                }
+            } catch (failure: Exception) { pendingOnboardingFailure = failure; throw failure }
+        }
+        job.invokeOnCompletion { failure -> if (failure != null) pendingOnboardingFailure = failure }
+        pendingOnboardingWrite = job
+        return job
     }
 }

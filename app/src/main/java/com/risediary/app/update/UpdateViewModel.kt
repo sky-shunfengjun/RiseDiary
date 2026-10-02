@@ -39,8 +39,16 @@ data class UpdateUiState(
     val download: DownloadState = DownloadState.Idle,
     val confirmCancel: Boolean = false,
     val installUri: String? = null,
-    val error: UpdateError? = null
-)
+    val error: UpdateError? = null,
+    val currentVersion: String = BuildConfig.VERSION_NAME,
+    val checkAuthorization: DownloadAuthorization? = null
+) {
+    val retryingOriginalVersion: Boolean
+        get() = (resolveUpdateDownloadTarget(this) as? UpdateDownloadTarget.Authorized)?.retryOriginal == true
+    val downloadEligibilityError: UpdateError?
+        get() = if (download.isActive() || download is DownloadState.Ready) null
+            else (resolveUpdateDownloadTarget(this) as? UpdateDownloadTarget.Blocked)?.reason
+}
 
 @HiltViewModel
 class UpdateViewModel @Inject constructor(
@@ -54,7 +62,6 @@ class UpdateViewModel @Inject constructor(
     // Kept during migration of the old entry points; both use this one app-owned VM.
     val state = ui.map { it.check }.stateIn(viewModelScope, SharingStarted.Eagerly, UpdateCheckState.Idle)
     private var developerSession = 0L
-    private var checkedPolicy: UpdateCheckPolicy? = null
     private var observedPolicy: UpdateCheckPolicy? = null
     private var checkGeneration = 0L
     private var pendingAutomaticUpdate = false
@@ -120,32 +127,35 @@ class UpdateViewModel @Inject constructor(
         try {
             val policy = preferences.settings.first().checkPolicy()
             if (token != checkGeneration) return
-            _ui.update { it.copy(check = UpdateCheckState.Checking, error = null) }
+            _ui.update { it.copy(check = UpdateCheckState.Checking, checkAuthorization = null, error = null) }
             val release = releaseSource.fetchLatestRelease(policy.channel)
             // Network implementations can finish after cancellation; neither old policy nor old job may commit.
             if (token != checkGeneration || preferences.settings.first().checkPolicy() != policy) return
             val available = isReleaseAvailable(currentVersion, release, policy)
-            checkedPolicy = policy
+            val asset = selectReleaseApk(release)
+            val authorization = asset?.let { authorizeDownload(release, it,
+                _ui.value.settings.copy(forceCheck = policy.force, releaseChannel = policy.channel), currentVersion) }
             val automatic = available && allowAutomaticPresentation && _ui.value.settings.automaticCheck
             if (automatic && _ui.value.developer.visible) pendingAutomaticUpdate = true
             _ui.update {
                 it.copy(check = if (available) UpdateCheckState.Available(release) else UpdateCheckState.UpToDate,
-                    release = release, visible = it.visible || (automatic && !it.developer.visible))
+                    release = release, checkAuthorization = authorization,
+                    error = if (available && asset == null) UpdateError.APK_UNAVAILABLE else null,
+                    visible = it.visible || (automatic && !it.developer.visible))
             }
         } catch (cancelled: CancellationException) { throw cancelled }
         catch (_: Exception) {
-            if (token == checkGeneration) _ui.update { it.copy(check = UpdateCheckState.Failed, release = null, error = UpdateError.CHECK) }
+            if (token == checkGeneration) _ui.update { it.copy(check = UpdateCheckState.Failed, release = null, checkAuthorization = null, error = UpdateError.CHECK) }
         } finally { if (token == checkGeneration) allowAutomaticPresentation = false }
     }
 
     private fun invalidateCheckPolicy() {
-        checkedPolicy = null
         checkGeneration++
         checkJob?.cancel()
         checkJob = null
         allowAutomaticPresentation = false
         pendingAutomaticUpdate = false
-        _ui.update { it.copy(check = UpdateCheckState.Idle, release = null) }
+        _ui.update { it.copy(check = UpdateCheckState.Idle, release = null, checkAuthorization = null) }
     }
     fun checkForUpdate(force: Boolean = false) { if (force) openAndCheck() else checkAtStartup() }
     fun dismiss() {
@@ -238,41 +248,49 @@ class UpdateViewModel @Inject constructor(
             downloadRestored.await()
             if (restoreFailed) { reportActionError(UpdateError.SETTINGS); return@launch }
             downloadMutex.withLock {
-            if (_ui.value.download.isActive()) return@withLock
-            val retry = (_ui.value.download as? DownloadState.Failed)?.record
-            val release = _ui.value.release ?: retry?.release ?: return@withLock
-            if (retry == null) {
-                if (_ui.value.check !is UpdateCheckState.Available) return@withLock
-                val storedPolicy = try { preferences.settings.first().checkPolicy() }
-                catch (cancelled: CancellationException) { throw cancelled }
-                catch (_: Exception) { reportActionError(UpdateError.SETTINGS); return@withLock }
-                if (checkedPolicy != storedPolicy) return@withLock
+                if (_ui.value.download.isActive() || _ui.value.download is DownloadState.Ready) return@withLock
+                preferenceMutex.withLock preferenceLock@{
+                    val token = checkGeneration
+                    val existing = record
+                    var enqueued: DownloadRecord? = null
+                    try {
+                        val liveSettings = preferences.settings.first()
+                        if (token != checkGeneration) { reportActionError(UpdateError.RECHECK_REQUIRED); return@preferenceLock }
+                        var target = resolveUpdateDownloadTarget(_ui.value.copy(settings = liveSettings))
+                        if (target !is UpdateDownloadTarget.Authorized) {
+                            reportActionError((target as UpdateDownloadTarget.Blocked).reason ?: UpdateError.RECHECK_REQUIRED)
+                            return@preferenceLock
+                        }
+                        if (existing != null) {
+                            refreshDownloadLocked()
+                            if (_ui.value.download.isActive() || _ui.value.download is DownloadState.Ready) return@preferenceLock
+                        }
+                        // A query can suspend; validate both the check generation and current strategy again before enqueue.
+                        val latestSettings = preferences.settings.first()
+                        target = resolveUpdateDownloadTarget(_ui.value.copy(settings = latestSettings))
+                        if (token != checkGeneration || target !is UpdateDownloadTarget.Authorized) {
+                            reportActionError((target as? UpdateDownloadTarget.Blocked)?.reason ?: UpdateError.RECHECK_REQUIRED)
+                            return@preferenceLock
+                        }
+                        _ui.update { it.copy(download = DownloadState.Starting, error = null) }
+                        enqueued = downloads.enqueue(target.release, target.asset, latestSettings.channel)
+                            .copy(authorization = target.authorization)
+                        record = enqueued
+                        preferences.saveDownload(enqueued)
+                        refreshDownloadLocked()
+                    } catch (cancelled: CancellationException) { throw cancelled }
+                    catch (error: Exception) {
+                        if (enqueued != null) {
+                            _ui.update { it.copy(error = UpdateError.SETTINGS) }
+                            refreshDownloadLocked()
+                        } else if (_ui.value.download == DownloadState.Starting) {
+                            _ui.update { it.copy(download = DownloadState.Failed(existing, UpdateError.DOWNLOAD)) }
+                        } else reportActionError(UpdateError.SETTINGS)
+                    }
+                }
             }
-            val asset = selectReleaseApk(release) ?: return@withLock
-            val existing = record
-            if (existing != null) {
-                refreshDownloadLocked()
-                if (_ui.value.download.isActive()) return@withLock
-                if (_ui.value.download is DownloadState.Ready && existing.asset.id == asset.id) return@withLock
-            }
-            _ui.update { it.copy(download = DownloadState.Starting, error = null) }
-            var enqueued: DownloadRecord? = null
-            try {
-                enqueued = downloads.enqueue(release, asset, _ui.value.settings.channel)
-                record = enqueued
-                preferences.saveDownload(enqueued)
-                refreshDownloadLocked()
-            } catch (cancelled: CancellationException) { throw cancelled }
-            catch (_: Exception) {
-                // If persistence failed after enqueue, keep tracking that live task in this session.
-                if (enqueued != null) {
-                    _ui.update { it.copy(error = UpdateError.SETTINGS) }
-                    refreshDownloadLocked()
-                } else _ui.update { it.copy(download = DownloadState.Failed(existing, UpdateError.DOWNLOAD)) }
-            }
-        } }
+        }
     }
-
     fun refreshDownload() { viewModelScope.launch { downloadMutex.withLock { refreshDownloadLocked() } } }
     private suspend fun refreshDownloadLocked() {
         val current = record ?: return
@@ -299,12 +317,20 @@ class UpdateViewModel @Inject constructor(
         viewModelScope.launch { downloadMutex.withLock {
             val current = record ?: return@withLock
             try {
-                if (downloads.cancel(current)) {
-                    record = null
-                    _ui.update { it.copy(download = DownloadState.Idle, error = null) }
-                    try { preferences.saveDownload(null) }
-                    catch (_: java.io.IOException) { _ui.update { it.copy(error = UpdateError.SETTINGS) } }
-                } else refreshDownloadLocked()
+                when (downloads.cancel(current)) {
+                    DownloadCancellation.CANCELLED -> {
+                        try {
+                            preferences.saveDownload(null)
+                            record = null
+                            _ui.update { it.copy(download = DownloadState.Idle, error = null) }
+                        } catch (cancelled: CancellationException) { throw cancelled }
+                        catch (_: Exception) {
+                            _ui.update { it.copy(download = DownloadState.Failed(current, UpdateError.FILE_MISSING),
+                                error = UpdateError.SETTINGS) }
+                        }
+                    }
+                    DownloadCancellation.COMPLETED -> refreshDownloadLocked()
+                }
             } catch (cancelled: CancellationException) { throw cancelled }
             catch (_: Exception) { _ui.update { it.copy(error = UpdateError.DOWNLOAD) } }
         } }

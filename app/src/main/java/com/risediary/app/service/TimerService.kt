@@ -38,17 +38,21 @@ class TimerService : Service() {
     @Inject lateinit var store: TimerSessionStore
     @Inject lateinit var elapsedClock: ElapsedRealtimeClock
     @Inject lateinit var wallClock: Clock
+    @Inject lateinit var bootIdentity: BootIdentityProvider
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val commandMutex = Mutex()
     private var tickerJob: Job? = null
     private var lastNotificationSecond = -1L
+    private var lastPersistedRealtime = 0L
+    private var lastPersistenceAttempt = 0L
+    private var pendingTransition: TimerTransition? = null
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val action = intent?.action ?: ACTION_RESTORE
-        if (action == ACTION_START || action == ACTION_RESUME || action == ACTION_RESTORE) {
+        if (action == ACTION_START || action == ACTION_RESUME || action == ACTION_RESTORE || action == ACTION_RETRY) {
             ServiceCompat.startForeground(
                 this,
                 NOTIFICATION_ID,
@@ -59,14 +63,23 @@ class TimerService : Service() {
 
         serviceScope.launch {
             commandMutex.withLock {
+                try {
+                if (pendingTransition != null && action != ACTION_RETRY) return@withLock
                 when (action) {
                     ACTION_START -> startNewSession()
                     ACTION_PAUSE -> pauseSession()
                     ACTION_RESUME -> resumeSession()
                     ACTION_FINISH -> finishSession()
                     ACTION_RESET -> resetSession()
+                    ACTION_RETRY -> {
+                        if (pendingTransition != null) {
+                            if (retryPendingTransition() && stateHolder.state.value.status == TimerStatus.RUNNING) startTicker()
+                        } else restoreSession()
+                    }
                     else -> restoreSession()
                 }
+                } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+                catch (_: Exception) { stateHolder.setPersistenceError(true) }
             }
         }
         return START_STICKY
@@ -78,64 +91,37 @@ class TimerService : Service() {
         val session = TimerSession(
             status = TimerStatus.RUNNING,
             startedAtEpochMillis = wallClock.millis(),
-            elapsedMillis = 0L,
             resumedAtElapsedRealtime = elapsedClock.millis(),
-            resumedAtWallClock = wallClock.millis()
+            resumedAtWallClock = wallClock.millis(),
+            bootCount = bootIdentity.currentBootCount()
         )
-        publish(session, persist = true)
-        startTicker()
+        if (commitTransition(prepareTimerTransition(session), persist = true)) startTicker()
     }
 
     private suspend fun restoreSession() {
-        val restored = store.load()
-        if (!restored.isActive) {
-            stateHolder.set(restored)
-            stopForeground(STOP_FOREGROUND_REMOVE)
-            stopSelf()
-            return
-        }
+        // load() normalizes the boot identity before any stored state can reach the UI.
+        val current = stateHolder.state.value
+        val restored = if (current.status == TimerStatus.IDLE) store.load()
+            else if (current.status == TimerStatus.RUNNING)
+                TimerMath.advance(current, elapsedClock.millis(), wallClock.millis()) else current
         lastNotificationSecond = -1L
-
-        var normalized = if (restored.status == TimerStatus.RUNNING) {
-            val elapsed = calculateElapsed(restored)
-            restored.copy(
-                elapsedMillis = elapsed,
-                resumedAtElapsedRealtime = elapsedClock.millis(),
-                resumedAtWallClock = wallClock.millis()
-            )
-        } else {
-            restored
-        }
-        if (
-            normalized.status == TimerStatus.RUNNING ||
-            normalized.elapsedMillis >= TimerMath.MAX_DURATION_MILLIS
-        ) {
-            normalized = processMilestones(normalized)
-            if (normalized.status == TimerStatus.LIMIT_REACHED) {
-                store.save(normalized)
-                return
-            }
-        }
-        publish(normalized, persist = true)
-        if (normalized.status == TimerStatus.RUNNING) startTicker()
+        val transition = prepareTimerTransition(restored)
+        if (commitTransition(transition, persist = true) && transition.session.status == TimerStatus.RUNNING) startTicker()
     }
 
     private suspend fun pauseSession() {
-        val current = stateHolder.state.value.takeIf(TimerSession::isActive)
-            ?: store.load().takeIf(TimerSession::isActive)
-            ?: return
+        val current = currentActiveSession() ?: return
         if (current.status != TimerStatus.RUNNING) return
         tickerJob?.cancel()
-        val paused = processMilestones(
-            current.copy(
-                status = TimerStatus.PAUSED,
-                elapsedMillis = calculateElapsed(current),
-                resumedAtElapsedRealtime = 0L,
-                resumedAtWallClock = 0L
-            )
+        val paused = current.copy(
+            status = TimerStatus.PAUSED,
+            elapsedMillis = calculateElapsed(current),
+            resumedAtElapsedRealtime = 0L,
+            resumedAtWallClock = 0L,
+            bootCount = bootIdentity.currentBootCount()
         )
-        if (paused.status == TimerStatus.LIMIT_REACHED) return
-        publish(paused, persist = true)
+        // Includes the pause-at-limit path: it must persist before stopping too.
+        commitTransition(prepareTimerTransition(paused), persist = true)
     }
 
     private suspend fun resumeSession() {
@@ -145,79 +131,62 @@ class TimerService : Service() {
         val resumed = current.copy(
             status = TimerStatus.RUNNING,
             resumedAtElapsedRealtime = elapsedClock.millis(),
-            resumedAtWallClock = wallClock.millis()
+            resumedAtWallClock = wallClock.millis(),
+            bootCount = bootIdentity.currentBootCount()
         )
-        publish(resumed, persist = true)
-        startTicker()
+        if (commitTransition(prepareTimerTransition(resumed), persist = true) &&
+            stateHolder.state.value.status == TimerStatus.RUNNING) startTicker()
     }
 
     private suspend fun finishSession() {
-        val current = stateHolder.state.value.takeIf(TimerSession::isActive)
-            ?: store.load().takeIf(TimerSession::isActive)
-            ?: return
+        val current = currentActiveSession() ?: return
         tickerJob?.cancel()
-        val duration = if (current.status == TimerStatus.RUNNING) {
-            calculateElapsed(current)
-        } else {
-            current.elapsedMillis
-        }.coerceIn(0L, TimerMath.MAX_DURATION_MILLIS)
         val finished = current.copy(
             status = TimerStatus.FINISHED,
-            elapsedMillis = duration,
+            elapsedMillis = calculateElapsed(current),
             resumedAtElapsedRealtime = 0L,
-            resumedAtWallClock = 0L
+            resumedAtWallClock = 0L,
+            bootCount = bootIdentity.currentBootCount()
         )
-        publish(finished, persist = true)
-        stopForeground(STOP_FOREGROUND_REMOVE)
-        stopSelf()
+        commitTransition(prepareTimerTransition(finished), persist = true)
     }
 
     private suspend fun resetSession() {
         tickerJob?.cancel()
-        publish(TimerSession(), persist = true)
-        NotificationManagerCompat.from(this).cancel(MILESTONE_NOTIFICATION_ID)
-        stopForeground(STOP_FOREGROUND_REMOVE)
-        stopSelf()
+        if (commitTransition(prepareTimerTransition(TimerSession()), persist = true)) {
+            NotificationManagerCompat.from(this).cancel(MILESTONE_NOTIFICATION_ID)
+        }
     }
 
-    /**
-     * The whole tick iteration runs inside [commandMutex] so a pause/finish/reset
-     * command can never interleave between reading the session and publishing the
-     * advanced state. This guarantees a stale RUNNING write can never land after
-     * a PAUSED write (pause only runs once the in-flight tick is fully done).
-     */
+    private suspend fun currentActiveSession(): TimerSession? =
+        stateHolder.state.value.takeIf(TimerSession::isActive) ?: store.load().takeIf(TimerSession::isActive)
+
+    /** Every tick and checkpoint shares the command lock, so no old RUNNING save follows a terminal one. */
     private fun startTicker() {
         tickerJob?.cancel()
         tickerJob = serviceScope.launch {
             while (isActive) {
                 var keepTicking = true
                 commandMutex.withLock {
+                    if (pendingTransition != null) {
+                        if (elapsedClock.millis() - lastPersistenceAttempt >= TIMER_CHECKPOINT_MILLIS) {
+                            retryPendingTransition()
+                        }
+                        keepTicking = pendingTransition != null || stateHolder.state.value.status == TimerStatus.RUNNING
+                        return@withLock
+                    }
                     val current = stateHolder.state.value
                     if (current.status != TimerStatus.RUNNING) {
                         keepTicking = false
                         return@withLock
                     }
-                    val advanced = TimerMath.advance(
-                        session = current,
-                        elapsedRealtimeNow = elapsedClock.millis(),
-                        wallClockNow = wallClock.millis()
-                    )
-                    val updated = processMilestones(advanced)
-                    if (
-                        updated.status == TimerStatus.LIMIT_REACHED ||
-                        updated.notifiedMilestonesMask != current.notifiedMilestonesMask
-                    ) {
-                        store.save(updated)
-                    }
-                    if (updated.status == TimerStatus.LIMIT_REACHED) {
+                    val now = elapsedClock.millis()
+                    val advanced = TimerMath.advance(current, now, wallClock.millis())
+                    val transition = prepareTimerTransition(advanced)
+                    val persist = shouldPersistTimerTick(current, transition.session, now, lastPersistedRealtime)
+                    val committed = commitTransition(transition, persist)
+                    if (committed && transition.session.status == TimerStatus.LIMIT_REACHED) {
                         keepTicking = false
-                        return@withLock
-                    }
-
-                    val seconds = updated.elapsedMillis / 1_000L
-                    if (seconds != lastNotificationSecond) {
-                        lastNotificationSecond = seconds
-                        notifyState(updated)
                     }
                 }
                 if (!keepTicking) break
@@ -226,49 +195,44 @@ class TimerService : Service() {
         }
     }
 
-    private suspend fun processMilestones(session: TimerSession): TimerSession {
-        val latest = TimerMilestones.latestUnnotified(
-            elapsedMillis = session.elapsedMillis,
-            notifiedMask = session.notifiedMilestonesMask
-        )
-        val reachedLimit = session.elapsedMillis >= TimerMath.MAX_DURATION_MILLIS
-        val updated = session.copy(
-            status = if (reachedLimit) TimerStatus.LIMIT_REACHED else session.status,
-            elapsedMillis = if (reachedLimit) {
-                TimerMath.MAX_DURATION_MILLIS
-            } else {
-                session.elapsedMillis
-            },
-            resumedAtElapsedRealtime = if (reachedLimit) 0L else session.resumedAtElapsedRealtime,
-            resumedAtWallClock = if (reachedLimit) 0L else session.resumedAtWallClock,
-            notifiedMilestonesMask = session.notifiedMilestonesMask or
-                TimerMilestones.maskThrough(session.elapsedMillis)
-        )
+    private suspend fun retryPendingTransition(): Boolean {
+        val pending = pendingTransition ?: return true
+        val transition = if (pending.session.status == TimerStatus.RUNNING) {
+            prepareTimerTransition(TimerMath.advance(pending.session, elapsedClock.millis(), wallClock.millis()))
+                .let { if (it.milestone == null) it.copy(milestone = pending.milestone) else it }
+        } else pending
+        return commitTransition(transition, persist = true)
+    }
 
-        stateHolder.set(updated)
-
-        if (reachedLimit) {
-            stopForeground(STOP_FOREGROUND_REMOVE)
-            notifyMilestone(TimerMilestone.LIMIT)
-            stopSelf()
-        } else if (latest != null) {
-            notifyMilestone(latest)
+    private suspend fun commitTransition(transition: TimerTransition, persist: Boolean): Boolean {
+        if (persist) lastPersistenceAttempt = elapsedClock.millis()
+        return try {
+            TimerSessionCommitter(
+                save = { store.save(it); lastPersistedRealtime = elapsedClock.millis() },
+                publish = { stateHolder.set(it) },
+                notify = ::notifyMilestone,
+                stop = { stopForeground(STOP_FOREGROUND_REMOVE); stopSelf() }
+            ).commit(transition, persist)
+            pendingTransition = null
+            stateHolder.setPersistenceError(false)
+            val seconds = transition.session.elapsedMillis / 1_000L
+            if (transition.session.isActive && seconds != lastNotificationSecond) {
+                lastNotificationSecond = seconds
+                notifyState(transition.session)
+            }
+            true
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+            throw cancelled
+        } catch (_: Exception) {
+            // Keep the durable transition and the service alive; explicit retry or a checkpoint can retry it.
+            pendingTransition = transition
+            stateHolder.setPersistenceError(true)
+            false
         }
-        return updated
     }
 
-    private fun calculateElapsed(session: TimerSession): Long = TimerMath.elapsed(
-        session = session,
-        elapsedRealtimeNow = elapsedClock.millis(),
-        wallClockNow = wallClock.millis()
-    )
-
-    private suspend fun publish(session: TimerSession, persist: Boolean) {
-        stateHolder.set(session)
-        if (persist) store.save(session)
-        if (session.isActive) notifyState(session)
-    }
-
+    private fun calculateElapsed(session: TimerSession): Long =
+        TimerMath.elapsedInCurrentProcess(session, elapsedClock.millis())
     @SuppressLint("MissingPermission")
     private fun notifyState(session: TimerSession) {
         if (canPostNotifications()) {
@@ -360,6 +324,7 @@ class TimerService : Service() {
         const val ACTION_PAUSE = "com.risediary.app.timer.PAUSE"
         const val ACTION_RESUME = "com.risediary.app.timer.RESUME"
         const val ACTION_FINISH = "com.risediary.app.timer.FINISH"
+        const val ACTION_RETRY = "com.risediary.app.timer.RETRY_PERSISTENCE"
         const val ACTION_RESET = "com.risediary.app.timer.RESET"
 
         private const val NOTIFICATION_ID = 1001

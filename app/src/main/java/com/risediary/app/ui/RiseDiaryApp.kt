@@ -79,11 +79,13 @@ import com.risediary.app.ui.theme.backgroundBrush
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.utils.MiuixPopupUtils
 import com.risediary.app.ui.icons.AppIcons
+import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -140,13 +142,21 @@ fun RiseDiaryApp(
     notificationDestination: StateFlow<NotificationDestination?>,
     onNotificationDestinationConsumed: (NotificationDestination) -> Unit
 ) {
+    val noticeContext = androidx.compose.ui.platform.LocalContext.current
+    LaunchedEffect(viewModel) {
+        viewModel.dataWriteNotices.collect { message ->
+            android.widget.Toast.makeText(noticeContext, message, android.widget.Toast.LENGTH_LONG).show()
+        }
+    }
     val appState by viewModel.state.collectAsStateWithLifecycle()
+    val retainMain by viewModel.retainMainContent.collectAsStateWithLifecycle()
+    val maintenanceState by viewModel.maintenanceState.collectAsStateWithLifecycle()
     val requestedDestination by
         notificationDestination.collectAsStateWithLifecycle()
 
     when {
-        keepsMainContentMounted(appState) -> {
-            val locked = appState == AppGateState.LOCKED
+        keepsMainContentMounted(appState) || (retainMain && appState == AppGateState.ERROR) -> {
+            val locked = appState != AppGateState.MAIN
             Box(modifier = Modifier.fillMaxSize()) {
                 MainAppContent(
                     interactionsBlocked = locked,
@@ -154,10 +164,20 @@ fun RiseDiaryApp(
                     onNotificationDestinationConsumed = onNotificationDestinationConsumed,
                     updateViewModel = updateViewModel
                 )
-                if (locked) {
+                if (!locked && maintenanceState != com.risediary.app.data.DataMaintenanceGate.State.IDLE) {
+                    Box(Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(12.dp)
+                        .background(MiuixTheme.colorScheme.surface, androidx.compose.foundation.shape.RoundedCornerShape(16.dp))) {
+                        Text(stringResource(if (maintenanceState == com.risediary.app.data.DataMaintenanceGate.State.RECOVERY_REQUIRED)
+                            R.string.data_recovery_required else R.string.data_maintenance_readonly), Modifier.padding(12.dp))
+                    }
+                }
+                if (appState == AppGateState.ERROR) {
+                    AppGateReadError(viewModel::retryRead)
+                } else if (locked) {
                     AppLockScreen(
                         mode = LockMode.VERIFY,
-                        onDone = viewModel::showMain
+                        onDone = {},
+                        onCredentialVerified = viewModel::onCredentialVerified
                     )
                 }
             }
@@ -172,15 +192,41 @@ fun RiseDiaryApp(
                 CircularProgressIndicator()
             }
         }
+        appState == AppGateState.ERROR -> AppGateReadError(viewModel::retryRead)
         else -> {
             OnboardingScreen(
                 mode = OnboardingMode.FIRST_RUN,
-                onDone = viewModel::showMain
+                onDone = {},
+                onSecurityVerified = viewModel::onOnboardingFinished
             )
         }
     }
 }
 
+@Composable
+private fun AppGateReadError(onRetry: () -> Unit, recovery: com.risediary.app.ui.backup.BackupViewModel = hiltViewModel()) {
+    val maintenance by recovery.maintenanceState.collectAsStateWithLifecycle()
+    val operation by recovery.state.collectAsStateWithLifecycle()
+    var waitingForRecovery by remember { mutableStateOf(false) }
+    LaunchedEffect(maintenance, waitingForRecovery) {
+        if (waitingForRecovery && maintenance == com.risediary.app.data.DataMaintenanceGate.State.IDLE) {
+            waitingForRecovery = false
+            onRetry()
+        }
+    }
+    Box(Modifier.fillMaxSize().background(MiuixTheme.colorScheme.background), contentAlignment = Alignment.Center) {
+        Column(Modifier.padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(stringResource(R.string.app_lock_error_read))
+            Spacer(Modifier.height(16.dp))
+            if (maintenance == com.risediary.app.data.DataMaintenanceGate.State.RECOVERY_REQUIRED) {
+                Text(stringResource(R.string.data_recovery_required))
+                TextButton(text = stringResource(R.string.data_retry_recovery),
+                    enabled = operation != com.risediary.app.ui.backup.BackupState.WORKING,
+                    onClick = { waitingForRecovery = true; recovery.retryRecovery() })
+            } else TextButton(text = stringResource(R.string.action_retry), onClick = onRetry)
+        }
+    }
+}
 // Covered entries can remain STARTED in miuix-nav. Gate effects by transition
 // visibility so both pages keep their blur during a swipe, then stop offscreen.
 private inline fun <reified T : Route> NavEntryBuilder.pageEntry(

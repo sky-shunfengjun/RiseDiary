@@ -16,11 +16,32 @@ import javax.inject.Singleton
 interface UpdateDownloads {
     suspend fun enqueue(release: GitHubRelease, asset: GitHubAsset, channel: UpdateChannel): DownloadRecord
     suspend fun query(record: DownloadRecord): DownloadState
-    /** False means completion won the race: do not remove a successfully downloaded file. */
-    suspend fun cancel(record: DownloadRecord): Boolean
+    /** Preserve completion confirmed before removal; otherwise cancellation wins. */
+    suspend fun cancel(record: DownloadRecord): DownloadCancellation
     suspend fun verifyForInstall(record: DownloadRecord): String
 }
 
+enum class DownloadCancellation { COMPLETED, CANCELLED }
+
+internal enum class CancellationQueryState { COMPLETED, PRESENT, ABSENT }
+
+/** DownloadManager query/remove are separate operations; never promise an atomic completion race. */
+internal suspend fun cancelDownloadWithPolicy(
+    query: suspend () -> CancellationQueryState,
+    remove: suspend () -> Int
+): DownloadCancellation {
+    when (query()) {
+        CancellationQueryState.COMPLETED -> return DownloadCancellation.COMPLETED
+        CancellationQueryState.ABSENT -> return DownloadCancellation.CANCELLED
+        CancellationQueryState.PRESENT -> Unit
+    }
+    if (remove() > 0) return DownloadCancellation.CANCELLED
+    return when (query()) {
+        CancellationQueryState.ABSENT -> DownloadCancellation.CANCELLED
+        CancellationQueryState.COMPLETED -> DownloadCancellation.COMPLETED
+        CancellationQueryState.PRESENT -> throw UpdateDownloadException(UpdateError.DOWNLOAD)
+    }
+}
 class UpdateDownloadException(val reason: UpdateError) : IOException()
 
 internal fun sha256Of(input: InputStream): String {
@@ -86,17 +107,24 @@ class SystemUpdateDownloads @Inject constructor(
         } ?: DownloadState.Failed(record, UpdateError.DOWNLOAD)
     }
 
-    override suspend fun cancel(record: DownloadRecord): Boolean = withContext(Dispatchers.IO) {
+    override suspend fun cancel(record: DownloadRecord): DownloadCancellation = withContext(Dispatchers.IO) {
         val manager = manager()
-        manager.query(DownloadManager.Query().setFilterById(record.id))?.use {
-            if (it.moveToFirst() && it.getInt(it.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS)) == DownloadManager.STATUS_SUCCESSFUL) {
-                return@withContext false
-            }
-        }
-        manager.remove(record.id)
-        true
+        cancelDownloadWithPolicy(
+            query = {
+                manager.query(DownloadManager.Query().setFilterById(record.id))?.use { cursor ->
+                    if (!cursor.moveToFirst()) CancellationQueryState.ABSENT
+                    else if (cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS)) == DownloadManager.STATUS_SUCCESSFUL &&
+                        manager.getUriForDownloadedFile(record.id) != null) {
+                        try {
+                            manager.openDownloadedFile(record.id).use { }
+                            CancellationQueryState.COMPLETED
+                        } catch (_: IOException) { CancellationQueryState.PRESENT }
+                    } else CancellationQueryState.PRESENT
+                } ?: throw UpdateDownloadException(UpdateError.DOWNLOAD)
+            },
+            remove = { manager.remove(record.id) }
+        )
     }
-
     override suspend fun verifyForInstall(record: DownloadRecord): String = withContext(Dispatchers.IO) {
         val manager = manager()
         val uri = manager.getUriForDownloadedFile(record.id)

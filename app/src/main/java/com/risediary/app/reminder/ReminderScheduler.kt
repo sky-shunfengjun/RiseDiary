@@ -12,9 +12,12 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import com.risediary.app.data.UserPreferences
+import com.risediary.app.data.DataMaintenanceGate
+import com.risediary.app.data.DataMaintenanceBusyException
 import com.risediary.app.data.repository.FlightRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import java.time.Clock
@@ -42,40 +45,50 @@ class ReminderScheduler @Inject constructor(
     suspend fun observeConfiguration() {
         preferences.reminderConfiguration
             .distinctUntilChanged()
-            .collectLatest { configuration -> syncAll(configuration) }
+            .combine(preferences.maintenanceGate.state) { configuration, state -> configuration to state }
+            .collectLatest { (_, state) ->
+                if (state == DataMaintenanceGate.State.IDLE) {
+                    try {
+                        // Re-read inside the permit instead of applying a captured
+                        // configuration that may predate a restore.
+                        syncAll()
+                    } catch (_: DataMaintenanceBusyException) {
+                        // A new maintenance operation won the race; IDLE will retry.
+                    }
+                }
+            }
     }
 
-    suspend fun syncAll() {
+    suspend fun syncAll() = preferences.maintenanceGate.write {
         syncAll(preferences.reminderConfiguration.first())
     }
-
     private suspend fun syncAll(configuration: ReminderConfiguration) {
         ReminderType.entries.forEach { type -> sync(type, configuration) }
     }
 
-    suspend fun sync(type: ReminderType) {
+    suspend fun sync(type: ReminderType) = preferences.maintenanceGate.write {
         sync(type, preferences.reminderConfiguration.first())
     }
 
-    suspend fun onReminderEnabledChanged(type: ReminderType, enabled: Boolean) {
-        if (enabled) {
-            sync(type)
-            return
+    suspend fun onReminderEnabledChanged(type: ReminderType, enabled: Boolean) =
+        preferences.maintenanceGate.write {
+            if (enabled) {
+                sync(type)
+            } else {
+                cancel(type)
+                if (!preferences.reminderConfiguration.first().hasEnabledReminders) {
+                    cancelBackgroundTest()
+                }
+            }
         }
-        cancel(type)
-        if (!preferences.reminderConfiguration.first().hasEnabledReminders) {
-            cancelBackgroundTest()
-        }
-    }
 
-    suspend fun rescheduleAfterFallback(type: ReminderType) {
+    suspend fun rescheduleAfterFallback(type: ReminderType) = preferences.maintenanceGate.write {
         sync(
             type = type,
             configuration = preferences.reminderConfiguration.first(),
             existingWorkPolicy = ExistingWorkPolicy.APPEND_OR_REPLACE
         )
     }
-
     private suspend fun sync(
         type: ReminderType,
         configuration: ReminderConfiguration,
@@ -237,7 +250,7 @@ class ReminderScheduler @Inject constructor(
         )
     }
 
-    suspend fun onFlightDataChanged() {
+    suspend fun onFlightDataChanged() = preferences.maintenanceGate.write {
         cancel(ReminderType.DAILY)
         cancel(ReminderType.INACTIVE)
         resetInactiveAnchorForEmptyHistory()
@@ -245,12 +258,12 @@ class ReminderScheduler @Inject constructor(
         sync(ReminderType.INACTIVE)
     }
 
-    suspend fun onLengthDataChanged() {
+    suspend fun onLengthDataChanged() = preferences.maintenanceGate.write {
         cancel(ReminderType.MONTHLY_LENGTH)
         sync(ReminderType.MONTHLY_LENGTH)
     }
 
-    suspend fun onAllDataChanged() {
+    suspend fun onAllDataChanged() = preferences.maintenanceGate.write {
         ReminderType.entries.forEach(::cancel)
         cancelBackgroundTest()
         resetInactiveAnchorForEmptyHistory()

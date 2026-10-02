@@ -420,6 +420,7 @@ private fun UpdateSheetContent(
                                 ?: stringResource(R.string.update_version_unknown)), color = colors.onSurfaceVariantSummary)
                         }
                         if (ui.check == UpdateCheckState.Failed) ErrorText(UpdateError.CHECK)
+                        ui.downloadEligibilityError?.takeUnless { it == ui.error }?.let { ErrorText(it) }
                         ui.error?.takeUnless { it == UpdateError.CHECK }?.let { ErrorText(it) }
                         (ui.download as? DownloadState.Failed)?.let { ErrorText(it.reason) }
                         val release = ui.release
@@ -644,6 +645,8 @@ private fun ErrorText(error: UpdateError) {
         UpdateError.INTEGRITY -> R.string.update_error_integrity
         UpdateError.INSTALL -> R.string.update_error_install
         UpdateError.PERMISSION -> R.string.update_error_permission
+        UpdateError.APK_UNAVAILABLE -> R.string.update_error_apk_unavailable
+        UpdateError.RECHECK_REQUIRED -> R.string.update_error_recheck
         UpdateError.LINK -> R.string.update_error_link
     }
     Text(stringResource(id), color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
@@ -659,6 +662,7 @@ private fun primaryLabel(action: UpdatePrimaryAction, ui: UpdateUiState): String
         else stringResource(R.string.update_download_percent, download.percent)
     download is DownloadState.Paused -> stringResource(if (download.waitingForWifi) R.string.update_wait_wifi else R.string.update_wait_network)
     action == UpdatePrimaryAction.INSTALL -> stringResource(R.string.update_install)
+    action == UpdatePrimaryAction.DOWNLOAD && ui.retryingOriginalVersion -> stringResource(R.string.update_retry_original)
     action == UpdatePrimaryAction.DOWNLOAD && download is DownloadState.Failed -> stringResource(R.string.update_retry_download)
     action == UpdatePrimaryAction.DOWNLOAD -> stringResource(R.string.update_download)
     action == UpdatePrimaryAction.CHECK && ui.check == UpdateCheckState.Failed -> stringResource(R.string.update_retry_check)

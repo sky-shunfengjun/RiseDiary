@@ -52,7 +52,7 @@ fun CheckinCard(
     modifier: Modifier = Modifier
 ) {
     var showMonth by remember { mutableStateOf(false) }
-    val today = LocalDate.now()
+    val today = LocalCalendarEnvironment.current.date
     val dateFormatter = remember { DateTimeFormatter.ofPattern("yyyy-MM-dd") }
 
     // Calculate this week's Monday–Sunday

@@ -76,8 +76,11 @@ class AppLockViewModel @Inject constructor(
         false
     )
 
+    var verifiedCredential: String? = null
+        private set
     private var firstPin = ""
     private var savedCredential = ""
+    private var savedLockEnabled = false
     private var loadJob: Job? = null
     private var countdownJob: Job? = null
     private var biometricRequestInProgress = false
@@ -94,21 +97,24 @@ class AppLockViewModel @Inject constructor(
         _errorMessage.value = null
         firstPin = ""
         _done.value = false
+        verifiedCredential = null
         _ready.value = false
         updateTitle()
 
         loadJob = viewModelScope.launch {
-            savedCredential = preferences.appLockPin.first()
-            val lockEnabled = preferences.appLockEnabled.first()
-            if (mode == LockMode.CREATE && lockEnabled) {
+            try {
+                val security = preferences.securitySettings.first()
+                savedCredential = security.credential
+                savedLockEnabled = security.lockEnabled
+                if (mode == LockMode.CREATE && security.lockEnabled) {
+                    _mode.value = LockMode.VERIFY
+                    updateTitle()
+                }
+                _attempts.value = security.attempts
+                startCountdownIfNeeded(security.lockoutUntil)
                 _ready.value = true
-                _done.value = true
-                return@launch
-            }
-            _attempts.value = preferences.appLockAttempts.first()
-            val lockoutUntil = preferences.appLockoutUntil.first()
-            startCountdownIfNeeded(lockoutUntil)
-            _ready.value = true
+            } catch (_: com.risediary.app.data.DataMaintenanceBusyException) { showSecurityError() } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { showSecurityError() }
         }
     }
 
@@ -182,7 +188,7 @@ class AppLockViewModel @Inject constructor(
                     withContext(Dispatchers.Default) {
                         pinSecurity.verify(entered, savedCredential)
                     }
-                } catch (cancelled: CancellationException) {
+                } catch (_: com.risediary.app.data.DataMaintenanceBusyException) { showSecurityError(); return@launch } catch (cancelled: CancellationException) {
                     throw cancelled
                 } catch (_: Exception) {
                     showSecurityError()
@@ -191,15 +197,13 @@ class AppLockViewModel @Inject constructor(
 
                 when (verification) {
                     PinVerification.MATCH -> {
-                        clearFailures()
-                        onSuccess()
+                        if (clearFailures() && confirmCurrentCredential()) onSuccess()
                     }
                     PinVerification.LEGACY_MATCH -> {
                         val upgradedCredential = createCredentialOrNull(entered) ?: return@launch
                         if (!saveAppLockCredential(upgradedCredential)) return@launch
                         savedCredential = upgradedCredential
-                        clearFailures()
-                        onSuccess()
+                        if (clearFailures() && confirmCurrentCredential()) onSuccess()
                     }
                     PinVerification.NO_MATCH -> onMismatch(errorRes)
                 }
@@ -214,16 +218,15 @@ class AppLockViewModel @Inject constructor(
             val credential = createCredentialOrNull(pin) ?: return@launch
             if (!saveAppLockCredential(credential)) return@launch
             savedCredential = credential
-            clearFailures()
-            _done.value = true
+            if (clearFailures() && confirmCurrentCredential()) _done.value = true
         }
     }
 
     private fun clearLock() {
         viewModelScope.launch {
             try {
-                preferences.setAppLock(enabled = false, pin = "")
-            } catch (cancelled: CancellationException) {
+                if (!preferences.tryDisableAppLock(savedCredential)) { showSecurityError(); return@launch }
+            } catch (_: com.risediary.app.data.DataMaintenanceBusyException) { showSecurityError(); return@launch } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
                 showSecurityError()
@@ -282,28 +285,44 @@ class AppLockViewModel @Inject constructor(
                 delay(250L)
             }
             lockoutDeadlineElapsed = 0L
-            clearFailures()
-            _errorMessage.value = null
+            if (clearFailures()) _errorMessage.value = null
         }
     }
 
-    private suspend fun clearFailures() {
-        _attempts.value = 0
-        _lockoutRemaining.value = 0
-        try {
-            preferences.clearAppLockFailures()
-        } catch (cancelled: CancellationException) {
-            throw cancelled
-        } catch (_: Exception) {
-            showSecurityError()
-        }
+    private suspend fun clearFailures(requireBiometric: Boolean = false): Boolean {
+        return try {
+            if (!preferences.clearFailuresForCredential(savedCredential, requireBiometric)) {
+                showSecurityError(); return false
+            }
+            _attempts.value = 0
+            _lockoutRemaining.value = 0
+            true
+        } catch (_: com.risediary.app.data.DataMaintenanceBusyException) { showSecurityError(); return false } catch (cancelled: CancellationException) { throw cancelled }
+        catch (_: Exception) { showSecurityError(); false }
     }
 
+    private suspend fun confirmCurrentCredential(): Boolean = try {
+        val current = preferences.securitySettings.first()
+        if (current.lockEnabled && current.credential == savedCredential) {
+            verifiedCredential = current.credential
+            true
+        } else { showSecurityError(); false }
+    } catch (_: com.risediary.app.data.DataMaintenanceBusyException) { showSecurityError(); false } catch (cancelled: CancellationException) { throw cancelled }
+    catch (_: Exception) { showSecurityError(); false }
+
+    fun retryLoad() {
+        val retryMode = when (_mode.value) {
+            LockMode.CHANGE_OLD, LockMode.CHANGE_NEW, LockMode.CHANGE_CONFIRM -> LockMode.CHANGE_OLD
+            LockMode.CREATE, LockMode.CREATE_CONFIRM -> LockMode.CREATE
+            else -> _mode.value
+        }
+        init(retryMode)
+    }
     private suspend fun createCredentialOrNull(pin: String): String? = try {
         withContext(Dispatchers.Default) {
             pinSecurity.createCredential(pin)
         }
-    } catch (cancelled: CancellationException) {
+    } catch (_: com.risediary.app.data.DataMaintenanceBusyException) { showSecurityError(); null } catch (cancelled: CancellationException) {
         throw cancelled
     } catch (_: Exception) {
         showSecurityError()
@@ -311,9 +330,10 @@ class AppLockViewModel @Inject constructor(
     }
 
     private suspend fun saveAppLockCredential(credential: String): Boolean = try {
-        preferences.setAppLock(enabled = true, pin = credential)
-        true
-    } catch (cancelled: CancellationException) {
+        val saved = preferences.trySetAppLockCredential(savedCredential, savedLockEnabled, credential)
+        if (saved) savedLockEnabled = true else showSecurityError()
+        saved
+    } catch (_: com.risediary.app.data.DataMaintenanceBusyException) { showSecurityError(); false } catch (cancelled: CancellationException) {
         throw cancelled
     } catch (_: Exception) {
         showSecurityError()
@@ -323,7 +343,7 @@ class AppLockViewModel @Inject constructor(
     private suspend fun saveFailureState(attempts: Int, lockoutUntil: Long): Boolean = try {
         preferences.setAppLockFailureState(attempts, lockoutUntil)
         true
-    } catch (cancelled: CancellationException) {
+    } catch (_: com.risediary.app.data.DataMaintenanceBusyException) { showSecurityError(); false } catch (cancelled: CancellationException) {
         throw cancelled
     } catch (_: Exception) {
         showSecurityError()
@@ -331,6 +351,7 @@ class AppLockViewModel @Inject constructor(
     }
 
     private fun showSecurityError() {
+        _ready.value = false
         _pin.value = ""
         _errorMessage.value = context.getString(R.string.app_lock_error_security)
     }
@@ -380,8 +401,7 @@ class AppLockViewModel @Inject constructor(
                         BiometricAuthResult.Success -> {
                             biometricRequestInProgress = false
                             viewModelScope.launch {
-                                clearFailures()
-                                _done.value = true
+                                if (clearFailures(requireBiometric = true) && confirmCurrentCredential()) _done.value = true
                             }
                         }
                         BiometricAuthResult.Error -> {

@@ -28,6 +28,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.risediary.app.R
+import com.risediary.app.data.DataMaintenanceBusyException
+import com.risediary.app.data.DataWriteConflictException
+import kotlinx.coroutines.CancellationException
 import com.risediary.app.ui.navigation3.LocalNavigator
 import com.risediary.app.ui.navigation3.Route
 import com.risediary.app.ui.components.SecondaryPageScaffold
@@ -37,6 +40,7 @@ import com.risediary.app.ui.theme.backgroundBrush
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
@@ -49,13 +53,26 @@ fun CardOrderScreen(
     val navigator = LocalNavigator.current
     val scope = rememberCoroutineScope()
     var isClosing by remember { mutableStateOf(false) }
+    var saveError by remember { mutableStateOf<String?>(null) }
     val closeScreen: () -> Unit = {
         if (!isClosing) {
             isClosing = true
+            saveError = null
             scope.launch {
-                runCatching { vm.save() }
-                    .onSuccess { navigator.pop() }
-                    .onFailure { isClosing = false }
+                try {
+                    vm.save()
+                    navigator.pop()
+                } catch (_: DataMaintenanceBusyException) {
+                    navigator.pop()
+                } catch (_: DataWriteConflictException) {
+                    navigator.pop()
+                } catch (cancelled: CancellationException) {
+                    isClosing = false
+                    throw cancelled
+                } catch (_: Exception) {
+                    saveError = "布局未保存，请稍后重试；当前调整已保留。"
+                    isClosing = false
+                }
             }
         }
     }
@@ -72,7 +89,9 @@ fun CardOrderScreen(
             vm = vm,
             listState = listState,
             modifier = Modifier.fillMaxSize(),
-            contentPadding = innerPadding
+            contentPadding = innerPadding,
+            saveError = saveError,
+            onReload = { saveError = null; vm.load() }
         )
     }
 }
@@ -82,7 +101,9 @@ private fun CardOrderList(
     vm: CardOrderViewModel,
     listState: LazyListState,
     modifier: Modifier = Modifier,
-    contentPadding: PaddingValues = PaddingValues()
+    contentPadding: PaddingValues = PaddingValues(),
+    saveError: String? = null,
+    onReload: () -> Unit = {}
 ) {
     var draggedCardId by remember { mutableStateOf<String?>(null) }
     var dragOffsetY by remember { mutableFloatStateOf(0f) }
@@ -123,6 +144,13 @@ private fun CardOrderList(
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     modifier = Modifier.padding(horizontal = 4.dp)
                 )
+                (saveError ?: vm.loadErrorMessage)?.let { message ->
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(message, color = MiuixTheme.colorScheme.error, style = MiuixTheme.textStyles.body2)
+                }
+                if (vm.loadErrorMessage != null) {
+                    TextButton(text = "重新读取", onClick = onReload)
+                }
                 Spacer(modifier = Modifier.height(4.dp))
             }
         }

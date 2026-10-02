@@ -13,7 +13,6 @@ import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import java.time.Clock
-import java.time.ZoneId
 import javax.inject.Singleton
 
 @Module
@@ -50,9 +49,5 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun provideZoneId(): ZoneId = ZoneId.systemDefault()
-
-    @Provides
-    @Singleton
-    fun provideClock(zoneId: ZoneId): Clock = Clock.system(zoneId)
+    fun provideClock(): Clock = Clock.systemUTC()
 }

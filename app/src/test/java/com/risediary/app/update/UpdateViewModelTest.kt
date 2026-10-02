@@ -187,7 +187,8 @@ class UpdateViewModelTest {
     }
 
     @Test fun completedFileMissingOffersRetryEvenAfterACheckFailure() = runTest(dispatcher) {
-        val task = DownloadRecord(7, release(), release().assets.single(), UpdateChannel.OFFICIAL)
+        val task = DownloadRecord(7, release(), release().assets.single(), UpdateChannel.OFFICIAL,
+            authorization = authorizeDownload(release(), release().assets.single(), UpdateSettings(), "v1.1.2"))
         val downloads = FakeDownloads().apply { queryError = UpdateError.FILE_MISSING }
         val vm = UpdateViewModel(ReleaseSource { error("offline") }, FakeUpdatePreferences(record = task), downloads)
         runCurrent()
@@ -293,7 +294,7 @@ class UpdateViewModelTest {
         vm.checkAtStartup(); runCurrent()
         assertEquals(0, calls)
         vm.openAndCheck(); runCurrent()
-        assertEquals(UpdatePrimaryAction.DISABLED, primaryUpdateAction(vm.ui.value))
+        assertEquals(UpdatePrimaryAction.CHECK, primaryUpdateAction(vm.ui.value))
         vm.downloadUpdate(); runCurrent()
         assertTrue(downloads.tasks.isEmpty())
     }
@@ -409,6 +410,126 @@ class UpdateViewModelTest {
         assertTrue(downloads.tasks.isEmpty())
     }
 
+    @Test fun failedOldDownloadCannotOfferDownloadForANewerReleaseWithoutApk() = runTest(dispatcher) {
+        val old = release("v98.0.0")
+        val task = DownloadRecord(7, old, old.assets.single(), UpdateChannel.OFFICIAL)
+        val downloads = FakeDownloads().apply { queryError = UpdateError.FILE_MISSING }
+        val vm = UpdateViewModel(ReleaseSource { release().copy(assets = emptyList()) },
+            FakeUpdatePreferences(record = task), downloads)
+        runCurrent()
+        vm.openAndCheck(); runCurrent()
+        assertEquals(UpdatePrimaryAction.CHECK, primaryUpdateAction(vm.ui.value))
+        vm.downloadUpdate(); runCurrent()
+        assertTrue(downloads.tasks.isEmpty())
+    }
+
+    @Test fun failedOldDownloadCannotBypassUpToDateCheck() = runTest(dispatcher) {
+        val old = release("v1.0.0")
+        val task = DownloadRecord(7, old, old.assets.single(), UpdateChannel.OFFICIAL)
+        val downloads = FakeDownloads().apply { queryError = UpdateError.FILE_MISSING }
+        val vm = UpdateViewModel(ReleaseSource { old }, FakeUpdatePreferences(record = task), downloads)
+        runCurrent()
+        vm.openAndCheck(); runCurrent()
+        assertEquals(UpdatePrimaryAction.CHECK, primaryUpdateAction(vm.ui.value))
+        vm.downloadUpdate(); runCurrent()
+        assertTrue(downloads.tasks.isEmpty())
+    }
+    @Test fun successfulNewCheckRetriesTheNewReleaseRatherThanOldTask() = runTest(dispatcher) {
+        val old = release("v98.0.0")
+        val task = DownloadRecord(7, old, old.assets.single(), UpdateChannel.OFFICIAL)
+        val downloads = FakeDownloads().apply { queryError = UpdateError.FILE_MISSING }
+        val vm = UpdateViewModel(ReleaseSource { release() }, FakeUpdatePreferences(record = task), downloads)
+        runCurrent(); vm.openAndCheck(); runCurrent()
+        assertEquals(UpdatePrimaryAction.DOWNLOAD, primaryUpdateAction(vm.ui.value))
+        vm.downloadUpdate(); runCurrent()
+        assertEquals("v99.0.0", downloads.tasks.single().release.tagName)
+    }
+
+    @Test fun legacyFailedTaskNeedsNewCheckBeforeOfflineRetry() = runTest(dispatcher) {
+        val task = DownloadRecord(7, release(), release().assets.single(), UpdateChannel.OFFICIAL)
+        val downloads = FakeDownloads().apply { queryError = UpdateError.FILE_MISSING }
+        val vm = UpdateViewModel(ReleaseSource { error("offline") }, FakeUpdatePreferences(record = task), downloads)
+        runCurrent(); vm.openAndCheck(); runCurrent()
+        assertEquals(UpdatePrimaryAction.CHECK, primaryUpdateAction(vm.ui.value))
+        assertEquals(UpdateError.RECHECK_REQUIRED, vm.ui.value.downloadEligibilityError)
+        vm.downloadUpdate(); runCurrent()
+        assertTrue(downloads.tasks.isEmpty())
+    }
+
+    @Test fun unchangedAuthorizedTaskHasExplicitOriginalVersionOfflineRetry() = runTest(dispatcher) {
+        val release = release()
+        val task = DownloadRecord(7, release, release.assets.single(), UpdateChannel.OFFICIAL,
+            authorization = authorizeDownload(release, release.assets.single(), UpdateSettings(), "v1.1.2"))
+        val downloads = FakeDownloads().apply { queryError = UpdateError.FILE_MISSING }
+        val vm = UpdateViewModel(ReleaseSource { error("offline") }, FakeUpdatePreferences(record = task), downloads)
+        runCurrent(); vm.openAndCheck(); runCurrent()
+        assertEquals(UpdatePrimaryAction.DOWNLOAD, primaryUpdateAction(vm.ui.value))
+        assertTrue(vm.ui.value.retryingOriginalVersion)
+        vm.downloadUpdate(); runCurrent()
+        assertEquals(release, downloads.tasks.single().release)
+    }
+
+    @Test fun revokedForceOrPreviewAuthorizationCannotRetryOldTarget() = runTest(dispatcher) {
+        for (preview in listOf(false, true)) {
+            val oldSettings = UpdateSettings(forceCheck = true,
+                releaseChannel = if (preview) ReleaseChannel.PREVIEW else ReleaseChannel.STABLE)
+            val old = release("v1.0.0").copy(prerelease = preview)
+            val task = DownloadRecord(7, old, old.assets.single(), UpdateChannel.OFFICIAL,
+                authorization = authorizeDownload(old, old.assets.single(), oldSettings, "v1.1.2"))
+            val downloads = FakeDownloads().apply { queryError = UpdateError.FILE_MISSING }
+            val vm = UpdateViewModel(ReleaseSource { error("offline") }, FakeUpdatePreferences(record = task), downloads)
+            runCurrent(); vm.openAndCheck(); runCurrent()
+            assertEquals(UpdatePrimaryAction.CHECK, primaryUpdateAction(vm.ui.value))
+            vm.downloadUpdate(); runCurrent()
+            assertTrue(downloads.tasks.isEmpty())
+        }
+    }
+
+    @Test fun policyChangeDuringTaskQueryIsCheckedAgainBeforeEnqueue() = runTest(dispatcher) {
+        val old = release("v98.0.0")
+        val task = DownloadRecord(7, old, old.assets.single(), UpdateChannel.OFFICIAL)
+        val downloads = FakeDownloads().apply { queryError = UpdateError.FILE_MISSING }
+        val prefs = FakeUpdatePreferences(record = task)
+        val vm = UpdateViewModel(ReleaseSource { release() }, prefs, downloads)
+        runCurrent(); vm.openAndCheck(); runCurrent()
+        val barrier = CompletableDeferred<Unit>()
+        downloads.queryBarrier = barrier
+        vm.downloadUpdate(); runCurrent()
+        prefs.settings.value = prefs.settings.value.copy(forceCheck = true)
+        runCurrent(); barrier.complete(Unit); runCurrent()
+        assertTrue(downloads.tasks.isEmpty())
+        assertEquals(UpdateError.RECHECK_REQUIRED, vm.ui.value.error)
+    }
+
+    @Test fun completionBetweenCancellationQueryAndRemoveFollowsCancellation() = runTest(dispatcher) {
+        val prefs = FakeUpdatePreferences()
+        val downloads = FakeDownloads()
+        val vm = UpdateViewModel(ReleaseSource { release() }, prefs, downloads)
+        vm.openAndCheck(); runCurrent(); vm.downloadUpdate(); runCurrent()
+        downloads.completeAfterCancellationQuery = true
+        vm.requestCancel(); vm.confirmCancel(); runCurrent()
+        assertEquals(listOf(7L), downloads.cancelled)
+        assertEquals(DownloadState.Idle, vm.ui.value.download)
+        assertNull(prefs.downloadRecord.value)
+        vm.refreshDownload(); runCurrent()
+        assertEquals(DownloadState.Idle, vm.ui.value.download)
+    }
+
+    @Test fun cancellationRemoveFailurePreservesRecordAndAllowsRetry() = runTest(dispatcher) {
+        val prefs = FakeUpdatePreferences()
+        val downloads = FakeDownloads()
+        val vm = UpdateViewModel(ReleaseSource { release() }, prefs, downloads)
+        vm.openAndCheck(); runCurrent(); vm.downloadUpdate(); runCurrent()
+        val stored = prefs.downloadRecord.value
+        downloads.cancellationRemoveError = true
+        vm.requestCancel(); vm.confirmCancel(); runCurrent()
+        assertEquals(stored, prefs.downloadRecord.value)
+        assertTrue(vm.ui.value.download is DownloadState.Running)
+        assertEquals(UpdateError.DOWNLOAD, vm.ui.value.error)
+        downloads.cancellationRemoveError = false
+        vm.requestCancel(); vm.confirmCancel(); runCurrent()
+        assertNull(prefs.downloadRecord.value)
+    }
     private fun release(tag: String = "v99.0.0") = GitHubRelease(tag, tag, RELEASES_URL, "notes",
         listOf(GitHubAsset(5, "RiseDiary-$tag.apk", "https://github.com/sky-shunfengjun/RiseDiary/releases/download/$tag/RiseDiary-$tag.apk", 1024)))
 }
@@ -446,13 +567,25 @@ private class FakeDownloads : UpdateDownloads {
     var verifications = 0
     override suspend fun enqueue(release: GitHubRelease, asset: GitHubAsset, channel: UpdateChannel): DownloadRecord =
         DownloadRecord(7, release, asset, channel).also(tasks::add)
-    override suspend fun query(record: DownloadRecord): DownloadState =
-        if (queryError != null) DownloadState.Failed(record, queryError!!) else if (completed) DownloadState.Ready(record) else DownloadState.Running(record, 35)
-    override suspend fun cancel(record: DownloadRecord): Boolean {
-        if (completed) return false
-        cancelled.add(record.id)
-        return true
+    var queryBarrier: CompletableDeferred<Unit>? = null
+    override suspend fun query(record: DownloadRecord): DownloadState {
+        queryBarrier?.await()
+        return if (queryError != null) DownloadState.Failed(record, queryError!!) else if (completed) DownloadState.Ready(record) else DownloadState.Running(record, 35)
     }
+    var completeAfterCancellationQuery = false
+    var cancellationRemoveError = false
+    override suspend fun cancel(record: DownloadRecord): DownloadCancellation = cancelDownloadWithPolicy(
+        query = {
+            val result = if (completed) CancellationQueryState.COMPLETED else CancellationQueryState.PRESENT
+            if (completeAfterCancellationQuery) completed = true
+            result
+        },
+        remove = {
+            if (cancellationRemoveError) throw java.io.IOException("remove failed")
+            cancelled.add(record.id)
+            1
+        }
+    )
     override suspend fun verifyForInstall(record: DownloadRecord): String {
         verifications++
         verificationError?.let { throw UpdateDownloadException(it) }

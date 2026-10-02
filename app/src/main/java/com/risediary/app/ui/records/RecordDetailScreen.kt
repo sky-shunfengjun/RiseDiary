@@ -49,6 +49,7 @@ import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.time.Instant
 import java.time.ZoneId
+import com.risediary.app.ui.components.LocalCalendarEnvironment
 import java.time.format.DateTimeFormatter
 import com.risediary.app.ui.icons.AppIcons
 
@@ -153,6 +154,7 @@ private fun DetailContent(
     contentPadding: androidx.compose.foundation.layout.PaddingValues,
     scrollState: ScrollState
 ) {
+    val calendar = LocalCalendarEnvironment.current
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -168,11 +170,11 @@ private fun DetailContent(
             ) {
                 DetailRow(
                     stringResource(R.string.record_detail_start_time),
-                    formatDateTime(flight.startTime)
+                    formatDateTime(flight.startTime, calendar.zoneId)
                 )
                 DetailRow(
                     stringResource(R.string.record_detail_end_time),
-                    formatDateTime(flight.endTime)
+                    formatDateTime(flight.endTime, calendar.zoneId)
                 )
                 DetailRow(
                     stringResource(R.string.record_detail_duration),
@@ -245,7 +247,7 @@ private fun DetailRow(label: String, value: String) {
     }
 }
 
-private fun formatDateTime(epochMillis: Long): String =
+private fun formatDateTime(epochMillis: Long, zoneId: ZoneId): String =
     DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").format(
-        Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault())
+        Instant.ofEpochMilli(epochMillis).atZone(zoneId)
     )

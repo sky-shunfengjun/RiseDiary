@@ -82,13 +82,15 @@ fun RecordsScreen(
     val navigator = LocalNavigator.current
     val currentTags by viewModel.tags.collectAsStateWithLifecycle()
     val allFlights by viewModel.allFlights.collectAsStateWithLifecycle()
+    val calendar by viewModel.calendarState.collectAsStateWithLifecycle()
     val flights = remember(
         allFlights,
         viewModel.selectedTag,
         viewModel.startDate,
-        viewModel.endDate
+        viewModel.endDate,
+        calendar
     ) {
-        viewModel.filter(allFlights)
+        viewModel.filter(allFlights, calendar.zoneId)
     }
     val availableTagNames = remember(currentTags, allFlights) {
         (currentTags.map { it.name } + allFlights.flatMap { TagJson.decode(it.methodTags) })
@@ -111,8 +113,8 @@ fun RecordsScreen(
     var headerHeight by remember(statusBarTop, density) { mutableStateOf(statusBarTop + 84.dp) }
     val todayLabel = stringResource(R.string.records_today)
     val yesterdayLabel = stringResource(R.string.records_yesterday)
-    val grouped = remember(flights, viewModel.userZoneId, todayLabel, yesterdayLabel) {
-        groupByDate(flights, viewModel.userZoneId, todayLabel, yesterdayLabel)
+    val grouped = remember(flights, calendar, todayLabel, yesterdayLabel) {
+        groupByDate(flights, calendar.zoneId, calendar.date, todayLabel, yesterdayLabel)
     }
     val blurProgress = rememberTopBlurProgress(listState)
     PageTopBlurLayout(
@@ -254,7 +256,7 @@ fun RecordsScreen(
                     items(group.items, key = Flight::id) { flight ->
                         FlightCard(
                             flight = flight,
-                            zoneId = viewModel.userZoneId,
+                            zoneId = calendar.zoneId,
                             onClick = {
                                 navigator.push(Route.RecordDetail(flight.id))
                             },
@@ -289,7 +291,7 @@ fun RecordsScreen(
                     text = stringResource(R.string.action_delete),
                     onClick = {
                         deleteTarget = null
-                        viewModel.delete(target)
+                        if (!viewModel.delete(target)) return@TextButton
                         // Launched on the stable MainAppContent scope so the
                         // undo Snackbar survives navigation to detail/edit.
                         snackbarScope.launch {
@@ -446,16 +448,16 @@ private fun StatItem(icon: ImageVector, text: String) {
 private fun formatDuration(seconds: Int): String =
     formatNaturalDuration(seconds)
 
-private data class DateGroup(val header: String, val items: List<Flight>)
+internal data class DateGroup(val header: String, val items: List<Flight>)
 
-private fun groupByDate(
+internal fun groupByDate(
     flights: List<Flight>,
     zoneId: ZoneId,
+    today: LocalDate,
     todayLabel: String,
     yesterdayLabel: String
 ): List<DateGroup> {
     val zone = zoneId
-    val today = LocalDate.now(zone)
     return flights
         .groupBy { Instant.ofEpochMilli(it.startTime).atZone(zone).toLocalDate() }
         .entries

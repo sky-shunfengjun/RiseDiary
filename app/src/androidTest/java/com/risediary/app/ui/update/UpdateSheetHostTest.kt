@@ -449,7 +449,7 @@ class UpdateSheetHostTest {
     private class Downloads : UpdateDownloads {
         override suspend fun enqueue(release: GitHubRelease, asset: GitHubAsset, channel: UpdateChannel) = error("not used")
         override suspend fun query(record: DownloadRecord) = DownloadState.Ready(record)
-        override suspend fun cancel(record: DownloadRecord) = false
+        override suspend fun cancel(record: DownloadRecord) = DownloadCancellation.COMPLETED
         override suspend fun verifyForInstall(record: DownloadRecord) = error("not used")
     }
 }

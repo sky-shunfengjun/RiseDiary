@@ -79,6 +79,9 @@ import com.risediary.app.ui.theme.RiseDiaryTheme
 import java.time.LocalTime
 import java.util.Locale
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
+import com.risediary.app.data.DataMaintenanceBusyException
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 enum class OnboardingMode {
     FIRST_RUN,
@@ -95,6 +98,7 @@ private const val PRIVACY_PAGE = 4
 fun OnboardingScreen(
     mode: OnboardingMode = OnboardingMode.FIRST_RUN,
     onDone: () -> Unit,
+    onSecurityVerified: ((String?) -> Unit)? = null,
     onManageAppLock: (() -> Unit)? = null,
     viewModel: OnboardingViewModel = hiltViewModel(),
     settingsViewModel: SettingsViewModel = hiltViewModel()
@@ -102,6 +106,7 @@ fun OnboardingScreen(
     val context = LocalContext.current
     val activity = remember(context) { context.findFragmentActivity() }
     val systemDark = isSystemInDarkTheme()
+    val saveError by viewModel.errorMessage.collectAsStateWithLifecycle()
 
     val persistedUsername by settingsViewModel.username.collectAsStateWithLifecycle()
     val persistedTheme by settingsViewModel.themeMode.collectAsStateWithLifecycle()
@@ -133,6 +138,7 @@ fun OnboardingScreen(
     var reminderTimeDraft by rememberSaveable { mutableStateOf(dailyReminderTime) }
     var reminderTimeDirty by rememberSaveable { mutableStateOf(false) }
 
+    var onboardingCredential by remember { mutableStateOf<String?>(null) }
     var showLockSetup by rememberSaveable { mutableStateOf(false) }
     var showTimePicker by rememberSaveable { mutableStateOf(false) }
     var showNotificationBlockedDialog by rememberSaveable { mutableStateOf(false) }
@@ -195,11 +201,20 @@ fun OnboardingScreen(
         onboardingScope.launch {
             try {
                 settingsViewModel.awaitOnboardingWrites()
-                viewModel.finish(
+                val completed = viewModel.finish(
                     firstRun = mode == OnboardingMode.FIRST_RUN,
                     reminderTime = reminderTimeDraft.takeIf { saveReminderTime }
                 )
-                onDone()
+                if (completed) {
+                    onSecurityVerified?.invoke(onboardingCredential)
+                    onDone()
+                }
+            } catch (error: DataMaintenanceBusyException) {
+                viewModel.reportSaveFailure(error)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                viewModel.reportSaveFailure(error)
             } finally {
                 finishing = false
             }
@@ -226,7 +241,8 @@ fun OnboardingScreen(
                         settingsViewModel.requestBiometricUnlock(true, activity)
                     }
                 },
-                onCancel = { showLockSetup = false }
+                onCancel = { showLockSetup = false },
+                onCredentialVerified = { onboardingCredential = it }
             )
         }
         return
@@ -352,6 +368,14 @@ fun OnboardingScreen(
                     }
                 }
 
+                saveError?.let { message ->
+                    Text(
+                        message,
+                        color = MiuixTheme.colorScheme.error,
+                        style = MiuixTheme.textStyles.body2,
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
+                    )
+                }
                 when (page) {
                     WELCOME_PAGE -> WelcomeAction(
                         backdrop = backdrop,

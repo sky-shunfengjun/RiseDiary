@@ -33,8 +33,7 @@ import androidx.compose.ui.unit.sp
 import com.risediary.app.R
 import com.risediary.app.ui.components.CompactRangeSwitcher
 import com.risediary.app.ui.components.LiquidSegmentOption
-import org.json.JSONArray
-import org.json.JSONObject
+import com.risediary.app.data.HomeCardOrderPolicy
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -141,39 +140,9 @@ internal fun TrendSelector(
     )
 }
 
-internal fun parseCardOrder(orderJson: String, visibilityJson: String): List<String> {
-    val order = try {
-        val array = JSONArray(orderJson)
-        (0 until array.length()).map { array.getString(it) }
-    } catch (_: Exception) {
-        emptyList()
-    }
-    val visibility = try {
-        val value = JSONObject(visibilityJson)
-        value.keys().asSequence().associate { it to value.getBoolean(it) }
-    } catch (_: Exception) {
-        emptyMap()
-    }
-    return resolveHomeCardOrder(order, visibility)
-}
+internal fun parseCardOrder(orderJson: String, visibilityJson: String): List<String> =
+    HomeCardOrderPolicy.visibleOrder(orderJson, visibilityJson, HomeCardOrderPolicy.currentIds)
 
-internal fun resolveHomeCardOrder(
-    savedOrder: List<String>,
-    visibility: Map<String, Boolean>
-): List<String> {
-    val defaultOrder = listOf("checkin", "overview", "trend", "length", "achievement")
-    val legacyMap = mapOf(
-        "recent7" to "checkin",
-        "summary" to "checkin",
-        "heatmap" to "checkin",
-        "distance" to "trend",
-    )
-    val normalized = (if (savedOrder.isEmpty()) defaultOrder else savedOrder)
-        .map { legacyMap[it] ?: it }
-        .let { ids ->
-            val seen = mutableSetOf<String>()
-            ids.filter { seen.add(it) }
-        }
-    val ordered = normalized + defaultOrder.filterNot(normalized::contains)
-    return ordered.filter { visibility[it] ?: true }
-}
+internal fun resolveHomeCardOrder(savedOrder: List<String>, visibility: Map<String, Boolean>): List<String> =
+    HomeCardOrderPolicy.normalizeIds(savedOrder, HomeCardOrderPolicy.currentIds)
+        .filter { visibility[it] ?: true }

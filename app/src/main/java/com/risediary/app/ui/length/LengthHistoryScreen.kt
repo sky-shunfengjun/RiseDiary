@@ -51,6 +51,8 @@ import com.risediary.app.ui.theme.RiseCard
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.Date
+import java.util.TimeZone
+import com.risediary.app.ui.components.LocalCalendarEnvironment
 import java.text.SimpleDateFormat
 import java.util.Locale
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
@@ -179,13 +181,7 @@ fun LengthHistoryScreen(
                 viewModel.clearError()
             },
             onSave = {
-                viewModel.save(it)
-                if (
-                    it.flaccidLengthCm in 0.1f..100f &&
-                    it.erectLengthCm in 0.1f..100f
-                ) {
-                    showEditor = false
-                }
+                viewModel.save(it, original = editorRecord) { showEditor = false }
             }
         )
     }
@@ -334,7 +330,10 @@ private fun LengthRecordCard(
     onDelete: () -> Unit
 ) {
     val locale = LocalConfiguration.current.locales[0]
-    val dateFormat = remember(locale) { SimpleDateFormat("yyyy/MM/dd", locale) }
+    val calendar = LocalCalendarEnvironment.current
+    val dateFormat = remember(locale, calendar.zoneId) {
+        SimpleDateFormat("yyyy/MM/dd", locale).apply { timeZone = TimeZone.getTimeZone(calendar.zoneId) }
+    }
     RiseCard(
         modifier = Modifier.fillMaxWidth(),
         onClick = onEdit

@@ -57,6 +57,7 @@ fun BackupRestoreScreen(
     val navigator = LocalNavigator.current
     val state by vm.state.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
+    val maintenanceState by vm.maintenanceState.collectAsStateWithLifecycle()
     val showClearDialog by vm.showClearConfirm.collectAsStateWithLifecycle()
     // File picker for import
     val importLauncher = rememberLauncherForActivityResult(
@@ -112,6 +113,14 @@ fun BackupRestoreScreen(
                 .padding(padding),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            if (maintenanceState == com.risediary.app.data.DataMaintenanceGate.State.RECOVERY_REQUIRED) {
+                Text(stringResource(R.string.data_recovery_required))
+                TextButton(
+                    text = stringResource(R.string.data_retry_recovery),
+                    enabled = state != BackupState.WORKING,
+                    onClick = vm::retryRecovery
+                )
+            }
             // ── Export ──
             Text(stringResource(R.string.backup_export_section), style = MiuixTheme.textStyles.title4,
                 fontWeight = FontWeight.SemiBold)
@@ -127,7 +136,7 @@ fun BackupRestoreScreen(
                     var showExportConfirm by remember { mutableStateOf(false) }
                     Button(
                         onClick = { showExportConfirm = true },
-                        enabled = state != BackupState.WORKING,
+                        enabled = state != BackupState.WORKING && maintenanceState == com.risediary.app.data.DataMaintenanceGate.State.IDLE,
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColorsPrimary()
                     ) {
@@ -194,7 +203,7 @@ title = { Text(stringResource(R.string.backup_confirm_export_title)) },
                     var showRestoreConfirm by remember { mutableStateOf(false) }
                     Button(
                         onClick = { showRestoreConfirm = true },
-                        enabled = state != BackupState.WORKING,
+                        enabled = state != BackupState.WORKING && maintenanceState == com.risediary.app.data.DataMaintenanceGate.State.IDLE,
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColorsPrimary()
                     ) {
@@ -262,7 +271,7 @@ title = { Text(stringResource(R.string.backup_confirm_restore_title)) },
                     Spacer(modifier = Modifier.height(12.dp))
                     Button(
                         onClick = { vm.showClearDialog() },
-                        enabled = state != BackupState.WORKING,
+                        enabled = state != BackupState.WORKING && maintenanceState == com.risediary.app.data.DataMaintenanceGate.State.IDLE,
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColors(
                             color = CardRed,

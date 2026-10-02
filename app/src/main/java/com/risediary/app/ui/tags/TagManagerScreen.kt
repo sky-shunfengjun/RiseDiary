@@ -91,7 +91,7 @@ fun TagManagerScreen(
     val density = LocalDensity.current
     var itemExtentPx by remember { mutableFloatStateOf(with(density) { 88.dp.toPx() }) }
 
-    LaunchedEffect(tags, draggedTagId) {
+    LaunchedEffect(tags, draggedTagId, pendingOrderIds) {
         if (draggedTagId == null) {
             val sourceIds = tags.map(Tag::id)
             val pending = pendingOrderIds
@@ -106,8 +106,12 @@ fun TagManagerScreen(
     fun finishDragging() {
         val finishingId = draggedTagId
         if (finishingId != null) {
-            pendingOrderIds = displayedTags.map(Tag::id)
-            viewModel.reorder(displayedTags.toList())
+            val requested = displayedTags.toList()
+            val requestedIds = requested.map(Tag::id)
+            pendingOrderIds = requestedIds
+            viewModel.reorder(requested) {
+                if (pendingOrderIds == requestedIds) pendingOrderIds = null
+            }
         }
         settleJob?.cancel()
         settleJob = dragScope.launch {

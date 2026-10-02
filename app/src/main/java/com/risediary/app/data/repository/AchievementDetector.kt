@@ -2,10 +2,8 @@ package com.risediary.app.data.repository
 
 import com.risediary.app.data.entity.Flight
 import com.risediary.app.data.entity.LengthRecord
-import java.time.Clock
-import java.time.Instant
 import java.time.LocalDate
-import java.time.ZoneId
+import com.risediary.app.util.LocalCalendarContext
 import com.risediary.app.util.StreakCalculator
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -17,8 +15,7 @@ class AchievementDetector @Inject constructor(
     private val flightRepository: FlightRepository,
     private val lengthRecordRepository: LengthRecordRepository,
     private val achievementRepository: AchievementRepository,
-    private val clock: Clock,
-    private val zoneId: ZoneId
+    private val calendar: LocalCalendarContext
 ) {
     suspend fun checkAndUnlock(flight: Flight): List<AchievementUnlock> {
         val candidates = linkedSetOf<String>()
@@ -82,7 +79,7 @@ class AchievementDetector @Inject constructor(
     }
 
     suspend fun calculateCurrentStreak(): Int {
-        val today = Instant.ofEpochMilli(clock.millis()).atZone(zoneId).toLocalDate()
+        val today = calendar.current().date
         val dates = flightRepository.getDistinctFlightDates()
             .mapNotNull { runCatching { LocalDate.parse(it) }.getOrNull() }
         return StreakCalculator.currentStreak(dates, today)
