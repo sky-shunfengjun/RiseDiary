@@ -1,6 +1,9 @@
 package com.risediary.app.ui.settings
 
-import androidx.activity.compose.BackHandler
+import com.risediary.app.ui.components.rememberTopBlurProgress
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.LazyListState
+import com.risediary.app.ui.components.PageBackHandler as BackHandler
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.tween
@@ -25,6 +28,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.risediary.app.R
+import com.risediary.app.data.DataMaintenanceBusyException
+import com.risediary.app.data.DataWriteConflictException
+import kotlinx.coroutines.CancellationException
 import com.risediary.app.ui.navigation3.LocalNavigator
 import com.risediary.app.ui.navigation3.Route
 import com.risediary.app.ui.components.SecondaryPageScaffold
@@ -34,6 +40,7 @@ import com.risediary.app.ui.theme.backgroundBrush
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Job
@@ -46,53 +53,57 @@ fun CardOrderScreen(
     val navigator = LocalNavigator.current
     val scope = rememberCoroutineScope()
     var isClosing by remember { mutableStateOf(false) }
+    var saveError by remember { mutableStateOf<String?>(null) }
     val closeScreen: () -> Unit = {
         if (!isClosing) {
             isClosing = true
+            saveError = null
             scope.launch {
-                runCatching { vm.save() }
-                    .onSuccess { navigator.pop() }
-                    .onFailure { isClosing = false }
+                try {
+                    vm.save()
+                    navigator.pop()
+                } catch (_: DataMaintenanceBusyException) {
+                    navigator.pop()
+                } catch (_: DataWriteConflictException) {
+                    navigator.pop()
+                } catch (cancelled: CancellationException) {
+                    isClosing = false
+                    throw cancelled
+                } catch (_: Exception) {
+                    saveError = "布局未保存，请稍后重试；当前调整已保留。"
+                    isClosing = false
+                }
             }
         }
     }
     BackHandler(enabled = !isClosing, onBack = closeScreen)
 
+    val listState = rememberLazyListState()
+
     SecondaryPageScaffold(
+        topBlurProgress = rememberTopBlurProgress(listState),
         title = stringResource(R.string.card_order_title),
         onBack = closeScreen
     ) { innerPadding ->
-        Column(modifier = Modifier.fillMaxSize()) {
-            Text(
-                stringResource(R.string.card_order_instructions),
-                fontSize = MiuixTheme.textStyles.body1.fontSize,
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                modifier = Modifier.padding(
-                    start = innerPadding.calculateLeftPadding(LayoutDirection.Ltr) + 4.dp,
-                    top = innerPadding.calculateTopPadding(),
-                    end = innerPadding.calculateRightPadding(LayoutDirection.Ltr) + 4.dp
-                )
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-
-            CardOrderList(
-                vm = vm,
-                modifier = Modifier.weight(1f),
-                contentPadding = PaddingValues(
-                    start = innerPadding.calculateLeftPadding(LayoutDirection.Ltr),
-                    end = innerPadding.calculateRightPadding(LayoutDirection.Ltr),
-                    bottom = innerPadding.calculateBottomPadding()
-                )
-            )
-        }
+        CardOrderList(
+            vm = vm,
+            listState = listState,
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = innerPadding,
+            saveError = saveError,
+            onReload = { saveError = null; vm.load() }
+        )
     }
 }
 
 @Composable
 private fun CardOrderList(
     vm: CardOrderViewModel,
+    listState: LazyListState,
     modifier: Modifier = Modifier,
-    contentPadding: PaddingValues = PaddingValues()
+    contentPadding: PaddingValues = PaddingValues(),
+    saveError: String? = null,
+    onReload: () -> Unit = {}
 ) {
     var draggedCardId by remember { mutableStateOf<String?>(null) }
     var dragOffsetY by remember { mutableFloatStateOf(0f) }
@@ -119,12 +130,30 @@ private fun CardOrderList(
         }
     }
 
-LazyColumn(
-verticalArrangement = Arrangement.spacedBy(12.dp),
-modifier = modifier
-    .fillMaxWidth(),
-contentPadding = contentPadding
-) {
+    LazyColumn(
+        state = listState,
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+        modifier = modifier.fillMaxWidth(),
+        contentPadding = contentPadding
+    ) {
+        item(key = "instructions") {
+            Column {
+                Text(
+                    stringResource(R.string.card_order_instructions),
+                    fontSize = MiuixTheme.textStyles.body1.fontSize,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    modifier = Modifier.padding(horizontal = 4.dp)
+                )
+                (saveError ?: vm.loadErrorMessage)?.let { message ->
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(message, color = MiuixTheme.colorScheme.error, style = MiuixTheme.textStyles.body2)
+                }
+                if (vm.loadErrorMessage != null) {
+                    TextButton(text = "重新读取", onClick = onReload)
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+            }
+        }
         itemsIndexed(
             items = vm.orderedIds,
             key = { _, id -> id }

@@ -1,5 +1,6 @@
 package com.risediary.app.ui.form
 
+import com.risediary.app.ui.components.rememberTopBlurProgress
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -119,8 +120,8 @@ fun RecordFormScreen(
 
     val activeAchievement = vm.newAchievementKeys.firstOrNull()
     val mainPagerState = LocalMainPagerState.current
-    LaunchedEffect(vm.saved, activeAchievement) {
-        if (vm.saved && activeAchievement == null) {
+    LaunchedEffect(vm.saved, activeAchievement, vm.saveWarning) {
+        if (vm.saved && activeAchievement == null && vm.saveWarning == null) {
             // Pop exactly one level so a manual draft form pushed below the
             // timer form is never destroyed by a popUntil(Main).
             if (navigator.backStackSize() > 1) {
@@ -133,6 +134,7 @@ fun RecordFormScreen(
     }
 
     SecondaryPageScaffold(
+        topBlurProgress = rememberTopBlurProgress(scrollState),
         title = if (flightId == null) {
             stringResource(R.string.form_new_record)
         } else {
@@ -143,12 +145,12 @@ fun RecordFormScreen(
         bottomAction = { backdrop ->
             LiquidGlassButton(
                 onClick = {
-                    if (!vm.isSaving && !vm.isLoading) vm.save()
+                    if (!vm.isSaving && !vm.isLoading && vm.quantitySettingsReady) vm.save()
                 },
                 backdrop = backdrop,
                 modifier = Modifier.widthIn(min = 184.dp, max = 224.dp),
-                isInteractive = !vm.isSaving && !vm.isLoading,
-                enabled = !vm.isSaving && !vm.isLoading,
+                isInteractive = !vm.isSaving && !vm.isLoading && vm.quantitySettingsReady,
+                enabled = !vm.isSaving && !vm.isLoading && vm.quantitySettingsReady,
                 tint = MiuixTheme.colorScheme.primary.copy(alpha = 0.075f),
                 height = 56.dp,
                 highlightIntensity = 0.38f,
@@ -429,7 +431,7 @@ fun RecordFormScreen(
 
                     TextField(
                         value = vm.moodNote,
-                        onValueChange = { vm.moodNote = it },
+                        onValueChange = vm::setMoodNoteInput,
                         label = stringResource(R.string.form_note_label),
                         leadingIcon = {
                             Icon(
@@ -452,9 +454,29 @@ fun RecordFormScreen(
                         maxLines = 5,
                         cornerRadius = 16.dp
                     )
+                    Text(
+                        if (vm.moodNote.length > RecordValidation.MAX_NEW_NOTE_LENGTH) {
+                            "历史长备注已保留，可删减；新备注最多 10000 字"
+                        } else {
+                            "${vm.moodNote.length} / ${RecordValidation.MAX_NEW_NOTE_LENGTH} 字"
+                        },
+                        style = MiuixTheme.textStyles.body2,
+                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                    )
                 }
             }
 
+            if (vm.isQuantitySettingsLoading) {
+                Text(
+                    "正在读取射精量设置…",
+                    style = MiuixTheme.textStyles.body2,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                )
+            }
+            vm.quantitySettingsError?.let { error ->
+                Text(error, style = MiuixTheme.textStyles.body2, color = MiuixTheme.colorScheme.error)
+                TextButton(text = "重试读取设置", onClick = vm::retryQuantitySettings)
+            }
             vm.errorMessage?.let { error ->
                 Box(
                     modifier = Modifier
@@ -587,6 +609,23 @@ fun RecordFormScreen(
                 }
             }
         )
+    }
+
+    vm.saveWarning?.let { warning ->
+        if (activeAchievement == null) {
+            LiquidAlertDialog(
+                onDismissRequest = vm::dismissSaveWarning,
+                confirmButton = {
+                    TextButton(
+                        text = stringResource(R.string.form_got_it),
+                        onClick = vm::dismissSaveWarning,
+                        colors = liquidDialogConfirmButtonColors()
+                    )
+                },
+                title = { Text("记录已保存", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) },
+                text = { Text(warning, style = MiuixTheme.textStyles.body1) }
+            )
+        }
     }
 
     if (activeAchievement != null) {

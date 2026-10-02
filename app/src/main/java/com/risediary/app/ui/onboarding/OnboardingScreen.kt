@@ -1,9 +1,15 @@
 package com.risediary.app.ui.onboarding
 
+import com.risediary.app.ui.components.PageTopBlurLayout
+import com.risediary.app.ui.components.rememberTopBlurProgress
+import com.risediary.app.ui.components.LocalPageEffectsActive
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.layout.onSizeChanged
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
-import androidx.activity.compose.BackHandler
+import com.risediary.app.ui.components.PageBackHandler as BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
@@ -73,6 +79,9 @@ import com.risediary.app.ui.theme.RiseDiaryTheme
 import java.time.LocalTime
 import java.util.Locale
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
+import com.risediary.app.data.DataMaintenanceBusyException
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 enum class OnboardingMode {
     FIRST_RUN,
@@ -89,6 +98,7 @@ private const val PRIVACY_PAGE = 4
 fun OnboardingScreen(
     mode: OnboardingMode = OnboardingMode.FIRST_RUN,
     onDone: () -> Unit,
+    onSecurityVerified: ((String?) -> Unit)? = null,
     onManageAppLock: (() -> Unit)? = null,
     viewModel: OnboardingViewModel = hiltViewModel(),
     settingsViewModel: SettingsViewModel = hiltViewModel()
@@ -96,6 +106,7 @@ fun OnboardingScreen(
     val context = LocalContext.current
     val activity = remember(context) { context.findFragmentActivity() }
     val systemDark = isSystemInDarkTheme()
+    val saveError by viewModel.errorMessage.collectAsStateWithLifecycle()
 
     val persistedUsername by settingsViewModel.username.collectAsStateWithLifecycle()
     val persistedTheme by settingsViewModel.themeMode.collectAsStateWithLifecycle()
@@ -112,6 +123,10 @@ fun OnboardingScreen(
     val dailyReminderTime by
         settingsViewModel.dailyReminderTime.collectAsStateWithLifecycle()
 
+    val pageScrollStates = listOf(
+        rememberScrollState(), rememberScrollState(), rememberScrollState(),
+        rememberScrollState(), rememberScrollState()
+    )
     var page by rememberSaveable { mutableIntStateOf(WELCOME_PAGE) }
     var usernameDraft by rememberSaveable { mutableStateOf(persistedUsername) }
     var usernameDirty by rememberSaveable { mutableStateOf(false) }
@@ -123,6 +138,7 @@ fun OnboardingScreen(
     var reminderTimeDraft by rememberSaveable { mutableStateOf(dailyReminderTime) }
     var reminderTimeDirty by rememberSaveable { mutableStateOf(false) }
 
+    var onboardingCredential by remember { mutableStateOf<String?>(null) }
     var showLockSetup by rememberSaveable { mutableStateOf(false) }
     var showTimePicker by rememberSaveable { mutableStateOf(false) }
     var showNotificationBlockedDialog by rememberSaveable { mutableStateOf(false) }
@@ -185,11 +201,20 @@ fun OnboardingScreen(
         onboardingScope.launch {
             try {
                 settingsViewModel.awaitOnboardingWrites()
-                viewModel.finish(
+                val completed = viewModel.finish(
                     firstRun = mode == OnboardingMode.FIRST_RUN,
                     reminderTime = reminderTimeDraft.takeIf { saveReminderTime }
                 )
-                onDone()
+                if (completed) {
+                    onSecurityVerified?.invoke(onboardingCredential)
+                    onDone()
+                }
+            } catch (error: DataMaintenanceBusyException) {
+                viewModel.reportSaveFailure(error)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                viewModel.reportSaveFailure(error)
             } finally {
                 finishing = false
             }
@@ -216,7 +241,8 @@ fun OnboardingScreen(
                         settingsViewModel.requestBiometricUnlock(true, activity)
                     }
                 },
-                onCancel = { showLockSetup = false }
+                onCancel = { showLockSetup = false },
+                onCredentialVerified = { onboardingCredential = it }
             )
         }
         return
@@ -237,8 +263,22 @@ fun OnboardingScreen(
             }
         }
         val cockpitWindowHeightPx = LocalView.current.height.toFloat()
+        var headerHeight by remember(density) { mutableStateOf(64.dp) }
         ProvideLiquidDialogHost(dialogHostState) {
-            Box(modifier = Modifier.fillMaxSize()) {
+            PageTopBlurLayout(
+                progress = rememberTopBlurProgress(pageScrollStates[page]),
+                topBarHeight = if (page > WELCOME_PAGE) headerHeight else 48.dp,
+                fadeHeight = if (page > WELCOME_PAGE) 24.dp else 0.dp,
+                overlay = {
+                    if (page > WELCOME_PAGE) {
+                        Box(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 20.dp)) {
+                            Box(Modifier.onSizeChanged { headerHeight = with(density) { it.height.toDp() } }) {
+                                SetupProgressHeader(step = page, backdrop = backdrop, onBack = { page-- })
+                            }
+                        }
+                    }
+                }
+            ) {
                 CockpitBackdrop(
                     topInsetPx = cockpitTopInsetPx,
                     windowHeightPx = cockpitWindowHeightPx,
@@ -256,17 +296,6 @@ fun OnboardingScreen(
                     .padding(horizontal = 20.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                if (page > WELCOME_PAGE) {
-                    SetupProgressHeader(
-                        step = page,
-                        backdrop = backdrop,
-                        onBack = { page-- }
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                } else {
-                    Spacer(modifier = Modifier.height(12.dp))
-                }
-
                 AnimatedContent(
                     targetState = page,
                     transitionSpec = {
@@ -283,55 +312,70 @@ fun OnboardingScreen(
                         .fillMaxWidth(),
                     label = "onboarding_page"
                 ) { currentPage ->
-                    when (currentPage) {
-                        WELCOME_PAGE -> WelcomeOnboardingPage()
-                        PROFILE_PAGE -> ProfileOnboardingPage(
-                            username = usernameDraft,
-                            onUsernameChange = {
-                                usernameDirty = true
-                                usernameDraft = it.take(40)
-                            }
-                        )
-                        THEME_PAGE -> ThemeOnboardingPage(
-                            themeMode = themeDraft,
-                            backdrop = backdrop,
-                            onThemeSelected = {
-                                themeDirty = true
-                                themeDraft = it
-                            }
-                        )
-                        RECORDING_PAGE -> RecordingOnboardingPage(
-                            volumeMode = volumeModeDraft,
-                            mlPerSpurt = mlPerSpurtDraft,
-                            backdrop = backdrop,
-                            onVolumeModeSelected = {
-                                recordingDirty = true
-                                volumeModeDraft = it
-                            },
-                            onMlPerSpurtChange = {
-                                recordingDirty = true
-                                mlPerSpurtDraft = it
-                            }
-                        )
-                        else -> PrivacyOnboardingPage(
-                            appLockEnabled = appLockEnabled,
-                            biometricAvailable = settingsViewModel.biometricAvailable,
-                            biometricEnabled = biometricEnabled,
-                            recommendedRemindersEnabled =
-                                dailyReminderEnabled && inactiveReminderEnabled,
-                            reminderTime = reminderTimeDraft,
-                            backdrop = backdrop,
-                            onCreateAppLock = { showLockSetup = true },
-                            onManageAppLock = onManageAppLock,
-                            onEnableBiometric = {
-                                settingsViewModel.requestBiometricUnlock(true, activity)
-                            },
-                            onRecommendedRemindersChange = ::requestRecommendedReminders,
-                            onEditReminderTime = { showTimePicker = true }
-                        )
+                    val effectsActive = LocalPageEffectsActive.current && currentPage == page
+                    CompositionLocalProvider(
+                        LocalOnboardingScrollState provides pageScrollStates[currentPage],
+                        LocalOnboardingContentTop provides if (currentPage > WELCOME_PAGE) headerHeight + 16.dp else 12.dp,
+                        LocalPageEffectsActive provides effectsActive
+                    ) {
+                        when (currentPage) {
+                            WELCOME_PAGE -> WelcomeOnboardingPage()
+                            PROFILE_PAGE -> ProfileOnboardingPage(
+                                username = usernameDraft,
+                                onUsernameChange = {
+                                    usernameDirty = true
+                                    usernameDraft = it.take(40)
+                                }
+                            )
+                            THEME_PAGE -> ThemeOnboardingPage(
+                                themeMode = themeDraft,
+                                backdrop = backdrop,
+                                onThemeSelected = {
+                                    themeDirty = true
+                                    themeDraft = it
+                                }
+                            )
+                            RECORDING_PAGE -> RecordingOnboardingPage(
+                                volumeMode = volumeModeDraft,
+                                mlPerSpurt = mlPerSpurtDraft,
+                                backdrop = backdrop,
+                                onVolumeModeSelected = {
+                                    recordingDirty = true
+                                    volumeModeDraft = it
+                                },
+                                onMlPerSpurtChange = {
+                                    recordingDirty = true
+                                    mlPerSpurtDraft = it
+                                }
+                            )
+                            else -> PrivacyOnboardingPage(
+                                appLockEnabled = appLockEnabled,
+                                biometricAvailable = settingsViewModel.biometricAvailable,
+                                biometricEnabled = biometricEnabled,
+                                recommendedRemindersEnabled =
+                                    dailyReminderEnabled && inactiveReminderEnabled,
+                                reminderTime = reminderTimeDraft,
+                                backdrop = backdrop,
+                                onCreateAppLock = { showLockSetup = true },
+                                onManageAppLock = onManageAppLock,
+                                onEnableBiometric = {
+                                    settingsViewModel.requestBiometricUnlock(true, activity)
+                                },
+                                onRecommendedRemindersChange = ::requestRecommendedReminders,
+                                onEditReminderTime = { showTimePicker = true }
+                            )
+                        }
                     }
                 }
 
+                saveError?.let { message ->
+                    Text(
+                        message,
+                        color = MiuixTheme.colorScheme.error,
+                        style = MiuixTheme.textStyles.body2,
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
+                    )
+                }
                 when (page) {
                     WELCOME_PAGE -> WelcomeAction(
                         backdrop = backdrop,

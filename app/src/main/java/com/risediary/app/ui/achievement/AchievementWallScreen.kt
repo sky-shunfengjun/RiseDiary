@@ -1,5 +1,7 @@
 package com.risediary.app.ui.achievement
 
+import com.risediary.app.ui.components.rememberTopBlurProgress
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -45,6 +47,8 @@ import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 import java.text.SimpleDateFormat
 import java.util.Date
+import java.util.TimeZone
+import com.risediary.app.ui.components.LocalCalendarEnvironment
 import java.util.Locale
 import com.risediary.app.ui.icons.AppIcons
 
@@ -61,11 +65,15 @@ fun AchievementWallScreen(
     val unlockedKeys = unlocked.map { it.achievementKey }.toSet()
     val unlockedMap = unlocked.associateBy { it.achievementKey }
 
+    val listState = rememberLazyGridState()
+
     SecondaryPageScaffold(
+        topBlurProgress = rememberTopBlurProgress(listState),
         title = stringResource(R.string.achievement_wall_title),
         onBack = { navigator.pop() }
     ) { innerPadding ->
         LazyVerticalGrid(
+            state = listState,
             columns = GridCells.Fixed(2),
             modifier = Modifier
                 .fillMaxSize()
@@ -108,7 +116,10 @@ private fun AchievementCard(
     accentColor: Color
 ) {
     val locale = LocalConfiguration.current.locales[0]
-    val dateFormat = remember(locale) { SimpleDateFormat("yyyy/MM/dd", locale) }
+    val calendar = LocalCalendarEnvironment.current
+    val dateFormat = remember(locale, calendar.zoneId) {
+        SimpleDateFormat("yyyy/MM/dd", locale).apply { timeZone = TimeZone.getTimeZone(calendar.zoneId) }
+    }
     Card(
         modifier = Modifier.fillMaxWidth(),
         cornerRadius = 24.dp,

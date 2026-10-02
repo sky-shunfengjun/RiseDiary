@@ -67,7 +67,8 @@ fun AppLockScreen(
     mode: LockMode = LockMode.VERIFY,
     onDone: () -> Unit,
     onCancel: (() -> Unit)? = null,  // null = no cancel button
-    vm: AppLockViewModel = hiltViewModel()
+    vm: AppLockViewModel = hiltViewModel(),
+    onCredentialVerified: ((String) -> Unit)? = null
 ) {
     SystemBarIconOverride(forceLightIcons = true)
     LaunchedEffect(mode) { vm.init(mode) }
@@ -105,6 +106,7 @@ fun AppLockScreen(
     // Navigate away on done
     LaunchedEffect(done) {
         if (done) {
+            vm.verifiedCredential?.let { onCredentialVerified?.invoke(it) }
             vm.consumeDone()
             onDone()
         }
@@ -225,7 +227,9 @@ fun AppLockScreen(
                     backdrop = lockBackdrop
                 )
             } else if (!ready) {
-                CircularProgressIndicator(modifier = Modifier.size(32.dp))
+                if (error != null) {
+                    TextButton(text = stringResource(R.string.action_retry), onClick = vm::retryLoad)
+                } else CircularProgressIndicator(modifier = Modifier.size(32.dp))
             }
 
             Spacer(modifier = Modifier.height(16.dp))

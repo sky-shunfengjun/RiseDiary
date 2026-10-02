@@ -84,7 +84,7 @@ fun LiquidDateRangePickerDialog(
     onConfirm: (LocalDate, LocalDate) -> Unit,
     onDismissRequest: () -> Unit
 ) {
-    val today = remember { LocalDate.now() }
+    val today = LocalCalendarEnvironment.current.date
     var selectedStart by remember { mutableStateOf<LocalDate?>(null) }
     var selectedEnd by remember { mutableStateOf<LocalDate?>(null) }
     var visibleMonth by remember { mutableStateOf(YearMonth.from(today)) }
@@ -249,7 +249,7 @@ private fun CalendarDay(
             selectedEnd != null &&
             date.isAfter(selectedStart) &&
             date.isBefore(selectedEnd)
-    val isToday = date == LocalDate.now()
+    val isToday = date == LocalCalendarEnvironment.current.date
     val interactionSource = remember { MutableInteractionSource() }
     val shape = if (isSelected) CircleShape else RoundedCornerShape(10.dp)
 

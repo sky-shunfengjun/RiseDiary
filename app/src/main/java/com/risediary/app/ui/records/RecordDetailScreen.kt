@@ -1,5 +1,7 @@
 package com.risediary.app.ui.records
 
+import com.risediary.app.ui.components.rememberTopBlurProgress
+import androidx.compose.foundation.ScrollState
 import com.risediary.app.util.formatNaturalDuration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -47,6 +49,7 @@ import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.time.Instant
 import java.time.ZoneId
+import com.risediary.app.ui.components.LocalCalendarEnvironment
 import java.time.format.DateTimeFormatter
 import com.risediary.app.ui.icons.AppIcons
 
@@ -66,7 +69,10 @@ fun RecordDetailScreen(
         if (deleted) navigator.pop()
     }
 
+    val scrollState = rememberScrollState()
+
     SecondaryPageScaffold(
+        topBlurProgress = if (!loading && flight != null) rememberTopBlurProgress(scrollState) else { { 0f } },
         title = stringResource(R.string.record_detail_title),
         onBack = { navigator.pop() },
         actions = {
@@ -105,7 +111,8 @@ fun RecordDetailScreen(
             }
             else -> DetailContent(
                 flight = checkNotNull(flight),
-                contentPadding = padding
+                contentPadding = padding,
+                scrollState = scrollState
             )
         }
     }
@@ -144,12 +151,14 @@ fun RecordDetailScreen(
 @Composable
 private fun DetailContent(
     flight: Flight,
-    contentPadding: androidx.compose.foundation.layout.PaddingValues
+    contentPadding: androidx.compose.foundation.layout.PaddingValues,
+    scrollState: ScrollState
 ) {
+    val calendar = LocalCalendarEnvironment.current
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState)
             .padding(contentPadding)
             .padding(vertical = 4.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -161,11 +170,11 @@ private fun DetailContent(
             ) {
                 DetailRow(
                     stringResource(R.string.record_detail_start_time),
-                    formatDateTime(flight.startTime)
+                    formatDateTime(flight.startTime, calendar.zoneId)
                 )
                 DetailRow(
                     stringResource(R.string.record_detail_end_time),
-                    formatDateTime(flight.endTime)
+                    formatDateTime(flight.endTime, calendar.zoneId)
                 )
                 DetailRow(
                     stringResource(R.string.record_detail_duration),
@@ -238,7 +247,7 @@ private fun DetailRow(label: String, value: String) {
     }
 }
 
-private fun formatDateTime(epochMillis: Long): String =
+private fun formatDateTime(epochMillis: Long, zoneId: ZoneId): String =
     DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").format(
-        Instant.ofEpochMilli(epochMillis).atZone(ZoneId.systemDefault())
+        Instant.ofEpochMilli(epochMillis).atZone(zoneId)
     )

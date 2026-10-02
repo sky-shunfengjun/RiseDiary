@@ -1,6 +1,6 @@
 package com.risediary.app.ui.components
 
-import androidx.activity.compose.BackHandler
+import com.risediary.app.ui.components.PageBackHandler as BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.EnterExitState

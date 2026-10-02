@@ -9,19 +9,22 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.risediary.app.R
 import com.risediary.app.data.UserPreferences
+import com.risediary.app.data.HomeCardOrderPolicy
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
-import org.json.JSONArray
-import org.json.JSONObject
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import javax.inject.Inject
 
 @HiltViewModel
 class CardOrderViewModel @Inject constructor(
     private val prefs: UserPreferences
 ) : ViewModel() {
-
     data class CardDef(val id: String, @StringRes val labelRes: Int)
+    private data class LayoutSnapshot(val order: String, val visibility: String)
 
     val allCards = listOf(
         CardDef("checkin", R.string.card_order_checkin),
@@ -31,61 +34,40 @@ class CardOrderViewModel @Inject constructor(
         CardDef("achievement", R.string.card_order_achievement),
     )
 
-    /** Observable ordered list of card IDs (Compose State). */
     val orderedIds = mutableStateListOf<String>()
-
-    /** Observable visibility map (Compose State). */
     var visibility by mutableStateOf<Map<String, Boolean>>(emptyMap())
         private set
+    var loadErrorMessage by mutableStateOf<String?>(null)
+        private set
+    private var loadedLayout: LayoutSnapshot? = null
+    private var loadJob: Job? = null
 
-    private var loadFailed = false
-    private var loaded = false
-
-    init {
-        load()
-    }
+    init { load() }
 
     fun load() {
-        viewModelScope.launch {
-            val result = runCatching {
-                // Load order from DataStore
-                val orderJson = prefs.homeCardOrder.first()
-                val savedIds: List<String> = try {
-                    val arr = JSONArray(orderJson)
-                    (0 until arr.length()).map { arr.getString(it) }
-                } catch (_: Exception) {
-                    emptyList()
-                }
-
-                // Merge: saved order first, then any new cards not in saved
-                val savedSet = savedIds.toSet()
-                val merged = savedIds + allCards.map { it.id }.filter { it !in savedSet }
-
-                // Load visibility from DataStore
-                val visJson = prefs.homeCardVisibility.first()
-                val visMap = try {
-                    val obj = JSONObject(visJson)
-                    allCards.associate { card ->
-                        card.id to obj.optBoolean(card.id, true)
-                    }
-                } catch (_: Exception) {
-                    allCards.associate { it.id to true }
-                }
-                Triple(merged, visMap, false)
-            }.getOrElse {
-                // DataStore unreadable: fall back to defaults and refuse to overwrite
-                // whatever was persisted with an accidental empty list.
-                Triple(
-                    allCards.map { it.id },
-                    allCards.associate { it.id to true },
-                    true
-                )
+        loadJob?.cancel()
+        loadedLayout = null
+        loadErrorMessage = null
+        loadJob = viewModelScope.launch {
+            try {
+                val layout = readLayout()
+                val ids = allCards.map { it.id }
+                val merged = HomeCardOrderPolicy.normalizeOrder(layout.order, ids)
+                val storedVisibility = runCatching {
+                    HomeCardOrderPolicy.readVisibility(layout.visibility)
+                }.getOrDefault(emptyMap())
+                orderedIds.clear()
+                orderedIds.addAll(merged)
+                visibility = ids.associateWith { storedVisibility[it] ?: true }
+                loadedLayout = layout
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                orderedIds.clear()
+                orderedIds.addAll(allCards.map { it.id })
+                visibility = allCards.associate { it.id to true }
+                loadErrorMessage = "无法读取卡片布局，请重新读取后再保存"
             }
-            loadFailed = result.third
-            orderedIds.clear()
-            orderedIds.addAll(result.first.ifEmpty { allCards.map { it.id } })
-            visibility = result.second
-            loaded = true
         }
     }
 
@@ -100,20 +82,21 @@ class CardOrderViewModel @Inject constructor(
         visibility = visibility + (cardId to !current)
     }
 
-    /** Save current order and visibility to DataStore. Suspends until write completes. */
-    suspend fun save() {
-        // Never overwrite persisted order with the empty in-memory defaults if the
-        // initial load has not finished (or failed) yet.
-        if (!loaded || loadFailed) return
-        val orderJson = JSONArray().apply {
-            orderedIds.forEach { put(it) }
-        }.toString()
-        prefs.setHomeCardOrder(orderJson)
+    /** The same permit protects the baseline check and the atomic two-field commit. */
+    suspend fun save() = prefs.maintenanceGate.write {
+        val expected = loadedLayout ?: error("卡片布局尚未读取成功，请重新读取后再保存")
+        prefs.maintenanceGate.requireCurrent(expected, readLayout())
+        val ids = allCards.map { it.id }
+        val orderJson = JsonArray(HomeCardOrderPolicy.normalizeIds(orderedIds.toList(), ids).map(::JsonPrimitive)).toString()
+        val visibilityJson = JsonObject(visibility.mapValues { JsonPrimitive(it.value) }).toString()
+        prefs.setHomeCardLayout(orderJson, visibilityJson)
+        // A later save from this page compares with its own last successful commit.
+        loadedLayout = LayoutSnapshot(orderJson, visibilityJson)
+    }
 
-        val visJson = JSONObject().apply {
-            visibility.forEach { (k, v) -> put(k, v) }
-        }.toString()
-        prefs.setHomeCardVisibility(visJson)
+    private suspend fun readLayout(): LayoutSnapshot {
+        val settings = prefs.settingsSnapshot(prefs.rawSnapshot())
+        return LayoutSnapshot(settings.homeCardOrder, settings.homeCardVisibility)
     }
 
     fun getLabelRes(cardId: String): Int = allCards.find { it.id == cardId }?.labelRes ?: 0

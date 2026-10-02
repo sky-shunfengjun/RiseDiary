@@ -14,6 +14,7 @@ interface TimerController {
     fun pause()
     fun resume()
     fun finish()
+    fun retryPersistence() = restore()
     fun reset()
 }
 
@@ -28,6 +29,7 @@ class ServiceTimerController @Inject constructor(
     override fun pause() = send(TimerService.ACTION_PAUSE)
     override fun resume() = send(TimerService.ACTION_RESUME, foreground = true)
     override fun finish() = send(TimerService.ACTION_FINISH)
+    override fun retryPersistence() = send(TimerService.ACTION_RETRY, foreground = true)
     override fun reset() = send(TimerService.ACTION_RESET)
 
     private fun send(action: String, foreground: Boolean = false) {

@@ -15,11 +15,13 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import com.risediary.app.data.DataMaintenanceGate
 
 @HiltViewModel
 class TagManagerViewModel @Inject constructor(
     private val repository: TagRepository,
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val maintenanceGate: DataMaintenanceGate = DataMaintenanceGate()
 ) : ViewModel() {
     val tags: StateFlow<List<Tag>> = repository.allTags.stateIn(
         viewModelScope,
@@ -45,8 +47,8 @@ class TagManagerViewModel @Inject constructor(
             return
         }
 
-        _isSaving.value = true
-        viewModelScope.launch {
+        maintenanceGate.launchWrite(viewModelScope) {
+            _isSaving.value = true
             try {
                 runCatching {
                     val duplicate = repository.getAll().firstOrNull {
@@ -64,6 +66,7 @@ class TagManagerViewModel @Inject constructor(
                             )
                         )
                     } else {
+                        maintenanceGate.requireCurrent(existing, repository.getById(existing.id))
                         repository.update(
                             existing.copy(name = normalized, color = color.uppercase())
                         )
@@ -82,7 +85,7 @@ class TagManagerViewModel @Inject constructor(
     }
 
     fun delete(tag: Tag) {
-        viewModelScope.launch { repository.delete(tag) }
+        maintenanceGate.launchWrite(viewModelScope) { repository.delete(tag) }
     }
 
     fun move(fromIndex: Int, toIndex: Int) {
@@ -93,13 +96,29 @@ class TagManagerViewModel @Inject constructor(
         val reordered = current.toMutableList().apply {
             add(toIndex, removeAt(fromIndex))
         }.mapIndexed { index, tag -> tag.copy(sortOrder = index) }
-        viewModelScope.launch { repository.updateAll(reordered) }
+        maintenanceGate.launchWrite(viewModelScope) {
+            maintenanceGate.requireCurrent(current.map { it.copy(sortOrder = 0) }.sortedBy(Tag::id), repository.getAll().map { it.copy(sortOrder = 0) }.sortedBy(Tag::id))
+            repository.updateAll(reordered)
+        }
     }
 
-    fun reorder(ordered: List<Tag>) {
+    fun reorder(ordered: List<Tag>, onRejected: () -> Unit = {}) {
         val normalized = ordered.mapIndexed { index, tag ->
             tag.copy(sortOrder = index)
         }
-        viewModelScope.launch { repository.updateAll(normalized) }
+        maintenanceGate.launchWrite(viewModelScope) {
+            try {
+                // A preceding drag may have already saved its order while Room's UI emission is pending.
+                // Compare the record identity and content, allowing the user's next order to replace that order.
+                maintenanceGate.requireCurrent(ordered.map { it.copy(sortOrder = 0) }.sortedBy(Tag::id),
+                    repository.getAll().map { it.copy(sortOrder = 0) }.sortedBy(Tag::id))
+                repository.updateAll(normalized)
+            } catch (cancelled: kotlinx.coroutines.CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                _error.value = context.getString(R.string.tag_manager_error_save_failed)
+                onRejected()
+            }
+        }.invokeOnCompletion { failure -> if (failure != null) onRejected() }
     }
 }

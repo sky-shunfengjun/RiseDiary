@@ -4,7 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.view.WindowManager
-import androidx.activity.compose.BackHandler
+import com.risediary.app.ui.components.PageBackHandler as BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
@@ -58,22 +58,18 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.risediary.app.R
 import com.risediary.app.ui.navigation3.LocalNavigator
 import com.risediary.app.ui.navigation3.Route
-import com.kyant.backdrop.Backdrop
 import com.risediary.app.service.TimerMath
 import com.risediary.app.service.TimerSession
 import com.risediary.app.service.TimerStatus
-import com.risediary.app.ui.components.LiquidGlassButton
 import com.risediary.app.ui.components.LiquidAlertDialog
 import com.risediary.app.ui.components.SecondaryPageScaffold
 import com.risediary.app.ui.components.liquidDialogCancelButtonColors
 import com.risediary.app.ui.components.liquidDialogConfirmButtonColors
 import com.risediary.app.util.formatTimerClock
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
-import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import com.risediary.app.ui.icons.AppIcons
 
 @Composable
 fun TimerScreen(
@@ -82,6 +78,7 @@ fun TimerScreen(
     val navigator = LocalNavigator.current
     val context = LocalContext.current
     val session by viewModel.session.collectAsStateWithLifecycle()
+    val persistenceError by viewModel.persistenceError.collectAsStateWithLifecycle()
     var showFinishConfirm by remember { mutableStateOf(false) }
     var showLeaveConfirm by remember { mutableStateOf(false) }
 
@@ -173,6 +170,12 @@ fun TimerScreen(
                 .padding(innerPadding)
                 .background(glowBrush)
         ) {
+            if (persistenceError) {
+                Column(Modifier.align(Alignment.TopCenter), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(stringResource(R.string.timer_error_save), color = MiuixTheme.colorScheme.error)
+                    TextButton(text = stringResource(R.string.action_retry), onClick = viewModel::retryPersistence)
+                }
+            }
             TimerInstrument(
                 session = session,
                 modifier = Modifier
@@ -386,116 +389,5 @@ private fun MinuteSecondTrack(
             radius = 3.dp.toPx(),
             center = androidx.compose.ui.geometry.Offset(cursorX, baseY)
         )
-    }
-}
-
-@Composable
-private fun TimerActionDock(
-    session: TimerSession,
-    backdrop: Backdrop,
-    onStart: () -> Unit,
-    onPause: () -> Unit,
-    onResume: () -> Unit,
-    onFinish: () -> Unit,
-    onReset: () -> Unit,
-    onRecord: () -> Unit
-) {
-    when (session.status) {
-        TimerStatus.IDLE -> {
-            PrimaryTimerButton(
-                text = stringResource(R.string.mode_select_timer),
-                icon = { Icon(AppIcons.PlayArrow, null, Modifier.size(24.dp)) },
-                onClick = onStart,
-                backdrop = backdrop
-            )
-        }
-
-        TimerStatus.RUNNING, TimerStatus.PAUSED -> {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                PrimaryTimerButton(
-                    text = if (session.status == TimerStatus.PAUSED) {
-                        stringResource(R.string.timer_resume)
-                    } else {
-                        stringResource(R.string.timer_pause)
-                    },
-                    icon = {
-                        Icon(
-                            if (session.status == TimerStatus.PAUSED) {
-                                AppIcons.PlayArrow
-                            } else {
-                                AppIcons.Pause
-                            },
-                            null,
-                            Modifier.size(24.dp)
-                        )
-                    },
-                    onClick = if (session.status == TimerStatus.PAUSED) onResume else onPause,
-                    backdrop = backdrop,
-                    width = 176.dp
-                )
-                LiquidGlassButton(
-                    onClick = onFinish,
-                    backdrop = backdrop,
-                    modifier = Modifier.size(60.dp),
-                    tint = MiuixTheme.colorScheme.error.copy(alpha = 0.06f),
-                    height = 60.dp,
-                    horizontalPadding = 0.dp,
-                    highlightIntensity = 0.35f,
-                    highlightRadiusMultiplier = 0.95f,
-                    pressExpansion = 2.dp
-                ) {
-                    Box(
-                        modifier = Modifier.size(60.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Icon(
-                            AppIcons.Stop,
-                            contentDescription = stringResource(R.string.timer_end_timing),
-                            tint = MiuixTheme.colorScheme.error,
-                            modifier = Modifier.size(24.dp)
-                        )
-                    }
-                }
-            }
-        }
-
-        TimerStatus.FINISHED -> {
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                LiquidGlassButton(
-                    onClick = onReset,
-                    backdrop = backdrop,
-                    modifier = Modifier.width(132.dp),
-                    height = 58.dp,
-                    highlightIntensity = 0.35f,
-                    highlightRadiusMultiplier = 0.95f,
-                    pressExpansion = 2.dp
-                ) {
-                    Icon(AppIcons.Refresh, null, Modifier.size(22.dp))
-                    Text(stringResource(R.string.timer_restart), fontWeight = FontWeight.Medium)
-                }
-                PrimaryTimerButton(
-                    text = stringResource(R.string.timer_fill_record),
-                    icon = { Icon(AppIcons.EditNote, null, Modifier.size(22.dp)) },
-                    onClick = onRecord,
-                    backdrop = backdrop,
-                    width = 176.dp
-                )
-            }
-        }
-
-        TimerStatus.LIMIT_REACHED -> {
-            PrimaryTimerButton(
-                text = stringResource(R.string.timer_fill_record),
-                icon = { Icon(AppIcons.EditNote, null, Modifier.size(24.dp)) },
-                onClick = onRecord,
-                backdrop = backdrop
-            )
-        }
     }
 }

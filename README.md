@@ -4,18 +4,23 @@
 
 本项目受 [sky22333/luleme](https://github.com/sky22333/luleme) 的启发，由 Codex 协助编写。
 
-> **隐私说明**：所有数据仅保存在设备本地，不会上传任何个人数据。应用唯一的外部访问是检查 GitHub 上的新版本（读取公开的版本信息），检查失败也不影响正常使用。
+> **隐私说明**：记录及个人设置保存在设备本地，应用不会将这些数据上传到服务器。联网用于从 GitHub 检查版本和下载更新；选择 7ED 下载通道时，安装包下载会经过第三方加速服务。自动检查更新可在应用内关闭，检查失败不影响记录功能。
 
 > **年龄提示**：**本应用建议 18 岁及以上人群使用。**
 
 **⬇️ [下载最新版 APK](https://github.com/sky-shunfengjun/RiseDiary/releases/latest)　|　💬 [加入QQ群组](https://qm.qq.com/q/Z3XTPXXEEW)**
 
 - 支持系统：Android 12（API 31）及以上；推荐 Android 13（API 33）及以上，Android 12/12L 会使用部分液态玻璃实体降级效果
-- 当前版本：v1.1.0
+- 当前版本：v1.1.2
 
-![起飞日记](screenshots/app.png)
+## 应用截图
 
-*此图片由 AI 生成*
+
+|                            首页                            |                            记录页                            |                             新建记录页                             |
+| :--------------------------------------------------------: | :-----------------------------------------------------------: | :-----------------------------------------------------------------: |
+|  <img src="screenshots/home.jpg" alt="首页" width="240">  | <img src="screenshots/records.jpg" alt="记录页" width="240"> | <img src="screenshots/new-record.jpg" alt="新建记录页" width="240"> |
+|                         **计时页**                         |                          **设置页**                          |                             **应用锁**                             |
+| <img src="screenshots/timer.jpg" alt="计时页" width="240"> | <img src="screenshots/settings.jpg" alt="设置页" width="240"> |    <img src="screenshots/app-lock.jpg" alt="应用锁" width="240">    |
 
 ## 功能特性
 
@@ -25,27 +30,27 @@
 - 控件体系基于 [YuKongA/miuix](https://github.com/YuKongA/miuix)（HyperOS 风格）构建
 - 液态玻璃效果移植自 [Kyant0/AndroidLiquidGlass](https://github.com/Kyant0/AndroidLiquidGlass)，保留原版的折射、高光、按压与拖动形变
 - Android 12/12L 自动使用部分实体降级样式；Android 13 及以上启用完整 RuntimeShader 高光效果
+- 页面支持分层进退、系统返回手势和顶部渐进模糊，悬浮底栏随页面切换联动
 
 ### 首页看板
 
 - 问候栏、今日状态卡片与记录小贴士
 - 本周 7 天打卡 / 月历热力图切换
-- 数据概览：累计次数、本月次数、平均用时、估算射精量、最远距离、平均间隔
+- 数据概览：累计次数、本月次数、平均用时、本周射精量、最远距离、平均间隔
 - 射精量 / 射精距离趋势柱状图，长度追踪双线折线图（支持触摸标记与横向滚动）
 - 首页卡片支持自定义排序与显隐
-- 下拉刷新
 
 ### 计时器
 
 - 精密仪表式界面，`HH:MM:SS` 精确到秒
-- 计时过程中到达里程碑（如 10 分钟）会发送提醒
+- 支持开始、暂停、继续和结束，运行时可在后台计时
+- 计时到达 30、60、90 分钟时发送里程碑提醒
 - 达到 120 分钟自动弹出记录表单并快捷填充时长
 
 ### 记录管理
 
 - 表单字段：开始 / 结束时间、用时、射精量、距离、方式标签、备注
-- 日期范围 + 方式标签筛选
-- 长按记录卡片删除，5 秒内可撤销
+- 射精量支持按毫升或股数输入，可设置默认输入方式及每股毫升换算值；已有记录保留已保存的数量
 
 ### 应用锁
 
@@ -57,6 +62,7 @@
 - 每日记录提醒
 - 长时间未记录提醒
 - 每月长度记录提醒
+- 提供通知测试和系统权限检查入口
 
 ### 成就系统
 
@@ -66,6 +72,7 @@
 ### 数据管理
 
 - ZIP 备份与恢复（记录、长度、标签、成就与设置）
+- 支持清空本地数据，恢复与清空前均需确认
 
 ### 其他
 
@@ -78,14 +85,15 @@
 
 | 类别     | 技术                                                               |
 | -------- | ------------------------------------------------------------------ |
-| 语言     | Kotlin 2.4.10                                                      |
-| UI       | Jetpack Compose（BOM 2026.06.01）+ miuix 0.9.3（HyperOS 风格控件） |
+| 语言     | Kotlin 2.4.20                                                      |
+| UI       | Jetpack Compose（BOM 2026.09.00）+ miuix 0.9.4（HyperOS 风格控件） |
 | 液态玻璃 | Kyant Backdrop 1.0.0 + Capsule 2.1.1                               |
 | 架构     | MVVM（ViewModel + Flow + Repository）                              |
 | 依赖注入 | Hilt 2.60.1                                                        |
 | 数据库   | Room 2.8.4（含 KSP 编译）                                          |
 | 设置存储 | DataStore Preferences 1.1.7                                        |
-| 导航     | Navigation 3（1.1.2）+ 自研 Navigator 封装                         |
+| 导航     | Navigation 3 + miuix-nav 0.9.4 + NavigationEvent 1.1.2             |
+| 更新说明 | multiplatform-markdown-renderer 0.35.0                             |
 | 后台任务 | WorkManager 2.10.1 + 前台服务                                      |
 | 生物识别 | AndroidX Biometric 1.1.0                                           |
 | 图表     | Vico 3.2.1（趋势 / 长度图表）+ Compose Canvas 自绘（热力图）       |
@@ -101,7 +109,9 @@
 构建方式：
 
 1. 使用 Android Studio 打开项目根目录，等待 Gradle 同步完成后直接运行；
-2. 或使用命令行（需要 JDK 17 及以上；单元测试任务使用 JDK 26 工具链）：
+2. 或使用命令行（需要 JDK 21；可使用 Android Studio 自带的 JBR，单元测试也使用 Java 21 工具链）：
+
+请确保 `JAVA_HOME` 指向本机的 JDK 21；如果 `gradle.properties` 中配置了 Java 安装路径，也需与本机实际位置一致。
 
 ```powershell
 # 调试版（包名 com.risediary.app.dev）
@@ -115,7 +125,7 @@
 ```
 
 - 调试 APK 生成在 `app/build/outputs/apk/debug/`；
-- 正式 APK 生成在 `app/build/outputs/apk/release/`，构建前需在项目根目录提供 `keystore.properties`（含 `storeFile`、`storePassword`、`keyAlias`、`keyPassword` 四个字段，该文件已被 `.gitignore` 忽略）。
+- 正式 APK 生成在 `app/build/outputs/apk/release/`，构建前需在项目根目录提供 `keystore.properties`
 
 ## 参与贡献
 

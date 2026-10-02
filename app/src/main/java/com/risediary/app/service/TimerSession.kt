@@ -14,7 +14,8 @@ data class TimerSession(
     val elapsedMillis: Long = 0L,
     val resumedAtElapsedRealtime: Long = 0L,
     val resumedAtWallClock: Long = 0L,
-    val notifiedMilestonesMask: Int = 0
+    val notifiedMilestonesMask: Int = 0,
+    val bootCount: Int? = null
 ) {
     val isActive: Boolean
         get() = status == TimerStatus.RUNNING || status == TimerStatus.PAUSED

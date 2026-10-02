@@ -16,20 +16,20 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import java.time.Instant
 import java.time.LocalDate
-import java.time.ZoneId
+import com.risediary.app.util.LocalCalendarContext
 import javax.inject.Inject
+import com.risediary.app.data.DataMaintenanceGate
 
 @HiltViewModel
 class RecordsViewModel @Inject constructor(
     private val flightRepo: FlightRepository,
     tagRepo: TagRepository,
-    private val zoneId: ZoneId,
-    private val reminderScheduler: ReminderScheduler
+    private val calendar: LocalCalendarContext,
+    private val reminderScheduler: ReminderScheduler,
+    private val maintenanceGate: DataMaintenanceGate = DataMaintenanceGate()
 ) : ViewModel() {
 
-    /** User timezone used for both filtering and grouping so they never disagree. */
-    val userZoneId: ZoneId
-        get() = zoneId
+    val calendarState = calendar.state
 
     val allFlights: StateFlow<List<Flight>> = flightRepo.allFlights
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
@@ -43,6 +43,14 @@ class RecordsViewModel @Inject constructor(
     private val _pendingDeletions = MutableStateFlow<List<PendingDeletion>>(emptyList())
     internal val pendingDeletions: StateFlow<List<PendingDeletion>> = _pendingDeletions.asStateFlow()
     private val deletionOperations = PendingDeletionOperations()
+
+    // Main.immediate may emit the current maintenance state during construction.
+    // Initialize pending entries before the collector is allowed to clear them.
+    init {
+        viewModelScope.launch {
+            maintenanceGate.state.collect { if (it != DataMaintenanceGate.State.IDLE) clearPendingDeletions() }
+        }
+    }
 
     fun filterByTag(tagName: String?) {
         selectedTag = tagName
@@ -59,9 +67,10 @@ class RecordsViewModel @Inject constructor(
      * operations mutex. Undo/finalize flip flags on the same entry, also under
      * the mutex, so delete and undo can never interleave on the same record.
      */
-    fun delete(flight: Flight) {
+    fun delete(flight: Flight): Boolean {
+        if (maintenanceGate.state.value != DataMaintenanceGate.State.IDLE) return false
         _pendingDeletions.update { enqueuePendingDeletion(it, flight) }
-        viewModelScope.launch {
+        maintenanceGate.launchWrite(viewModelScope) {
             deletionOperations.run {
                 val entry = _pendingDeletions.value.firstOrNull { it.flight.id == flight.id }
                     ?: return@run
@@ -74,11 +83,14 @@ class RecordsViewModel @Inject constructor(
                 }
             }
             runCatching { reminderScheduler.onFlightDataChanged() }
+        }.invokeOnCompletion { failure ->
+            if (failure != null) removePendingDeletion(flight.id)
         }
+        return true
     }
 
     fun undoDelete(flight: Flight) {
-        viewModelScope.launch {
+        maintenanceGate.launchWrite(viewModelScope) {
             deletionOperations.run {
                 val entry = _pendingDeletions.value.firstOrNull { it.flight.id == flight.id }
                     ?: return@run
@@ -95,7 +107,7 @@ class RecordsViewModel @Inject constructor(
     }
 
     fun finalizeDeletion(flightId: Long) {
-        viewModelScope.launch {
+        maintenanceGate.launchWrite(viewModelScope) {
             deletionOperations.run {
                 val entry = _pendingDeletions.value.firstOrNull { it.flight.id == flightId }
                     ?: return@run
@@ -115,7 +127,7 @@ class RecordsViewModel @Inject constructor(
         _pendingDeletions.update { removePendingDeletion(it, flightId) }
     }
 
-    fun filter(flights: List<Flight>): List<Flight> {
+    fun filter(flights: List<Flight>, zoneId: java.time.ZoneId = calendar.current().zoneId): List<Flight> {
         return flights.filter { flight ->
             val localDate = Instant.ofEpochMilli(flight.startTime).atZone(zoneId).toLocalDate()
             val matchesTag = selectedTag?.let { it in TagJson.decode(flight.methodTags) } ?: true

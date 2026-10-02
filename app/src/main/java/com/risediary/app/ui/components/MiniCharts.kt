@@ -47,6 +47,8 @@ import com.risediary.app.R
 import com.risediary.app.ui.theme.CardBlue
 import com.risediary.app.ui.theme.CardGreen
 import java.text.SimpleDateFormat
+import java.time.ZoneId
+import java.util.TimeZone
 import java.util.Date
 import java.util.Locale
 import kotlin.math.ceil
@@ -79,7 +81,8 @@ internal data class ChartAxisRange(
 internal fun buildTrendChartPoints(
     flights: List<Flight>,
     isVolume: Boolean,
-    locale: Locale = Locale.getDefault()
+    locale: Locale = Locale.getDefault(),
+    zoneId: ZoneId = ZoneId.systemDefault()
 ): List<TrendChartPoint> {
     val sorted = flights
         .mapNotNull { flight ->
@@ -87,9 +90,9 @@ internal fun buildTrendChartPoints(
             if (value == null || !value.isFinite() || value < 0f) null else flight to value
         }
         .sortedWith(compareBy<Pair<Flight, Float>> { it.first.startTime }.thenBy { it.first.id })
-    val dayFormat = SimpleDateFormat("M/d", locale)
-    val dayKeyFormat = SimpleDateFormat("yyyy/M/d", locale)
-    val timeFormat = SimpleDateFormat("M/d HH:mm", locale)
+    val dayFormat = SimpleDateFormat("M/d", locale).apply { timeZone = TimeZone.getTimeZone(zoneId) }
+    val dayKeyFormat = SimpleDateFormat("yyyy/M/d", locale).apply { timeZone = TimeZone.getTimeZone(zoneId) }
+    val timeFormat = SimpleDateFormat("M/d HH:mm", locale).apply { timeZone = TimeZone.getTimeZone(zoneId) }
     val dayCounts = sorted.groupingBy {
         dayKeyFormat.format(Date(it.first.startTime))
     }.eachCount()
@@ -113,7 +116,8 @@ internal fun buildTrendChartPoints(
 
 internal fun buildLengthChartPoints(
     records: List<LengthRecord>,
-    locale: Locale = Locale.getDefault()
+    locale: Locale = Locale.getDefault(),
+    zoneId: ZoneId = ZoneId.systemDefault()
 ): List<LengthChartPoint> {
     val valid = records
         .filter {
@@ -121,9 +125,9 @@ internal fun buildLengthChartPoints(
                 it.erectLengthCm >= 0f && it.flaccidLengthCm >= 0f
         }
         .sortedWith(compareBy<LengthRecord> { it.recordDate }.thenBy { it.id })
-    val dayFormat = SimpleDateFormat("M/d", locale)
-    val dayKeyFormat = SimpleDateFormat("yyyy/M/d", locale)
-    val fullFormat = SimpleDateFormat("yyyy/M/d", locale)
+    val dayFormat = SimpleDateFormat("M/d", locale).apply { timeZone = TimeZone.getTimeZone(zoneId) }
+    val dayKeyFormat = SimpleDateFormat("yyyy/M/d", locale).apply { timeZone = TimeZone.getTimeZone(zoneId) }
+    val fullFormat = SimpleDateFormat("yyyy/M/d", locale).apply { timeZone = TimeZone.getTimeZone(zoneId) }
     val dayIndexes = mutableMapOf<String, Int>()
     val dayCounts = valid.groupingBy { dayKeyFormat.format(Date(it.recordDate)) }.eachCount()
     return valid.mapIndexed { index, record ->
@@ -207,8 +211,9 @@ private fun TrendColumnChartContent(
     modifier: Modifier = Modifier
 ) {
     val locale = LocalConfiguration.current.locales[0]
-    val points = remember(flights, isVolume, locale) {
-        buildTrendChartPoints(flights, isVolume, locale)
+    val calendar = LocalCalendarEnvironment.current
+    val points = remember(flights, isVolume, locale, calendar.zoneId) {
+        buildTrendChartPoints(flights, isVolume, locale, calendar.zoneId)
     }
     if (points.isEmpty()) return
     val unit = if (isVolume) "ml" else "cm"
@@ -335,7 +340,8 @@ private fun LengthTrendChartContent(
 ) {
     val locale = LocalConfiguration.current.locales[0]
     val markerFormat = stringResource(R.string.length_chart_marker)
-    val points = remember(records, locale) { buildLengthChartPoints(records, locale) }
+    val calendar = LocalCalendarEnvironment.current
+    val points = remember(records, locale, calendar.zoneId) { buildLengthChartPoints(records, locale, calendar.zoneId) }
     if (points.isEmpty()) return
     val modelProducer = remember { CartesianChartModelProducer() }
     val range = remember(points) {

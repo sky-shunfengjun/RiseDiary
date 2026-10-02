@@ -6,17 +6,43 @@ object TimerMath {
     fun elapsed(
         session: TimerSession,
         elapsedRealtimeNow: Long,
-        wallClockNow: Long
+        wallClockNow: Long,
+        currentBootCount: Int? = null
     ): Long {
-        if (session.status != TimerStatus.RUNNING) return session.elapsedMillis
-        val monotonicDelta = elapsedRealtimeNow - session.resumedAtElapsedRealtime
-        // elapsedRealtime resets to 0 after a reboot, making the delta negative.
-        // Never fall back to wall-clock here: it would count the powered-off
-        // time into the duration and pollute saved records.
-        val delta = if (monotonicDelta >= 0L) monotonicDelta else 0L
-        return (session.elapsedMillis + delta).coerceIn(0L, MAX_DURATION_MILLIS)
+        if (session.bootCount == null || session.bootCount < 0 || currentBootCount != session.bootCount) {
+            return session.elapsedMillis.coerceIn(0L, MAX_DURATION_MILLIS)
+        }
+        return elapsedInCurrentProcess(session, elapsedRealtimeNow)
     }
 
+    /** Only for a session created here, or normalized by [restore] before it entered the holder. */
+    internal fun elapsedInCurrentProcess(session: TimerSession, elapsedRealtimeNow: Long): Long {
+        if (session.status != TimerStatus.RUNNING) return session.elapsedMillis
+        val delta = (elapsedRealtimeNow - session.resumedAtElapsedRealtime).coerceAtLeast(0L)
+        return (session.elapsedMillis.coerceIn(0L, MAX_DURATION_MILLIS) +
+            delta.coerceAtMost(MAX_DURATION_MILLIS)).coerceAtMost(MAX_DURATION_MILLIS)
+    }
+
+    internal fun restore(
+        session: TimerSession,
+        elapsedRealtimeNow: Long,
+        wallClockNow: Long,
+        currentBootCount: Int?
+    ): TimerSession {
+        if (session.status != TimerStatus.RUNNING) return session
+        val sameBoot = currentBootCount != null && currentBootCount >= 0 &&
+            session.bootCount == currentBootCount &&
+            elapsedRealtimeNow >= session.resumedAtElapsedRealtime
+        val elapsed = if (sameBoot) elapsedInCurrentProcess(session, elapsedRealtimeNow)
+            else session.elapsedMillis.coerceIn(0L, MAX_DURATION_MILLIS)
+        return session.copy(
+            status = if (sameBoot) TimerStatus.RUNNING else TimerStatus.PAUSED,
+            elapsedMillis = elapsed,
+            resumedAtElapsedRealtime = if (sameBoot && elapsed < MAX_DURATION_MILLIS) elapsedRealtimeNow else 0L,
+            resumedAtWallClock = if (sameBoot && elapsed < MAX_DURATION_MILLIS) wallClockNow else 0L,
+            bootCount = currentBootCount
+        )
+    }
     /** Moves a running session's baseline forward after a periodic tick. */
     fun advance(
         session: TimerSession,
@@ -25,7 +51,7 @@ object TimerMath {
     ): TimerSession {
         if (session.status != TimerStatus.RUNNING) return session
         return session.copy(
-            elapsedMillis = elapsed(session, elapsedRealtimeNow, wallClockNow),
+            elapsedMillis = elapsedInCurrentProcess(session, elapsedRealtimeNow),
             resumedAtElapsedRealtime = elapsedRealtimeNow,
             resumedAtWallClock = wallClockNow
         )

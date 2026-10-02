@@ -6,6 +6,42 @@ import org.junit.Test
 
 class RecordValidationTest {
     @Test
+    fun storageAcceptsBothSafeDerivedExtremesWithoutApplyingDirectInputBounds() {
+        assertNull(RecordValidation.validateStoredQuantity(1_000, 100_000f))
+        assertNull(RecordValidation.validateStoredQuantity(10_000, 1_000f))
+    }
+
+    @Test
+    fun storageRejectsNonFiniteMissingOrUnsafeAmounts() {
+        assertNotNull(RecordValidation.validateStoredQuantity(null, null))
+        assertNotNull(RecordValidation.validateStoredQuantity(10_001, 1_000f))
+        listOf(0f, -1f, 100_001f, Float.NaN, Float.POSITIVE_INFINITY).forEach {
+            assertNotNull(RecordValidation.validateStoredQuantity(1, it))
+        }
+    }
+
+    @Test
+    fun newNotesAreLimitedButHistoricalLongNotesCanBePreservedOrShortened() {
+        assertNull(RecordValidation.validateNote("x".repeat(10_000)))
+        assertNotNull(RecordValidation.validateNote("x".repeat(10_001)))
+        val historical = " x ".repeat(5_000)
+        assertNull(RecordValidation.validateNote(historical, historical))
+        assertNull(RecordValidation.validateNote(historical.dropLast(1), historical))
+        assertNotNull(RecordValidation.validateNote(historical + "x", historical))
+    }
+    @Test
+    fun acceptsSafeDerivedVolumeAboveDirectInputLimit() {
+        assertNull(
+            RecordValidation.validate(
+                durationSeconds = 60,
+                spurtCount = 501,
+                volumeMl = 1_002f,
+                distanceCm = null,
+                distanceWasEntered = false
+            )
+        )
+    }
+    @Test
     fun acceptsBoundaryDurationAndValidVolume() {
         assertNull(
             RecordValidation.validate(

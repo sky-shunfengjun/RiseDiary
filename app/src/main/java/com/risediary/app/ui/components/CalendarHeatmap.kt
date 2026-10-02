@@ -41,7 +41,7 @@ fun CalendarHeatmap(
     dayCounts: Map<String, Int>,
     modifier: Modifier = Modifier
 ) {
-    val today = LocalDate.now()
+    val today = LocalCalendarEnvironment.current.date
     val currentYearMonth = remember(today) { YearMonth.from(today) }
     var displayedMonth by remember { mutableStateOf(currentYearMonth) }
     val dateFormatter = remember { DateTimeFormatter.ofPattern("yyyy-MM-dd") }

@@ -16,27 +16,37 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class ReminderDeliveryCoordinator @Inject constructor(
+class ReminderDeliveryCoordinator internal constructor(
     private val preferences: UserPreferences,
     private val flightRepository: FlightRepository,
     private val lengthRepository: LengthRecordRepository,
-    private val notifier: ReminderNotifier,
-    private val clock: Clock
+    private val clock: Clock,
+    private val postReminder: (ReminderType) -> Boolean
 ) {
+    @Inject constructor(
+        preferences: UserPreferences,
+        flightRepository: FlightRepository,
+        lengthRepository: LengthRecordRepository,
+        notifier: ReminderNotifier,
+        clock: Clock
+    ) : this(preferences, flightRepository, lengthRepository, clock, notifier::post)
     private val deliveryMutex = Mutex()
 
     suspend fun deliver(type: ReminderType) {
-        deliveryMutex.withLock {
-            val configuration = preferences.reminderConfiguration.first()
-            if (!configuration.isEnabled(type)) return@withLock
-            when (type) {
-                ReminderType.DAILY -> deliverDaily()
-                ReminderType.INACTIVE -> deliverInactive(configuration)
-                ReminderType.MONTHLY_LENGTH -> deliverMonthly()
+        // Permission precedes the delivery lock: reads, notification and marker
+        // are one operation, so maintenance cannot replace data in between.
+        preferences.maintenanceGate.write {
+            deliveryMutex.withLock {
+                val configuration = preferences.reminderConfiguration.first()
+                if (!configuration.isEnabled(type)) return@withLock
+                when (type) {
+                    ReminderType.DAILY -> deliverDaily()
+                    ReminderType.INACTIVE -> deliverInactive(configuration)
+                    ReminderType.MONTHLY_LENGTH -> deliverMonthly()
+                }
             }
         }
     }
-
     private suspend fun deliverDaily() {
         val zoneId = ZoneId.systemDefault()
         val today = Instant.now(clock).atZone(zoneId).toLocalDate()
@@ -48,7 +58,7 @@ class ReminderDeliveryCoordinator @Inject constructor(
                 lastSentEpochDay = runtime.dailyLastSentEpochDay,
                 todayEpochDay = today.toEpochDay()
             ) &&
-            notifier.post(ReminderType.DAILY)
+            postReminder(ReminderType.DAILY)
         ) {
             preferences.markDailyReminderSent(today.toEpochDay())
         }
@@ -77,7 +87,7 @@ class ReminderDeliveryCoordinator @Inject constructor(
                 lastSentDate = lastSentDate,
                 intervalDays = configuration.inactiveDays
             ) &&
-            notifier.post(ReminderType.INACTIVE)
+            postReminder(ReminderType.INACTIVE)
         ) {
             preferences.markInactiveReminderSent(today.toEpochDay())
         }
@@ -98,7 +108,7 @@ class ReminderDeliveryCoordinator @Inject constructor(
                 lastSentYearMonth = runtime.monthlyLastSent,
                 currentYearMonth = currentMonth.toString()
             ) &&
-            notifier.post(ReminderType.MONTHLY_LENGTH)
+            postReminder(ReminderType.MONTHLY_LENGTH)
         ) {
             preferences.markMonthlyReminderSent(currentMonth.toString())
         }

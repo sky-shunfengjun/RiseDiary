@@ -12,7 +12,7 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
-import java.io.IOException
+import java.time.Clock
 import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -28,30 +28,30 @@ private fun timerSessionDataStore(context: Context): DataStore<Preferences> =
 
 @Singleton
 class TimerSessionStore @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val bootIdentity: BootIdentityProvider,
+    private val elapsedClock: ElapsedRealtimeClock,
+    private val wallClock: Clock
 ) {
 
     private val timerDataStore: DataStore<Preferences> = timerSessionDataStore(context)
 
     suspend fun load(): TimerSession {
-        return try {
-            val values = timerDataStore.data.first()
-            val status = runCatching {
-                TimerStatus.valueOf(values[KEY_STATUS] ?: TimerStatus.IDLE.name)
-            }.getOrDefault(TimerStatus.IDLE)
-            TimerSession(
-                status = status,
-                startedAtEpochMillis = values[KEY_STARTED_AT] ?: 0L,
-                elapsedMillis = values[KEY_ELAPSED] ?: 0L,
-                resumedAtElapsedRealtime = values[KEY_RESUMED_ELAPSED] ?: 0L,
-                resumedAtWallClock = values[KEY_RESUMED_WALL] ?: 0L,
-                notifiedMilestonesMask = values[KEY_NOTIFIED_MILESTONES] ?: 0
-            )
-        } catch (error: IOException) {
-            TimerSession()
-        }
+        val values = timerDataStore.data.first()
+        val status = runCatching {
+            TimerStatus.valueOf(values[KEY_STATUS] ?: TimerStatus.IDLE.name)
+        }.getOrDefault(TimerStatus.IDLE)
+        val stored = TimerSession(
+            status = status,
+            startedAtEpochMillis = values[KEY_STARTED_AT] ?: 0L,
+            elapsedMillis = values[KEY_ELAPSED] ?: 0L,
+            resumedAtElapsedRealtime = values[KEY_RESUMED_ELAPSED] ?: 0L,
+            resumedAtWallClock = values[KEY_RESUMED_WALL] ?: 0L,
+            notifiedMilestonesMask = values[KEY_NOTIFIED_MILESTONES] ?: 0,
+            bootCount = values[KEY_BOOT_COUNT]?.takeIf { it >= 0 }
+        )
+        return TimerMath.restore(stored, elapsedClock.millis(), wallClock.millis(), bootIdentity.currentBootCount())
     }
-
     suspend fun save(session: TimerSession) {
         timerDataStore.edit { values ->
             values[KEY_STATUS] = session.status.name
@@ -60,10 +60,13 @@ class TimerSessionStore @Inject constructor(
             values[KEY_RESUMED_ELAPSED] = session.resumedAtElapsedRealtime
             values[KEY_RESUMED_WALL] = session.resumedAtWallClock
             values[KEY_NOTIFIED_MILESTONES] = session.notifiedMilestonesMask
+            val boot = session.bootCount
+            if (boot == null || boot < 0) values.remove(KEY_BOOT_COUNT) else values[KEY_BOOT_COUNT] = boot
         }
     }
 
     private companion object {
+        val KEY_BOOT_COUNT = intPreferencesKey("boot_count")
         val KEY_STATUS = stringPreferencesKey("status")
         val KEY_STARTED_AT = longPreferencesKey("started_at_epoch")
         val KEY_ELAPSED = longPreferencesKey("elapsed_millis")

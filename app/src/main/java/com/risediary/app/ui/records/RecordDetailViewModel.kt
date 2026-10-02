@@ -11,11 +11,13 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import com.risediary.app.data.DataMaintenanceGate
 
 @HiltViewModel
 class RecordDetailViewModel @Inject constructor(
     private val repository: FlightRepository,
-    private val reminderScheduler: ReminderScheduler
+    private val reminderScheduler: ReminderScheduler,
+    private val maintenanceGate: DataMaintenanceGate = DataMaintenanceGate()
 ) : ViewModel() {
     private var flightId: Long? = null
 
@@ -44,7 +46,7 @@ class RecordDetailViewModel @Inject constructor(
 
     fun delete() {
         val current = _flight.value ?: return
-        viewModelScope.launch {
+        maintenanceGate.launchWrite(viewModelScope) {
             repository.delete(current)
             _deleted.value = true
             runCatching { reminderScheduler.onFlightDataChanged() }

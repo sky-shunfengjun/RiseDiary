@@ -1,0 +1,6 @@
+Markdown Renderer 0.35.0: https://github.com/mikepenz/multiplatform-markdown-renderer
+Copyright Mike Penz and contributors. Apache License, Version 2.0.
+JetBrains Markdown parser: https://github.com/JetBrains/markdown
+Copyright JetBrains s.r.o. and contributors. Apache License, Version 2.0.
+License text: Markdown-Apache-2.0.txt
+GitHub icon: Simple Icons (CC0), https://simpleicons.org/ (brand guidelines apply).
