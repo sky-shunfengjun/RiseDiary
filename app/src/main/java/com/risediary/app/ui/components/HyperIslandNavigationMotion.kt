@@ -127,7 +127,13 @@ internal class HyperIslandNavigationMotion(
         val raw = movingScope?.let { (-it.relativeDepth).coerceIn(0f, 1f) } ?: 1f
         val sameBoundary = movingRoute == old.route
         val predictive = popping && movingScope?.gesture != null
-        val initial = if (sameBoundary) oldPose else BoundaryPose(1f, 0f, 0f)
+        val initial = when {
+            sameBoundary -> oldPose
+            // The previous upper page may have finished leaving. A newly exposed
+            // pop boundary starts at its own live depth, not an offscreen enter pose.
+            popping -> BoundaryPose(raw, 1f - raw, 1f - raw)
+            else -> BoundaryPose(1f, 0f, 0f)
+        }
         val target = if (popping) BoundaryPose(1f, 0f, 0f)
             else BoundaryPose(0f, 1f, 1f)
         session = Session(

@@ -7,6 +7,15 @@ package com.risediary.app.ui.about
 
 import com.risediary.app.ui.components.rememberTopBlurProgress
 import com.risediary.app.ui.components.PageTopBlurLayout
+import android.os.SystemClock
+import androidx.compose.foundation.clickable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.platform.testTag
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.risediary.app.update.DeveloperTapCounter
 import android.os.Build
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
@@ -57,8 +66,6 @@ import com.risediary.app.ui.navigation3.LocalNavigator
 import com.risediary.app.ui.navigation3.Route
 import com.risediary.app.ui.theme.LocalRiseDarkTheme
 import com.risediary.app.ui.theme.backgroundBrush
-import com.risediary.app.ui.update.UpdateStatusDialog
-import com.risediary.app.ui.update.UpdateStatusDialogState
 import com.risediary.app.update.UpdateCheckState
 import com.risediary.app.update.UpdateViewModel
 import top.yukonga.miuix.kmp.basic.Card
@@ -80,7 +87,17 @@ fun AboutScreen(
     val navigator = LocalNavigator.current
     val uriHandler = LocalUriHandler.current
     val updateState by updateViewModel.state.collectAsStateWithLifecycle()
-    var showStatusDialog by remember { mutableStateOf(false) }
+    val updateUi by updateViewModel.ui.collectAsStateWithLifecycle()
+    val taps = remember { DeveloperTapCounter() }
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    LaunchedEffect(updateUi.settings.developerEnabled, updateUi.developer.visible) { taps.reset() }
+    DisposableEffect(lifecycle) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_PAUSE || event == Lifecycle.Event.ON_STOP) taps.reset()
+        }
+        lifecycle.addObserver(observer)
+        onDispose { taps.reset(); lifecycle.removeObserver(observer) }
+    }
     val isChecking = updateState is UpdateCheckState.Checking
     val updateButtonDescription = stringResource(R.string.update_button_content_description)
     val githubUrl = stringResource(R.string.about_github_url)
@@ -121,7 +138,7 @@ fun AboutScreen(
         overlay = {
             PageTopBar(
                 title = stringResource(R.string.about_title),
-                onBack = { navigator.pop() },
+                onBack = { taps.reset(); navigator.pop() },
                 backdrop = pageBackdrop,
                 titleAlpha = { titleAlpha }
             )
@@ -143,6 +160,7 @@ fun AboutScreen(
                     state = lazyListState,
                     modifier = Modifier
                         .fillMaxSize()
+                        .testTag("about_list")
                         .scrollEndHaptic()
                         .overScrollVertical(),
                     contentPadding = PaddingValues(bottom = 120.dp),
@@ -158,9 +176,11 @@ fun AboutScreen(
                             horizontalAlignment = Alignment.CenterHorizontally
                         ) {
                             Image(
-                                modifier = Modifier.size(100.dp),
+                                modifier = Modifier.size(100.dp).testTag("about_app_icon").clickable(interactionSource = null, indication = null) {
+                                    if (taps.tap(SystemClock.elapsedRealtime())) updateViewModel.openDeveloper()
+                                },
                                 painter = painterResource(R.drawable.app_icon),
-                                contentDescription = null,
+                                contentDescription = stringResource(R.string.app_name),
                             )
                             Text(
                                 modifier = Modifier.padding(top = 12.dp, bottom = 5.dp),
@@ -242,7 +262,7 @@ fun AboutScreen(
                             ),
                             pressFeedbackType = PressFeedbackType.None,
                             showIndication = true,
-                            onClick = { navigator.push(Route.ThirdPartyLibs) }
+                            onClick = { taps.reset(); navigator.push(Route.ThirdPartyLibs) }
                         ) {
                             Column(
                                 modifier = Modifier.padding(
@@ -278,6 +298,19 @@ fun AboutScreen(
                             }
                         }
                     }
+                    if (updateUi.settings.developerEnabled) {
+                        item(key = "developer") {
+                            Card(
+                                modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp),
+                                colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer),
+                            ) {
+                                ArrowPreference(
+                                    title = stringResource(R.string.developer_entry),
+                                    onClick = { taps.reset(); updateViewModel.openDeveloper() },
+                                )
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -292,12 +325,11 @@ fun AboutScreen(
         ) {
             LiquidGlassButton(
                 onClick = {
-                    showStatusDialog = true
-                    updateViewModel.checkForUpdate(force = true)
+                    updateViewModel.openAndCheck()
                 },
                 backdrop = pageBackdrop,
-                enabled = !isChecking,
-                isInteractive = !isChecking,
+                enabled = true,
+                isInteractive = true,
                 tint = MiuixTheme.colorScheme.primary.copy(alpha = 0.075f),
                 height = 52.dp,
                 modifier = Modifier
@@ -319,25 +351,7 @@ fun AboutScreen(
         }
     }
 
-    // The app-level host already shows UpdateAvailableDialog for the whole app;
-    // composing it here too would race for the single dialog slot.
-    if (showStatusDialog) {
-        val status = when (updateState) {
-            UpdateCheckState.UpToDate -> UpdateStatusDialogState.UP_TO_DATE
-            UpdateCheckState.Failed -> UpdateStatusDialogState.FAILED
-            else -> null
-        }
-        if (status != null) {
-            UpdateStatusDialog(
-                currentVersion = updateViewModel.currentVersion,
-                state = status,
-                onDismiss = {
-                    showStatusDialog = false
-                    updateViewModel.dismiss()
-                }
-            )
-        }
-    }
+
 }
 
 internal fun aboutLibrariesEntryHorizontalPadding() = 0.dp

@@ -96,6 +96,7 @@ fun PageTopBlurLayout(
     topBarHeight: Dp = 48.dp,
     fadeHeight: Dp = 0.dp,
     includeStatusBar: Boolean = true,
+    background: Brush = backgroundBrush(),
     overlay: @Composable BoxScope.() -> Unit = {},
     content: @Composable BoxScope.() -> Unit,
 ) {
@@ -105,11 +106,11 @@ fun PageTopBlurLayout(
     val intensity by remember(active) {
         derivedStateOf { if (active) latestProgress().coerceIn(0f, 1f) else 0f }
     }
-    val background = backgroundBrush()
+    val latestBackground by rememberUpdatedState(background)
     val surface = MiuixTheme.colorScheme.surface
     val backdrop = if (active && intensity > 0f && isRuntimeShaderSupported()) {
         rememberLayerBackdrop {
-            drawRect(brush = background)
+            drawRect(brush = latestBackground)
             drawContent()
         }
     } else null

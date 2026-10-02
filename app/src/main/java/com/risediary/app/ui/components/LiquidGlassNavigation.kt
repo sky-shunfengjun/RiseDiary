@@ -221,8 +221,14 @@ internal fun LiquidGlassButton(
     content: @Composable RowScope.() -> Unit
 ) {
     val animationScope = rememberCoroutineScope()
+    val currentHighlightIntensity by rememberUpdatedState(highlightIntensity)
+    val currentHighlightRadius by rememberUpdatedState(highlightRadiusMultiplier)
     val interactiveHighlight = remember(animationScope) {
-        InteractiveHighlight(animationScope, intensity = highlightIntensity, radiusMultiplier = highlightRadiusMultiplier)
+        InteractiveHighlight(
+            animationScope,
+            intensity = { currentHighlightIntensity },
+            radiusMultiplier = { currentHighlightRadius }
+        )
     }
     Row(
         modifier
@@ -230,7 +236,8 @@ internal fun LiquidGlassButton(
                 backdrop = backdrop,
                 shape = { ContinuousCapsule },
                 effects = { vibrancy(); blur(2.dp.toPx()); lens(12.dp.toPx(), 24.dp.toPx()) },
-                layerBlock = if (isInteractive && enabled) {{
+                // State changes block new input, while an existing press spring keeps drawing.
+                layerBlock = {
                     val width = size.width
                     val heightPx = size.height
                     if (width > 0f && heightPx > 0f) {
@@ -247,7 +254,7 @@ internal fun LiquidGlassButton(
                         scaleX = scale + maxDragScale * abs(cos(offsetAngle) * offset.x / size.maxDimension) * (width / heightPx).fastCoerceAtMost(1f)
                         scaleY = scale + maxDragScale * abs(sin(offsetAngle) * offset.y / size.maxDimension) * (heightPx / width).fastCoerceAtMost(1f)
                     }
-                }} else null,
+                },
                 onDrawSurface = {
                     if (tint.isSpecified) {
                         drawRect(tint, blendMode = BlendMode.Hue)
@@ -276,7 +283,8 @@ internal fun LiquidGlassButton(
                     )
                 }
             )
-            .then(if (isInteractive && enabled) Modifier.then(interactiveHighlight.modifier).then(interactiveHighlight.gestureModifier) else Modifier)
+            .then(interactiveHighlight.modifier)
+            .then(if (isInteractive && enabled) interactiveHighlight.gestureModifier else Modifier)
             .height(height)
             .padding(horizontal = horizontalPadding),
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),

@@ -38,6 +38,8 @@ internal val thirdPartyLibCardCornerRadius = CardDefaults.CornerRadius
 
 private val thirdPartyLibs = listOf(
     ThirdPartyLib("Jetpack Compose", "https://developer.android.com/jetpack/compose"),
+    ThirdPartyLib("Markdown Renderer (Apache 2.0)", "https://github.com/mikepenz/multiplatform-markdown-renderer"),
+    ThirdPartyLib("JetBrains Markdown (Apache 2.0)", "https://github.com/JetBrains/markdown"),
     ThirdPartyLib("Miuix", "https://github.com/YuKongA/miuix"),
     ThirdPartyLib("AndroidLiquidGlass", "https://github.com/Kyant0/AndroidLiquidGlass"),
     ThirdPartyLib("Miuix Nav", "https://github.com/compose-miuix-ui/miuix"),

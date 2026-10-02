@@ -260,6 +260,61 @@ class HyperIslandNavigationMotionTest {
         assertTrue(h.motion.rootPageReady)
     }
 
+    @Test fun secondProgrammaticReturnStartsAtTheRevealedPageAfterThirdExitFinishes() {
+        for (phase in listOf(NavSettlePhase.Programmatic, NavSettlePhase.Commit)) {
+            for (culled in listOf(false, true)) {
+                val driver = Driver().apply { top = 2f }
+                val motion = HyperIslandNavigationMotion(listOf(Route.Main, Route.ModeSelect, Route.Timer))
+                val root = Scope(driver, 0)
+                val second = Scope(driver, 1)
+                val third = Scope(driver, 2)
+                motion.register(Route.Main, root)
+                motion.register(Route.ModeSelect, second)
+                motion.register(Route.Timer, third)
+                if (phase == NavSettlePhase.Commit) {
+                    driver.gesture = NavGesture(0.4f, NavSwipeEdge.Left, 500f, 500f)
+                    driver.top = 1.6f
+                    motion.frame(third)
+                }
+                motion.updateStack(listOf(Route.Main, Route.ModeSelect))
+                driver.settle = Settle(phase)
+                driver.top = 1f
+                motion.frame(second)
+                driver.gesture = null
+                driver.settle = null
+                if (culled) motion.unregister(Route.Timer, third)
+                motion.updateStack(listOf(Route.Main))
+                driver.settle = Settle(NavSettlePhase.Programmatic)
+                assertEquals("Second page must begin onscreen ($phase, culled=$culled)",
+                    0f, motion.frame(second).translationXFraction, 0.0001f)
+                driver.top = 0.5f
+                assertEquals(0.5f, motion.frame(second).translationXFraction, 0.0001f)
+                assertEquals(0.5f, motion.frame(root).blurIntensity, 0.0001f)
+                driver.top = 0f
+                assertEquals(1f, motion.frame(second).translationXFraction, 0.0001f)
+                driver.settle = null
+                assertTrue(motion.rootPageReady)
+            }
+        }
+    }
+
+    @Test fun poppingRevealedPageDuringItsOwnEnterContinuesFromCurrentPosition() {
+        val driver = Driver().apply { top = 0f }
+        val motion = HyperIslandNavigationMotion(listOf(Route.Main))
+        val root = Scope(driver, 0)
+        val second = Scope(driver, 1)
+        motion.register(Route.Main, root)
+        motion.updateStack(listOf(Route.Main, Route.ModeSelect))
+        motion.register(Route.ModeSelect, second)
+        driver.settle = Settle(NavSettlePhase.Programmatic)
+        driver.top = 0.65f
+        val before = motion.frame(second)
+        motion.updateStack(listOf(Route.Main))
+        driver.settle = Settle(NavSettlePhase.Programmatic)
+        assertEquals(before.translationXFraction, motion.frame(second).translationXFraction, 0.0001f)
+        driver.top = 0f
+        assertEquals(1f, motion.frame(second).translationXFraction, 0.0001f)
+    }
     @Test fun secondBackDuringCommitKeepsTheVisibleOutgoingPagePosition() {
         val h = Harness()
         val third = Scope(h.driver, 2)

@@ -39,8 +39,8 @@ import kotlinx.coroutines.launch
 internal class InteractiveHighlight(
     val animationScope: CoroutineScope,
     val position: (size: Size, offset: Offset) -> Offset = { _, offset -> offset },
-    val intensity: Float = 1f,
-    val radiusMultiplier: Float = 1.5f
+    val intensity: () -> Float = { 1f },
+    val radiusMultiplier: () -> Float = { 1.5f }
 ) {
 
     private val pressProgressAnimationSpec =
@@ -82,7 +82,7 @@ half4 main(float2 coord) {
             if (progress > 0f) {
                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && shader != null) {
                     drawRect(
-                        Color.White.copy(0.08f * progress * intensity),
+                        Color.White.copy(0.08f * progress * intensity()),
                         blendMode = BlendMode.Plus
                     )
                     shader.apply {
@@ -91,9 +91,9 @@ half4 main(float2 coord) {
                         setFloatUniform("size", size.width, size.height)
                         setColorUniform(
                             "color",
-                            Color.White.copy(0.15f * progress * intensity).toArgb()
+                            Color.White.copy(0.15f * progress * intensity()).toArgb()
                         )
-                        setFloatUniform("radius", size.minDimension * radiusMultiplier)
+                        setFloatUniform("radius", size.minDimension * radiusMultiplier())
                         setFloatUniform(
                             "position",
                             highlightPosition.x.fastCoerceIn(0f, size.width),
@@ -106,7 +106,7 @@ half4 main(float2 coord) {
                     )
                 } else {
                     drawRect(
-                        Color.White.copy(0.25f * progress * intensity),
+                        Color.White.copy(0.25f * progress * intensity()),
                         blendMode = BlendMode.Plus
                     )
                 }
@@ -115,57 +115,44 @@ half4 main(float2 coord) {
             drawContent()
         }
 
+    private fun release() {
+        // This scope belongs to the button, rather than its replaceable pointer-input node.
+        animationScope.launch {
+            launch { pressProgressAnimation.animateTo(0f, pressProgressAnimationSpec) }
+            launch { positionAnimation.animateTo(startPosition, positionAnimationSpec) }
+        }
+    }
+
     val gestureModifier: Modifier =
         Modifier.pointerInput(animationScope) {
-            inspectDragGestures(
-                onDragStart = { down ->
-                    startPosition = down.position
-                    animationScope.launch {
-                        launch {
-                            pressProgressAnimation.animateTo(
-                                1f,
-                                pressProgressAnimationSpec
-                            )
+            var pressed = false
+            try {
+                inspectDragGestures(
+                    onDragStart = { down ->
+                        pressed = true
+                        startPosition = down.position
+                        animationScope.launch {
+                            launch {
+                                pressProgressAnimation.animateTo(1f, pressProgressAnimationSpec)
+                            }
+                            launch { positionAnimation.snapTo(startPosition) }
                         }
-                        launch { positionAnimation.snapTo(startPosition) }
+                    },
+                    onDragEnd = {
+                        pressed = false
+                        release()
+                    },
+                    onDragCancel = {
+                        pressed = false
+                        release()
                     }
-                },
-                onDragEnd = {
-                    animationScope.launch {
-                        launch {
-                            pressProgressAnimation.animateTo(
-                                0f,
-                                pressProgressAnimationSpec
-                            )
-                        }
-                        launch {
-                            positionAnimation.animateTo(
-                                startPosition,
-                                positionAnimationSpec
-                            )
-                        }
-                    }
-                },
-                onDragCancel = {
-                    animationScope.launch {
-                        launch {
-                            pressProgressAnimation.animateTo(
-                                0f,
-                                pressProgressAnimationSpec
-                            )
-                        }
-                        launch {
-                            positionAnimation.animateTo(
-                                startPosition,
-                                positionAnimationSpec
-                            )
-                        }
-                    }
+                ) { change, _ ->
+                    animationScope.launch { positionAnimation.snapTo(change.position) }
                 }
-            ) { change, _ ->
-                animationScope.launch {
-                    positionAnimation.snapTo(change.position)
-                }
+            } finally {
+                // Disabling interaction can detach this node before it receives an up/cancel event.
+                // Finish only the visual spring; cancellation never invokes a button action.
+                if (pressed) release()
             }
         }
 }

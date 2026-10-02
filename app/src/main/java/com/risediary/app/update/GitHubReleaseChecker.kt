@@ -1,70 +1,118 @@
 package com.risediary.app.update
 
-import android.net.Uri
 import com.risediary.app.BuildConfig
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
+import kotlinx.serialization.json.*
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
+import javax.inject.Inject
 
-data class GitHubRelease(
-    val tagName: String,
-    val name: String,
-    val releaseUrl: String
-)
+fun interface ReleaseSource {
+    suspend fun fetchLatestRelease(channel: ReleaseChannel): GitHubRelease
+}
 
-/** Reads only public release metadata; no record or account data is sent. */
-class GitHubReleaseChecker @javax.inject.Inject constructor() {
+internal data class ReleasePage(val releases: List<GitHubRelease>, val hasNext: Boolean)
 
-    suspend fun fetchLatestRelease(): GitHubRelease? = withContext(Dispatchers.IO) {
-        val connection = (URL(LATEST_RELEASE_URL).openConnection() as HttpURLConnection).apply {
+/** Finish pagination before choosing: the API list order is not our publication policy. */
+internal suspend fun fetchNewestPublishedRelease(fetchPage: suspend (Int) -> ReleasePage): GitHubRelease {
+    val releases = mutableListOf<GitHubRelease>()
+    var page = 1
+    while (true) {
+        kotlinx.coroutines.currentCoroutineContext().ensureActive()
+        val result = fetchPage(page)
+        releases.addAll(result.releases)
+        if (!result.hasNext) break
+        if (page == Int.MAX_VALUE) throw IOException("Too many release pages")
+        page++
+    }
+    return newestPublishedRelease(releases)
+}
+
+/** Only public release metadata is requested; diary data stays on the device. */
+class GitHubReleaseChecker @Inject constructor() : ReleaseSource {
+    override suspend fun fetchLatestRelease(channel: ReleaseChannel): GitHubRelease = withContext(Dispatchers.IO) {
+        when (channel) {
+            ReleaseChannel.STABLE -> parseReleaseResponse(request("/latest").first)
+            ReleaseChannel.PREVIEW -> fetchNewestPublishedRelease { page ->
+                val (json, next) = request("?per_page=100&page=$page")
+                ReleasePage(parseReleaseList(json), next)
+            }
+        }
+    }
+
+    private fun request(suffix: String): Pair<String, Boolean> {
+        val connection = (URL("https://api.github.com/repos/sky-shunfengjun/RiseDiary/releases$suffix").openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"
             connectTimeout = 8_000
             readTimeout = 8_000
             useCaches = false
-            doInput = true
             setRequestProperty("Accept", "application/vnd.github+json")
             setRequestProperty("X-GitHub-Api-Version", "2022-11-28")
             setRequestProperty("User-Agent", "RiseDiary/${BuildConfig.VERSION_NAME}")
         }
         try {
-            if (connection.responseCode !in 200..299) {
-                throw IOException("GitHub returned HTTP ${connection.responseCode}")
+            if (connection.responseCode !in 200..299) throw IOException("GitHub HTTP ${connection.responseCode}")
+            val json = connection.inputStream.bufferedReader(Charsets.UTF_8).use { reader ->
+                val content = StringBuilder()
+                val buffer = CharArray(8192)
+                while (true) {
+                    val count = reader.read(buffer)
+                    if (count < 0) break
+                    if (content.length + count > 2_000_000) throw IOException("Release response too large")
+                    content.append(buffer, 0, count)
+                }
+                content.toString()
             }
-            val json = connection.inputStream.bufferedReader().use { it.readText() }
-            val payload = JSONObject(json)
-            if (payload.optBoolean("draft") || payload.optBoolean("prerelease")) return@withContext null
-
-            val tagName = payload.optString("tag_name").trim()
-            if (tagName.isBlank()) return@withContext null
-
-            val releaseUrl = safeReleaseUrl(payload.optString("html_url")) ?: RELEASES_URL
-            GitHubRelease(
-                tagName = tagName,
-                name = payload.optString("name").trim().ifBlank { tagName },
-                releaseUrl = releaseUrl
-            )
-        } finally {
-            connection.disconnect()
-        }
-    }
-
-    private fun safeReleaseUrl(value: String): String? {
-        val uri = Uri.parse(value.trim())
-        return value.takeIf {
-            uri.scheme == "https" && uri.host == "github.com" &&
-                uri.path?.startsWith("/sky-shunfengjun/RiseDiary/releases") == true
-        }
-    }
-
-    private companion object {
-        const val LATEST_RELEASE_URL =
-            "https://api.github.com/repos/sky-shunfengjun/RiseDiary/releases/latest"
-        const val RELEASES_URL = "https://github.com/sky-shunfengjun/RiseDiary/releases"
+            // Only the existence of the next relation is used; every URL is built locally.
+            val next = connection.getHeaderField("Link").orEmpty().split(',')
+                .any { Regex("rel=\"next\"").containsMatchIn(it) }
+            return json to next
+        } finally { connection.disconnect() }
     }
 }
+
+internal fun parseReleaseResponse(json: String): GitHubRelease =
+    parseRelease(Json.parseToJsonElement(json).jsonObject, stable = true)
+
+internal fun parseReleaseList(json: String): List<GitHubRelease> =
+    Json.parseToJsonElement(json).jsonArray.mapNotNull { element ->
+        val payload = element.jsonObject
+        when (payload["draft"]?.jsonPrimitive?.booleanOrNull) {
+            true -> null
+            false -> if (payload["published_at"] == JsonNull) null else parseRelease(payload, stable = false)
+            else -> throw IOException("Invalid draft flag")
+        }
+    }
+
+private fun parseRelease(payload: JsonObject, stable: Boolean): GitHubRelease {
+    fun JsonObject.string(key: String): String = (this[key] as? JsonPrimitive)?.contentOrNull.orEmpty()
+    val prerelease = payload["prerelease"]?.jsonPrimitive?.booleanOrNull ?: throw IOException("Invalid release flag")
+    if (payload["draft"]?.jsonPrimitive?.booleanOrNull != false || (stable && prerelease)) throw IOException("No stable release")
+    val tag = payload.string("tag_name").trim()
+    if (!isVersionRecognized(tag) || (stable && parseVersion(tag)?.prerelease != null)) throw IOException("Invalid release version")
+    val assets = (payload["assets"] as? JsonArray).orEmpty().mapNotNull { element ->
+        val asset = element as? JsonObject ?: return@mapNotNull null
+        val url = asset.string("browser_download_url").trim()
+        if (asset.string("state") != "uploaded" || !isProjectApkUrl(url)) return@mapNotNull null
+        val digest = asset.string("digest").removePrefix("sha256:").lowercase()
+            .takeIf { asset.string("digest").startsWith("sha256:") && it.matches(Regex("[0-9a-f]{64}")) }
+        GitHubAsset(asset["id"]?.jsonPrimitive?.longOrNull ?: 0L, asset.string("name"), url,
+            asset["size"]?.jsonPrimitive?.longOrNull ?: 0L, digest)
+    }
+    val id = payload["id"]?.jsonPrimitive?.longOrNull ?: 0L
+    val published = payload.string("published_at").takeIf { it.isNotBlank() }
+    if (!stable) {
+        if (id <= 0 || published == null) throw IOException("Invalid publication metadata")
+        try { java.time.Instant.parse(published) } catch (error: Exception) { throw IOException("Invalid publication time", error) }
+    }
+    return GitHubRelease(tag, payload.string("name").ifBlank { tag },
+        safeReleaseUrl(payload.string("html_url")) ?: "$RELEASES_URL/tag/$tag", payload.string("body"), assets,
+        id = id, prerelease = prerelease, publishedAt = published)
+}
+internal fun isVersionRecognized(value: String): Boolean = parseVersion(value) != null
 
 private data class ParsedVersion(
     val major: Int,

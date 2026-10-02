@@ -1,0 +1,120 @@
+package com.risediary.app.update
+
+import android.app.DownloadManager
+import android.content.Context
+import androidx.core.net.toUri
+import android.os.Environment
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.io.IOException
+import java.io.InputStream
+import java.security.MessageDigest
+import javax.inject.Inject
+import javax.inject.Singleton
+
+interface UpdateDownloads {
+    suspend fun enqueue(release: GitHubRelease, asset: GitHubAsset, channel: UpdateChannel): DownloadRecord
+    suspend fun query(record: DownloadRecord): DownloadState
+    /** False means completion won the race: do not remove a successfully downloaded file. */
+    suspend fun cancel(record: DownloadRecord): Boolean
+    suspend fun verifyForInstall(record: DownloadRecord): String
+}
+
+class UpdateDownloadException(val reason: UpdateError) : IOException()
+
+internal fun sha256Of(input: InputStream): String {
+    val digest = MessageDigest.getInstance("SHA-256")
+    val buffer = ByteArray(32 * 1024)
+    while (true) {
+        val count = input.read(buffer)
+        if (count < 0) break
+        if (count > 0) digest.update(buffer, 0, count)
+    }
+    return digest.digest().joinToString("") { "%02x".format(it.toInt() and 255) }
+}
+
+@Singleton
+class SystemUpdateDownloads @Inject constructor(
+    @ApplicationContext private val context: Context
+) : UpdateDownloads {
+    private fun manager(): DownloadManager =
+        context.getSystemService(DownloadManager::class.java)
+            ?: throw UpdateDownloadException(UpdateError.DOWNLOAD)
+
+    override suspend fun enqueue(release: GitHubRelease, asset: GitHubAsset, channel: UpdateChannel) =
+        withContext(Dispatchers.IO) {
+            val safeName = asset.name.removeSuffix(".apk").replace(Regex("[^A-Za-z0-9._-]"), "_").take(100)
+            val request = DownloadManager.Request(channel.downloadUrl(asset.downloadUrl).toUri())
+                .setTitle("RiseDiary ${release.tagName}")
+                .setMimeType("application/vnd.android.package-archive")
+                .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+                .setAllowedOverMetered(true)
+                .setAllowedOverRoaming(true)
+                .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS,
+                    "RiseDiary/$safeName-${System.currentTimeMillis()}-${asset.id}-${java.util.UUID.randomUUID()}.apk")
+            DownloadRecord(manager().enqueue(request), release, asset, channel)
+        }
+
+    override suspend fun query(record: DownloadRecord): DownloadState = withContext(Dispatchers.IO) {
+        val manager = manager()
+        manager.query(DownloadManager.Query().setFilterById(record.id))?.use { cursor ->
+            if (!cursor.moveToFirst()) return@withContext DownloadState.Failed(record, UpdateError.FILE_MISSING)
+            when (cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))) {
+                DownloadManager.STATUS_SUCCESSFUL -> {
+                    if (manager.getUriForDownloadedFile(record.id) == null) {
+                        DownloadState.Failed(record, UpdateError.FILE_MISSING)
+                    } else {
+                        try {
+                            manager.openDownloadedFile(record.id).use { }
+                            DownloadState.Ready(record)
+                        } catch (_: IOException) {
+                            DownloadState.Failed(record, UpdateError.FILE_MISSING)
+                        }
+                    }
+                }
+                DownloadManager.STATUS_FAILED -> {
+                    val reason = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_REASON))
+                    DownloadState.Failed(record, if (reason == DownloadManager.ERROR_INSUFFICIENT_SPACE) UpdateError.STORAGE else UpdateError.DOWNLOAD)
+                }
+                DownloadManager.STATUS_PAUSED -> DownloadState.Paused(record,
+                    cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_REASON)) == DownloadManager.PAUSED_QUEUED_FOR_WIFI)
+                else -> DownloadState.Running(record, downloadPercent(
+                    cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR)),
+                    cursor.getLong(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES))))
+            }
+        } ?: DownloadState.Failed(record, UpdateError.DOWNLOAD)
+    }
+
+    override suspend fun cancel(record: DownloadRecord): Boolean = withContext(Dispatchers.IO) {
+        val manager = manager()
+        manager.query(DownloadManager.Query().setFilterById(record.id))?.use {
+            if (it.moveToFirst() && it.getInt(it.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS)) == DownloadManager.STATUS_SUCCESSFUL) {
+                return@withContext false
+            }
+        }
+        manager.remove(record.id)
+        true
+    }
+
+    override suspend fun verifyForInstall(record: DownloadRecord): String = withContext(Dispatchers.IO) {
+        val manager = manager()
+        val uri = manager.getUriForDownloadedFile(record.id)
+            ?: throw UpdateDownloadException(UpdateError.FILE_MISSING)
+        try {
+            manager.openDownloadedFile(record.id).use { descriptor ->
+                android.os.ParcelFileDescriptor.AutoCloseInputStream(descriptor).use { input ->
+                    val expected = record.asset.sha256
+                    if (expected != null && sha256Of(input) != expected) {
+                        throw UpdateDownloadException(UpdateError.INTEGRITY)
+                    }
+                }
+            }
+        } catch (error: UpdateDownloadException) {
+            throw error
+        } catch (_: IOException) {
+            throw UpdateDownloadException(UpdateError.FILE_MISSING)
+        }
+        uri.toString()
+    }
+}

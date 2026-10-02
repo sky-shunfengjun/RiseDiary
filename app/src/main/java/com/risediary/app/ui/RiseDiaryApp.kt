@@ -1,10 +1,6 @@
 package com.risediary.app.ui
 
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.SpringSpec
-import androidx.compose.animation.core.spring
-import androidx.compose.foundation.MutatePriority
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -16,7 +12,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.unit.dp
@@ -39,6 +34,7 @@ import com.risediary.app.ui.about.AboutScreen
 import com.risediary.app.ui.about.ThirdPartyLibsScreen
 import com.risediary.app.ui.achievement.AchievementWallScreen
 import com.risediary.app.ui.backup.BackupRestoreScreen
+import com.risediary.app.ui.components.springAnimateToPage
 import com.risediary.app.ui.components.LiquidGlassBottomBar
 import com.risediary.app.ui.components.LocalPageEffectsActive
 import com.risediary.app.ui.components.HyperIslandNavigationMotion
@@ -72,8 +68,9 @@ import com.risediary.app.ui.settings.ReminderSettingsScreen
 import com.risediary.app.ui.tags.TagManagerScreen
 import com.risediary.app.ui.timer.TimerScreen
 import com.risediary.app.ui.timer.TimerCoordinatorViewModel
-import com.risediary.app.ui.update.UpdateAvailableDialog
-import com.risediary.app.update.UpdateCheckState
+import com.risediary.app.ui.update.UpdateSheetHost
+import com.risediary.app.ui.update.UpdateSheetBackdrop
+import com.risediary.app.ui.update.UpdateSheetPresentation
 import com.risediary.app.update.UpdateViewModel
 import com.risediary.app.service.TimerStatus
 import com.risediary.app.reminder.NotificationDestination
@@ -84,8 +81,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
-import kotlin.math.abs
-import kotlin.math.sqrt
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.utils.MiuixPopupUtils
 import com.risediary.app.ui.icons.AppIcons
@@ -138,57 +133,6 @@ class MainPagerState(
     }
 }
 
-private val PagerNavigationSpringSpec: SpringSpec<Float> = spring(
-    stiffness = 322.2f,
-    dampingRatio = 32.31f / (2f * sqrt(322.2f)),
-    visibilityThreshold = 0.5f,
-)
-
-private suspend fun androidx.compose.foundation.pager.PagerState.springAnimateToPage(target: Int) {
-    if (target !in 0 until pageCount) return
-    var shouldSnapToTarget = false
-    scroll(MutatePriority.UserInput) {
-        val pageSize = layoutInfo.pageSize + layoutInfo.pageSpacing
-        val distance = target - currentPage - currentPageOffsetFraction
-        val scrollPixels = distance * pageSize
-        if (abs(scrollPixels) <= 0.5f) return@scroll
-
-        var consumedScroll = 0f
-        var skipScroll = false
-        Animatable(0f).animateTo(
-            targetValue = scrollPixels,
-            animationSpec = PagerNavigationSpringSpec,
-        ) {
-            if (skipScroll) return@animateTo
-
-            val delta = value - consumedScroll
-            if (abs(delta) > 0.5f) {
-                val consumed = scrollBy(delta)
-                consumedScroll += consumed
-                if (abs(delta - consumed) > 0.1f) {
-                    shouldSnapToTarget = true
-                    skipScroll = true
-                }
-            } else {
-                consumedScroll = value
-            }
-
-            if (abs(velocity) < 0.1f && abs(scrollPixels - consumedScroll) < 1.0f) {
-                skipScroll = true
-            }
-        }
-
-        val remaining = scrollPixels - consumedScroll
-        if (abs(remaining) > 0.5f) {
-            scrollBy(remaining)
-        }
-    }
-
-    if (shouldSnapToTarget || currentPage != target) {
-        scrollToPage(target)
-    }
-}
-
 @Composable
 fun RiseDiaryApp(
     viewModel: AppGateViewModel = hiltViewModel(),
@@ -199,10 +143,6 @@ fun RiseDiaryApp(
     val appState by viewModel.state.collectAsStateWithLifecycle()
     val requestedDestination by
         notificationDestination.collectAsStateWithLifecycle()
-
-    LaunchedEffect(Unit) {
-        updateViewModel.checkForUpdate()
-    }
 
     when {
         keepsMainContentMounted(appState) -> {
@@ -300,8 +240,7 @@ private fun MainAppContent(
         drawContent()
     }
     val liquidDialogHostState = rememberLiquidDialogHostState()
-    val updateState by updateViewModel.state.collectAsStateWithLifecycle()
-    val uriHandler = LocalUriHandler.current
+    val updateSheetPresentation = remember { UpdateSheetPresentation() }
 
     val currentKey = navigator.current()
     val isMain = currentKey is Route.Main
@@ -357,161 +296,152 @@ private fun MainAppContent(
                         .background(appBackground)
                         .blockInteractionsAndAccessibility(interactionsBlocked)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .layerBackdrop(backdrop)
-                    ) {
-                        StableNavigationBackHost {
-                            NavDisplay(
-                                backStack = navigator.backStack,
-                                transition = navigationTransition,
-                                effects = NavDisplayEffects(
-                                    cornerClipRadius = navigationCornerRadius,
-                                    cornerClipMode = NavCornerClipMode.All,
-                                    dimAmount = 0f, // PageTransitionLayer supplies the theme-colored mask.
-                                ),
-                                onBack = {
-                                    if (!interactionsBlocked) navigator.pop()
-                                },
-                                modifier = Modifier.fillMaxSize(),
-                                content = {
-                                    pageEntry<Route.Main>(
-                                        navigationMotion,
-                                        overlay = {
-                                            // Keep the bar clear while it sinks, like HyperIsland.
-                                            // It stays in Main's entry, beneath secondary pages.
-                                            LiquidGlassBottomBar(
-                                                selectedTabIndex = mainPagerState.selectedPage,
-                                                onTabSelected = { index ->
-                                                    if (isMain && !returningToRoot && !interactionsBlocked) mainPagerState.animateToPage(index)
-                                                },
-                                                onFlightClick = {
-                                                    if (isMain && !returningToRoot && !interactionsBlocked) navigator.push(Route.ModeSelect)
-                                                },
-                                                backdrop = mainSceneBackdrop,
-                                                modifier = Modifier
-                                                    .align(Alignment.BottomCenter)
-                                                    .graphicsLayer {
-                                                        val progress = bottomBarProgress()
-                                                        translationY = size.height * progress
-                                                        alpha = 1f - progress
-                                                    }
-                                                    .blockInteractionsAndAccessibility(!isMain || returningToRoot || interactionsBlocked)
-                                                    .navigationBarsPadding()
-                                                    .padding(start = 20.dp, end = 20.dp, bottom = 8.dp)
+                    UpdateSheetBackdrop(updateSheetPresentation, interactionsBlocked) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .layerBackdrop(backdrop)
+                        ) {
+                            StableNavigationBackHost {
+                                NavDisplay(
+                                    backStack = navigator.backStack,
+                                    transition = navigationTransition,
+                                    effects = NavDisplayEffects(
+                                        cornerClipRadius = navigationCornerRadius,
+                                        cornerClipMode = NavCornerClipMode.All,
+                                        dimAmount = 0f, // PageTransitionLayer supplies the theme-colored mask.
+                                    ),
+                                    onBack = {
+                                        if (!interactionsBlocked) navigator.pop()
+                                    },
+                                    modifier = Modifier.fillMaxSize(),
+                                    content = {
+                                        pageEntry<Route.Main>(
+                                            navigationMotion,
+                                            overlay = {
+                                                // Keep the bar clear while it sinks, like HyperIsland.
+                                                // It stays in Main's entry, beneath secondary pages.
+                                                LiquidGlassBottomBar(
+                                                    selectedTabIndex = mainPagerState.selectedPage,
+                                                    onTabSelected = { index ->
+                                                        if (isMain && !returningToRoot && !interactionsBlocked) mainPagerState.animateToPage(index)
+                                                    },
+                                                    onFlightClick = {
+                                                        if (isMain && !returningToRoot && !interactionsBlocked) navigator.push(Route.ModeSelect)
+                                                    },
+                                                    backdrop = mainSceneBackdrop,
+                                                    modifier = Modifier
+                                                        .align(Alignment.BottomCenter)
+                                                        .graphicsLayer {
+                                                            val progress = bottomBarProgress()
+                                                            translationY = size.height * progress
+                                                            alpha = 1f - progress
+                                                        }
+                                                        .blockInteractionsAndAccessibility(!isMain || returningToRoot || interactionsBlocked)
+                                                        .navigationBarsPadding()
+                                                        .padding(start = 20.dp, end = 20.dp, bottom = 8.dp)
+                                                )
+                                            },
+                                        ) {
+                                            MainScene(
+                                                pagerState = pagerState,
+                                                mainPagerState = mainPagerState,
+                                                sceneBackdrop = mainSceneBackdrop,
+                                                snackbarHostState = snackbarHostState,
+                                                snackbarScope = pagerCoroutineScope
                                             )
-                                        },
-                                    ) {
-                                        MainScene(
-                                            pagerState = pagerState,
-                                            mainPagerState = mainPagerState,
-                                            sceneBackdrop = mainSceneBackdrop,
-                                            snackbarHostState = snackbarHostState,
-                                            snackbarScope = pagerCoroutineScope
-                                        )
+                                        }
+                                        pageEntry<Route.ModeSelect>(navigationMotion) { ModeSelectScreen() }
+                                        pageEntry<Route.Timer>(navigationMotion) { TimerScreen() }
+                                        pageEntry<Route.RecordForm>(navigationMotion) { route ->
+                                            RecordFormScreen(
+                                                isTimer = route.isTimer,
+                                                durationMillis = route.duration,
+                                                timerStartTimeMillis = route.startTime,
+                                                flightId = null
+                                            )
+                                        }
+                                        pageEntry<Route.RecordDetail>(navigationMotion) { route ->
+                                            RecordDetailScreen(flightId = route.flightId)
+                                        }
+                                        pageEntry<Route.RecordEdit>(navigationMotion) { route ->
+                                            RecordFormScreen(
+                                                isTimer = false,
+                                                durationMillis = 0L,
+                                                timerStartTimeMillis = 0L,
+                                                flightId = route.flightId
+                                            )
+                                        }
+                                        pageEntry<Route.TagManager>(navigationMotion) { TagManagerScreen() }
+                                        pageEntry<Route.AchievementWall>(navigationMotion) { AchievementWallScreen() }
+                                        pageEntry<Route.About>(navigationMotion) { AboutScreen(updateViewModel = updateViewModel) }
+                                        pageEntry<Route.ThirdPartyLibs>(navigationMotion) { ThirdPartyLibsScreen() }
+                                        pageEntry<Route.CardOrder>(navigationMotion) { CardOrderScreen() }
+                                        pageEntry<Route.BackupRestore>(navigationMotion) {
+                                            BackupRestoreScreen(snackbarHostState = snackbarHostState)
+                                        }
+                                        pageEntry<Route.LengthHistory>(navigationMotion) { LengthHistoryScreen() }
+                                        pageEntry<Route.ReminderSettings>(navigationMotion) { ReminderSettingsScreen() }
+                                        pageEntry<Route.AppLockSettings>(navigationMotion) { AppLockSettingsScreen() }
+                                        pageEntry<Route.LockSetup>(navigationMotion) {
+                                            AppLockScreen(
+                                                mode = LockMode.CREATE,
+                                                onDone = { navigator.pop() },
+                                                onCancel = { navigator.pop() }
+                                            )
+                                        }
+                                        pageEntry<Route.LockChange>(navigationMotion) {
+                                            AppLockScreen(
+                                                mode = LockMode.CHANGE_OLD,
+                                                onDone = { navigator.pop() },
+                                                onCancel = { navigator.pop() }
+                                            )
+                                        }
+                                        pageEntry<Route.LockDisable>(navigationMotion) {
+                                            AppLockScreen(
+                                                mode = LockMode.DISABLE_VERIFY,
+                                                onDone = { navigator.pop() },
+                                                onCancel = { navigator.pop() }
+                                            )
+                                        }
+                                        pageEntry<Route.OnboardingReview>(navigationMotion) {
+                                            OnboardingScreen(
+                                                mode = OnboardingMode.REVIEW,
+                                                onDone = { navigator.pop() },
+                                                onManageAppLock = {
+                                                    navigator.push(Route.AppLockSettings)
+                                                }
+                                            )
+                                        }
                                     }
-                                    pageEntry<Route.ModeSelect>(navigationMotion) { ModeSelectScreen() }
-                                    pageEntry<Route.Timer>(navigationMotion) { TimerScreen() }
-                                    pageEntry<Route.RecordForm>(navigationMotion) { route ->
-                                        RecordFormScreen(
-                                            isTimer = route.isTimer,
-                                            durationMillis = route.duration,
-                                            timerStartTimeMillis = route.startTime,
-                                            flightId = null
-                                        )
-                                    }
-                                    pageEntry<Route.RecordDetail>(navigationMotion) { route ->
-                                        RecordDetailScreen(flightId = route.flightId)
-                                    }
-                                    pageEntry<Route.RecordEdit>(navigationMotion) { route ->
-                                        RecordFormScreen(
-                                            isTimer = false,
-                                            durationMillis = 0L,
-                                            timerStartTimeMillis = 0L,
-                                            flightId = route.flightId
-                                        )
-                                    }
-                                    pageEntry<Route.TagManager>(navigationMotion) { TagManagerScreen() }
-                                    pageEntry<Route.AchievementWall>(navigationMotion) { AchievementWallScreen() }
-                                    pageEntry<Route.About>(navigationMotion) { AboutScreen() }
-                                    pageEntry<Route.ThirdPartyLibs>(navigationMotion) { ThirdPartyLibsScreen() }
-                                    pageEntry<Route.CardOrder>(navigationMotion) { CardOrderScreen() }
-                                    pageEntry<Route.BackupRestore>(navigationMotion) {
-                                        BackupRestoreScreen(snackbarHostState = snackbarHostState)
-                                    }
-                                    pageEntry<Route.LengthHistory>(navigationMotion) { LengthHistoryScreen() }
-                                    pageEntry<Route.ReminderSettings>(navigationMotion) { ReminderSettingsScreen() }
-                                    pageEntry<Route.AppLockSettings>(navigationMotion) { AppLockSettingsScreen() }
-                                    pageEntry<Route.LockSetup>(navigationMotion) {
-                                        AppLockScreen(
-                                            mode = LockMode.CREATE,
-                                            onDone = { navigator.pop() },
-                                            onCancel = { navigator.pop() }
-                                        )
-                                    }
-                                    pageEntry<Route.LockChange>(navigationMotion) {
-                                        AppLockScreen(
-                                            mode = LockMode.CHANGE_OLD,
-                                            onDone = { navigator.pop() },
-                                            onCancel = { navigator.pop() }
-                                        )
-                                    }
-                                    pageEntry<Route.LockDisable>(navigationMotion) {
-                                        AppLockScreen(
-                                            mode = LockMode.DISABLE_VERIFY,
-                                            onDone = { navigator.pop() },
-                                            onCancel = { navigator.pop() }
-                                        )
-                                    }
-                                    pageEntry<Route.OnboardingReview>(navigationMotion) {
-                                        OnboardingScreen(
-                                            mode = OnboardingMode.REVIEW,
-                                            onDone = { navigator.pop() },
-                                            onManageAppLock = {
-                                                navigator.push(Route.AppLockSettings)
-                                            }
-                                        )
-                                    }
-                                }
-                            )
+                                )
+                            }
                         }
+                        // Keep the current entry and its draft while the lock overlay
+                        // is open, including screens with their own save-on-back handler.
+                        BackHandler(enabled = interactionsBlocked || returningToRoot) { }
+                        LiquidSnackbarHost(
+                            hostState = snackbarHostState,
+                            backdrop = backdrop,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .navigationBarsPadding()
+                                .padding(
+                                    start = 20.dp,
+                                    end = 20.dp,
+                                    bottom = if (isMain) 84.dp else 20.dp
+                                )
+                        )
+                        LiquidDialogHost(
+                            state = liquidDialogHostState,
+                            backdrop = backdrop
+                        )
                     }
-                    // Keep the current entry and its draft while the lock overlay
-                    // is open, including screens with their own save-on-back handler.
-                    BackHandler(enabled = interactionsBlocked || returningToRoot) { }
-                    LiquidSnackbarHost(
-                        hostState = snackbarHostState,
-                        backdrop = backdrop,
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .navigationBarsPadding()
-                            .padding(
-                                start = 20.dp,
-                                end = 20.dp,
-                                bottom = if (isMain) 84.dp else 20.dp
-                            )
-                    )
-                    LiquidDialogHost(
-                        state = liquidDialogHostState,
-                        backdrop = backdrop
-                    )
                     // miuix popups (OverlayListPopup/OverlayDropdownPreference) register
                     // their state into the popup host; without it the popup never renders
                     // and the triggering row stays stuck in its pressed state.
                     MiuixPopupUtils.MiuixPopupHost()
-                    val availableRelease = (updateState as? UpdateCheckState.Available)?.release
-                    if (!interactionsBlocked && availableRelease != null) {
-                        UpdateAvailableDialog(
-                            currentVersion = updateViewModel.currentVersion,
-                            release = availableRelease,
-                            onDismiss = updateViewModel::dismiss,
-                            onOpenRelease = { releaseUrl ->
-                                updateViewModel.dismiss()
-                                runCatching { uriHandler.openUri(releaseUrl) }
-                            }
-                        )
-                    }
+                    UpdateSheetHost(updateViewModel, interactionsBlocked, updateSheetPresentation)
                 }
             }
         }
