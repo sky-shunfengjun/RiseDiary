@@ -76,6 +76,7 @@ internal object BackupJsonCodec {
 
     fun settingsToJson(value: SettingsSnapshot) = JSONObject().apply {
         put("username", value.username)
+        put("live_updates_enabled", value.liveUpdatesEnabled)
         put("prediction_max_ticks", value.predictionMaxTicks)
         put("ml_per_spurt", value.mlPerSpurt)
         put("default_volume_mode", value.defaultVolumeMode.storedValue)
@@ -197,6 +198,7 @@ internal object BackupJsonCodec {
         SettingsSnapshot(
             predictionMaxTicks = if (has("prediction_max_ticks")) strictTicks("prediction_max_ticks") else 80,
             username = getString("username"),
+            liveUpdatesEnabled = if (has("live_updates_enabled")) getBoolean("live_updates_enabled") else true,
             mlPerSpurt = getDouble("ml_per_spurt").toFloat(),
             defaultVolumeMode = parseBackupDefaultVolumeMode(
                 optString("default_volume_mode", DefaultVolumeMode.MILLILITERS.storedValue)

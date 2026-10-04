@@ -73,6 +73,8 @@ import com.risediary.app.ui.update.UpdateSheetBackdrop
 import com.risediary.app.ui.update.UpdateSheetPresentation
 import com.risediary.app.update.UpdateViewModel
 import com.risediary.app.service.TimerStatus
+import com.risediary.app.service.TimerNotificationEntry
+import com.risediary.app.service.resolveTimerNotificationRoute
 import com.risediary.app.reminder.NotificationDestination
 import com.risediary.app.ui.theme.RiseCard
 import com.risediary.app.ui.theme.backgroundBrush
@@ -140,6 +142,8 @@ fun RiseDiaryApp(
     viewModel: AppGateViewModel = hiltViewModel(),
     updateViewModel: UpdateViewModel = hiltViewModel(),
     notificationDestination: StateFlow<NotificationDestination?>,
+    timerNotificationEntry: StateFlow<TimerNotificationEntry?>,
+    onTimerNotificationConsumed: (TimerNotificationEntry) -> Unit,
     onNotificationDestinationConsumed: (NotificationDestination) -> Unit
 ) {
     val noticeContext = androidx.compose.ui.platform.LocalContext.current
@@ -153,6 +157,7 @@ fun RiseDiaryApp(
     val maintenanceState by viewModel.maintenanceState.collectAsStateWithLifecycle()
     val requestedDestination by
         notificationDestination.collectAsStateWithLifecycle()
+    val requestedTimerEntry by timerNotificationEntry.collectAsStateWithLifecycle()
 
     when {
         keepsMainContentMounted(appState) || (retainMain && appState == AppGateState.ERROR) -> {
@@ -161,6 +166,8 @@ fun RiseDiaryApp(
                 MainAppContent(
                     interactionsBlocked = locked,
                     notificationDestination = requestedDestination,
+                    timerNotificationEntry = requestedTimerEntry,
+                    onTimerNotificationConsumed = onTimerNotificationConsumed,
                     onNotificationDestinationConsumed = onNotificationDestinationConsumed,
                     updateViewModel = updateViewModel
                 )
@@ -261,6 +268,8 @@ private inline fun <reified T : Route> NavEntryBuilder.pageEntry(
 private fun MainAppContent(
     interactionsBlocked: Boolean,
     notificationDestination: NotificationDestination?,
+    timerNotificationEntry: TimerNotificationEntry?,
+    onTimerNotificationConsumed: (TimerNotificationEntry) -> Unit,
     onNotificationDestinationConsumed: (NotificationDestination) -> Unit,
     timerCoordinator: TimerCoordinatorViewModel = hiltViewModel(),
     updateViewModel: UpdateViewModel
@@ -268,6 +277,9 @@ private fun MainAppContent(
     val navigator = rememberNavigator(Route.Main)
     remember(navigator) { navigator.discardExpiredForms(timerCoordinator::isFormLive); true }
     val timerSession by timerCoordinator.session.collectAsStateWithLifecycle()
+    val timerRestorationReady by timerCoordinator.restorationReady.collectAsStateWithLifecycle()
+    val timerPersistenceError by timerCoordinator.persistenceError.collectAsStateWithLifecycle()
+    val timerNoticeContext = androidx.compose.ui.platform.LocalContext.current
     val snackbarHostState = remember { androidx.compose.material3.SnackbarHostState() }
     val pagerState = rememberPagerState(pageCount = { 3 })
     val pagerCoroutineScope = rememberCoroutineScope()
@@ -301,6 +313,22 @@ private fun MainAppContent(
 
     val returningToRoot by remember(navigationMotion, navigationKeys) {
         derivedStateOf { isMain && !navigationMotion.rootPageReady }
+    }
+
+    LaunchedEffect(timerNotificationEntry, interactionsBlocked, timerRestorationReady,
+        timerSession.sessionId, timerSession.status, timerPersistenceError) {
+        val entry = timerNotificationEntry ?: return@LaunchedEffect
+        if (interactionsBlocked || !timerRestorationReady) return@LaunchedEffect
+        if (timerPersistenceError && timerSession.sessionId != entry.sessionId) {
+            // Keep the request while the existing timer page offers recovery retry.
+            navigator.push(Route.Timer)
+            return@LaunchedEffect
+        }
+        val route = resolveTimerNotificationRoute(entry, timerSession, locked = false)
+        if (route != null) navigator.push(route)
+        else android.widget.Toast.makeText(timerNoticeContext, R.string.notification_timer_expired,
+            android.widget.Toast.LENGTH_SHORT).show()
+        onTimerNotificationConsumed(entry)
     }
 
     LaunchedEffect(notificationDestination, interactionsBlocked) {

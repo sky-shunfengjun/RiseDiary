@@ -15,6 +15,7 @@ class TimerFinishIntentTest {
         holder.set(TimerSession(status = TimerStatus.RUNNING, sessionId = "s1"))
         var sent: Intent? = null
         val context = object : ContextWrapper(ApplicationProvider.getApplicationContext<Context>()) {
+            override fun startForegroundService(service: Intent): ComponentName = startService(service)
             override fun startService(service: Intent): ComponentName {
                 sent = service
                 return ComponentName(this, TimerService::class.java)
@@ -32,6 +33,7 @@ class TimerFinishIntentTest {
         val holder = TimerStateHolder()
         holder.setCommandError("旧错误")
         val context = object : ContextWrapper(ApplicationProvider.getApplicationContext<Context>()) {
+            override fun startForegroundService(service: Intent): ComponentName = startService(service)
             override fun startService(service: Intent): ComponentName {
                 throw IllegalStateException("service unavailable")
             }
@@ -48,6 +50,7 @@ class TimerFinishIntentTest {
         val candidate = TimerFinishPolicy.capture(atClick, 108_000L, 13_000L)
         var sent: Intent? = null
         val context = object : ContextWrapper(ApplicationProvider.getApplicationContext<Context>()) {
+            override fun startForegroundService(service: Intent): ComponentName = startService(service)
             override fun startService(service: Intent): ComponentName {
                 sent = service
                 return ComponentName(this, TimerService::class.java)
@@ -62,5 +65,41 @@ class TimerFinishIntentTest {
         assertEquals(8_000L, decoded.elapsedMillis)
         assertEquals(108_000L, decoded.requestedAtEpochMillis)
         assertEquals("s1", decoded.sessionId)
+    }
+
+    @Test fun coldFinishDispatchStartsForegroundAndKeepsTheCapturedTimesForStorageLoad() {
+        val holder = TimerStateHolder()
+        var sent: Intent? = null
+        val context = object : ContextWrapper(ApplicationProvider.getApplicationContext<Context>()) {
+            override fun startService(service: Intent): ComponentName = error("cold finish needs foreground service")
+            override fun startForegroundService(service: Intent): ComponentName {
+                sent = service
+                return ComponentName(this, TimerService::class.java)
+            }
+        }
+        ServiceTimerController(context, holder).requestFinish("cold", 108000L, 13000L)
+        val intent = requireNotNull(sent)
+        assertEquals("cold", intent.getStringExtra(TimerService.EXTRA_SESSION_ID))
+        assertEquals(108000L, intent.getLongExtra(TimerService.EXTRA_WALL, 0))
+        assertEquals(13000L, intent.getLongExtra(TimerService.EXTRA_MONO, 0))
+        assertFalse(intent.hasExtra(TimerService.EXTRA_CANDIDATE))
+    }
+
+    @Test fun aCheckpointAfterTheCapturedClickUsesStorageInsteadOfIncludingTheDelay() {
+        val holder = TimerStateHolder()
+        holder.set(TimerSession(status = TimerStatus.RUNNING, sessionId = "one",
+            elapsedMillis = 10000L, resumedAtElapsedRealtime = 15000L))
+        var sent: Intent? = null
+        val context = object : ContextWrapper(ApplicationProvider.getApplicationContext<Context>()) {
+            override fun startForegroundService(service: Intent): ComponentName {
+                sent = service
+                return ComponentName(this, TimerService::class.java)
+            }
+        }
+        ServiceTimerController(context, holder).requestFinish("one", 108000L, 13000L)
+        val intent = requireNotNull(sent)
+        assertFalse(intent.hasExtra(TimerService.EXTRA_CANDIDATE))
+        assertEquals(108000L, intent.getLongExtra(TimerService.EXTRA_WALL, 0L))
+        assertEquals(13000L, intent.getLongExtra(TimerService.EXTRA_MONO, 0L))
     }
 }

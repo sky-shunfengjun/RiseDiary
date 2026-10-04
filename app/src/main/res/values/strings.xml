@@ -622,4 +622,20 @@
     <string name="video_timer_collapse">收起计时操作</string>
     <string name="video_unavailable">视频无法访问</string>
     <string name="video_relink">重新关联</string>
+    <string name="settings_live_updates">实时活动</string>
+    <string name="settings_live_updates_summary">计时时显示系统实时活动</string>
+    <string name="settings_live_updates_off">已关闭，保留普通计时通知</string>
+    <string name="settings_live_updates_notifications_off">系统通知未开启</string>
+    <string name="settings_live_updates_unsupported">系统暂不支持，使用普通通知</string>
+    <string name="settings_live_updates_restricted">系统未允许，使用普通通知</string>
+    <string name="settings_live_updates_system">系统通知设置</string>
+    <string name="settings_live_updates_system_summary">查看通知和实时活动权限</string>
+    <string name="notification_timer_pause">暂停</string>
+    <string name="notification_timer_resume">继续</string>
+    <string name="notification_timer_finish">结束</string>
+    <string name="notification_timer_confirm_title">等待结束确认</string>
+    <string name="notification_timer_finished_title">计时已结束</string>
+    <string name="notification_timer_preparing_title">正在准备计时</string>
+    <string name="notification_timer_return">点按返回计时</string>
+    <string name="notification_timer_expired">这次计时已结束</string>
 </resources>

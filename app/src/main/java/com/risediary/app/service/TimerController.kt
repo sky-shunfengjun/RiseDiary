@@ -38,8 +38,10 @@ class ServiceTimerController @Inject constructor(
     override fun resume(sessionId: String) = send(TimerService.ACTION_RESUME, sessionId, true)
     override fun requestFinish(sessionId: String, wallClockNow: Long, elapsedRealtimeNow: Long, candidate: TimerFinishCandidate?) {
         val current = state.value.takeIf { it.sessionId == sessionId && it.isActive }
-        val captured = candidate ?: current?.let { TimerFinishPolicy.capture(it, wallClockNow, elapsedRealtimeNow) }
-        send(TimerService.ACTION_REQUEST_FINISH, sessionId) {
+        val captured = candidate ?: current?.takeIf {
+            it.status != TimerStatus.RUNNING || it.resumedAtElapsedRealtime <= elapsedRealtimeNow
+        }?.let { TimerFinishPolicy.capture(it, wallClockNow, elapsedRealtimeNow) }
+        send(TimerService.ACTION_REQUEST_FINISH, sessionId, foreground = true) {
             putExtra(TimerService.EXTRA_WALL, wallClockNow)
             putExtra(TimerService.EXTRA_MONO, elapsedRealtimeNow)
             captured?.let { putExtra(TimerService.EXTRA_CANDIDATE, json.encodeToString(it)) }

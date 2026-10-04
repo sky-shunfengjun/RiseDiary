@@ -17,7 +17,6 @@ import androidx.core.content.ContextCompat
 import com.risediary.app.MainActivity
 import com.risediary.app.R
 import com.risediary.app.RiseDiaryApp
-import com.risediary.app.util.formatTimerClock
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -27,6 +26,8 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.retryWhen
+import com.risediary.app.data.UserPreferences
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.time.Clock
@@ -46,23 +47,57 @@ class TimerService : Service() {
     @Inject lateinit var bootIdentity: BootIdentityProvider
     @Inject lateinit var maintenanceGate: DataMaintenanceGate
     @Inject lateinit var videoGrants: VideoGrantRegistry
+    @Inject lateinit var preferences: UserPreferences
+    @Inject lateinit var notifications: TimerNotificationFactory
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val json = Json { encodeDefaults = true }
     private val commandMutex = Mutex()
     private var tickerJob: Job? = null
-    private var lastNotificationSecond = -1L
+    private var lastNotificationKey: TimerNotificationUpdateKey? = null
+    private var lastNotificationClockOffset = Long.MIN_VALUE
+    private var notificationCaps: TimerNotificationCapabilities? = null
+    private var capsCheckedAt = -1L
+    private var liveUpdatesEnabled = false
+    private var dismissedSessionId: String? = null
     private var lastPersistedRealtime = 0L
     private var lastPersistenceAttempt = 0L
     private var pendingTransition: TimerTransition? = null
     private var handledStartId = 0
     private var lastStopRequestId = 0
 
+    override fun onCreate() {
+        super.onCreate()
+        serviceScope.launch {
+            preferences.liveUpdatesEnabled.retryWhen { cause, _ ->
+                if (cause is kotlinx.coroutines.CancellationException) throw cause
+                liveUpdatesEnabled = false
+                notifyState(stateHolder.state.value)
+                delay(5_000L)
+                true
+            }.collect { enabled ->
+                liveUpdatesEnabled = enabled
+                notifyState(stateHolder.state.value)
+            }
+        }
+    }
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val action = intent?.action ?: ACTION_RESTORE
-        if (action == ACTION_START || action == ACTION_RESUME || action == ACTION_RESTORE || action == ACTION_RETRY) {
+        if (action == ACTION_RESTORE) {
+            notificationCaps = null
+            capsCheckedAt = -1L
+        }
+        if (action == ACTION_NOTIFICATION_DISMISSED && stateHolder.state.value.isActive &&
+            TimerSessionPolicy.matches(stateHolder.state.value, intent?.getStringExtra(EXTRA_SESSION_ID))) {
+            // Suppress promotion before startForeground can repost this dismissed notification.
+            dismissedSessionId = stateHolder.state.value.sessionId
+        }
+        if (action == ACTION_START || action == ACTION_RESUME || action == ACTION_RESTORE ||
+            action == ACTION_RETRY || action == ACTION_REQUEST_FINISH ||
+            intent?.getBooleanExtra(TimerNotificationIntents.EXTRA_NOTIFICATION_COMMAND, false) == true) {
             ServiceCompat.startForeground(
                 this,
                 NOTIFICATION_ID,
@@ -76,10 +111,11 @@ class TimerService : Service() {
                 // Only the command that owns the lock may stop its service start request.
                 handledStartId = startId
                 try {
-                    if (pendingTransition != null && action !in setOf(ACTION_RETRY, ACTION_REQUEST_FINISH, ACTION_DISCARD)) return@withLock
+                    if (pendingTransition != null && action !in setOf(ACTION_RETRY, ACTION_REQUEST_FINISH, ACTION_DISCARD, ACTION_NOTIFICATION_DISMISSED)) return@withLock
                     when (action) {
                         ACTION_START -> startNewSession(json.decodeFromString<TimerStartRequest>(
                             requireNotNull(intent?.getStringExtra(EXTRA_START))))
+                        ACTION_NOTIFICATION_DISMISSED -> dismissLiveUpdate(intent?.getStringExtra(EXTRA_SESSION_ID))
                         ACTION_PAUSE -> pauseSession(intent?.getStringExtra(EXTRA_SESSION_ID))
                         ACTION_RESUME -> resumeSession(intent?.getStringExtra(EXTRA_SESSION_ID))
                         ACTION_REQUEST_FINISH -> requestFinish(intent)
@@ -121,7 +157,7 @@ class TimerService : Service() {
                 wallClock.millis(), elapsedClock.millis(), bootIdentity.currentBootCount())
             if (session == current) return@write
             NotificationManagerCompat.from(this).cancel(MILESTONE_NOTIFICATION_ID)
-            lastNotificationSecond = -1L
+            lastNotificationKey = null
             stateHolder.setCommandError(null)
             videoGrants.retain("timer-service", listOfNotNull(session.video?.video?.uriString).toSet())
             if (commitTransition(prepareTimerTransition(session), true)) startTicker()
@@ -132,7 +168,7 @@ class TimerService : Service() {
         val current = effectiveSession()
         val restored = if (current.status == TimerStatus.RUNNING)
             TimerMath.advance(current, elapsedClock.millis(), wallClock.millis()) else current
-        lastNotificationSecond = -1L
+        lastNotificationKey = null
         val transition = prepareTimerTransition(restored)
         if (commitTransition(transition, true) && transition.session.status == TimerStatus.RUNNING) startTicker()
     }
@@ -207,6 +243,16 @@ class TimerService : Service() {
             NotificationManagerCompat.from(this).cancel(MILESTONE_NOTIFICATION_ID)
             videoGrants.requestCleanup()
         }
+    }
+
+    private suspend fun dismissLiveUpdate(id: String?) {
+        val current = pendingTransition?.session ?: effectiveSession()
+        val dismissed = TimerNotificationPolicy.dismiss(current, id)
+        if (dismissed === current) return
+        // Respect dismissal immediately even if its durable write needs a retry.
+        dismissedSessionId = id
+        if (commitTransition(prepareTimerTransition(dismissed), true) &&
+            dismissed.status == TimerStatus.RUNNING) startTicker()
     }
 
     private suspend fun resetSession(id: String?) {
@@ -286,11 +332,7 @@ class TimerService : Service() {
             pendingTransition = null
             stateHolder.setPersistenceError(false)
             stateHolder.setCommandError(null)
-            val seconds = transition.session.elapsedMillis / 1_000L
-            if (transition.session.isActive && seconds != lastNotificationSecond) {
-                lastNotificationSecond = seconds
-                notifyState(transition.session)
-            }
+            if (transition.session.isActive) notifyState(transition.session)
             true
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
             throw cancelled
@@ -298,6 +340,7 @@ class TimerService : Service() {
             // Keep the durable transition and the service alive; explicit retry or a checkpoint can retry it.
             pendingTransition = transition
             stateHolder.setPersistenceError(true)
+            notifyState(stateHolder.state.value)
             false
         }
     }
@@ -309,15 +352,38 @@ class TimerService : Service() {
         if (stopSelfResult(startId)) stopForeground(STOP_FOREGROUND_REMOVE)
     }
 
-    private fun calculateElapsed(session: TimerSession): Long =
-        TimerMath.elapsedInCurrentProcess(session, elapsedClock.millis())
+    private fun currentCapabilities(): TimerNotificationCapabilities {
+        val now = elapsedClock.millis()
+        if (notificationCaps == null || now - capsCheckedAt >= 1_000L) {
+            val latest = runCatching { TimerLiveUpdateSupport.capabilities(this) }.getOrElse {
+                TimerNotificationCapabilities(Build.VERSION.SDK_INT, false, false, 0)
+            }
+            if (latest != notificationCaps) lastNotificationKey = null
+            notificationCaps = latest
+            capsCheckedAt = now
+        }
+        return requireNotNull(notificationCaps)
+    }
+
     @SuppressLint("MissingPermission")
     private fun notifyState(session: TimerSession) {
-        if (canPostNotifications()) {
-            runCatching {
-                NotificationManagerCompat.from(this)
-                    .notify(NOTIFICATION_ID, buildNotification(session))
-            }
+        if (!session.isActive) return
+        if (!canPostNotifications()) { lastNotificationKey = null; return }
+        // Notification failures must never turn a committed timer into a failed data write.
+        runCatching {
+            val caps = currentCapabilities()
+            val failed = stateHolder.persistenceError.value || stateHolder.commandError.value != null
+            val dismissed = session.liveUpdateDismissed || session.sessionId == dismissedSessionId
+            val promotion = TimerNotificationPolicy.requestPromotion(session, liveUpdatesEnabled, caps, dismissed, failed)
+            val key = TimerNotificationPolicy.updateKey(session, promotion, failed)
+            val offset = wallClock.millis() - elapsedClock.millis()
+            val clockChanged = lastNotificationClockOffset == Long.MIN_VALUE ||
+                kotlin.math.abs(offset - lastNotificationClockOffset) > 1_000L
+            if (key == lastNotificationKey && !clockChanged) return
+            NotificationManagerCompat.from(this).notify(NOTIFICATION_ID,
+                notifications.build(session, liveUpdatesEnabled, failed, dismissed, caps))
+            lastNotificationKey = key
+            lastNotificationClockOffset = offset
         }
     }
 
@@ -359,29 +425,14 @@ class TimerService : Service() {
                 Manifest.permission.POST_NOTIFICATIONS
             ) == PackageManager.PERMISSION_GRANTED
 
-    private fun buildNotification(session: TimerSession): Notification {
-        val title = if (session.status == TimerStatus.PAUSED) {
-            getString(R.string.notification_timer_paused_title)
-        } else {
-            getString(R.string.notification_timer_running_title)
-        }
-        val text = getString(
-            R.string.notification_timer_elapsed,
-            formatTimerClock(session.elapsedMillis)
-        )
-        return NotificationCompat.Builder(this, RiseDiaryApp.CHANNEL_TIMER)
-            .setContentTitle(title)
-            .setContentText(text)
-            .setSmallIcon(android.R.drawable.ic_menu_recent_history)
-            .setContentIntent(openAppPendingIntent(NOTIFICATION_ID))
-            .setOngoing(session.isActive)
-            .setOnlyAlertOnce(true)
-            .setCategory(NotificationCompat.CATEGORY_STOPWATCH)
-            .build()
-    }
+    private fun buildNotification(session: TimerSession): Notification =
+        notifications.build(session, liveUpdatesEnabled,
+            stateHolder.persistenceError.value || stateHolder.commandError.value != null,
+            session.liveUpdateDismissed || session.sessionId == dismissedSessionId, currentCapabilities())
 
     private fun openAppPendingIntent(requestCode: Int): PendingIntent =
-        PendingIntent.getActivity(
+        stateHolder.state.value.sessionId?.let { TimerNotificationIntents.activity(this, it) }
+            ?: PendingIntent.getActivity(
             this,
             requestCode,
             Intent(this, MainActivity::class.java).apply {
@@ -401,6 +452,7 @@ class TimerService : Service() {
         const val ACTION_RESTORE = "com.risediary.app.timer.RESTORE"
         const val ACTION_START = "com.risediary.app.timer.START"
         const val ACTION_PAUSE = "com.risediary.app.timer.PAUSE"
+        const val ACTION_NOTIFICATION_DISMISSED = "com.risediary.app.timer.NOTIFICATION_DISMISSED"
         const val ACTION_RESUME = "com.risediary.app.timer.RESUME"
         const val ACTION_REQUEST_FINISH = "com.risediary.app.timer.REQUEST_FINISH"
         const val ACTION_CONFIRM_FINISH = "com.risediary.app.timer.CONFIRM_FINISH"

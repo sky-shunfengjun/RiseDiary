@@ -38,7 +38,8 @@ data class TimerSession(
     val kind: TimerKind = TimerKind.NORMAL,
     val video: VideoPlaybackSnapshot? = null,
     val finishCandidate: TimerFinishCandidate? = null,
-    val endedAtEpochMillis: Long? = null
+    val endedAtEpochMillis: Long? = null,
+    val liveUpdateDismissed: Boolean = false
 ) {
     val isActive: Boolean get() = status == TimerStatus.RUNNING || status == TimerStatus.PAUSED
     val isTerminal: Boolean get() = status == TimerStatus.FINISHED || status == TimerStatus.LIMIT_REACHED

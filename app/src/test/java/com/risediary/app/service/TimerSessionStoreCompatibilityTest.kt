@@ -109,6 +109,22 @@ class TimerSessionStoreCompatibilityTest {
         assertEquals(expected, sessionStore.loadAt(11_000L, 999_000L))
     }
 
+
+    @Test fun oldSessionWithoutLiveUpdateStateRemainsReadable() = runTest {
+        val data = MemoryStore(fixture(TimerStatus.PAUSED, 5000L, version = 2))
+        assertFalse(store(data).load().liveUpdateDismissed)
+    }
+
+    @Test fun userDismissalSurvivesAProcessRestoreWithoutChangingElapsedTime() = runTest {
+        val data = MemoryStore(fixture(TimerStatus.PAUSED, 5000L, version = 2))
+        val initial = store(data).load().copy(liveUpdateDismissed = true)
+        store(data).save(initial)
+        val restored = store(data).load()
+        assertTrue(restored.liveUpdateDismissed)
+        assertEquals(5000L, restored.elapsedMillis)
+        assertEquals(initial.sessionId, restored.sessionId)
+    }
+
     private fun store(data: DataStore<Preferences>, boot: Int = 4) = TimerSessionStore(
         data,
         BootIdentityProvider { boot },

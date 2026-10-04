@@ -77,7 +77,8 @@ data class SettingsSnapshot(
     val homeCardOrder: String,
     val homeCardVisibility: String,
     val onboardingCompleted: Boolean,
-    val predictionMaxTicks: Int = 80
+    val predictionMaxTicks: Int = 80,
+    val liveUpdatesEnabled: Boolean = true
 )
 
 @Singleton

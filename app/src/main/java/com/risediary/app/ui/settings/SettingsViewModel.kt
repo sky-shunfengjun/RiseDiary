@@ -44,7 +44,31 @@ class SettingsViewModel @Inject constructor(
     val predictionSettings = mutablePredictionSettings.asStateFlow()
     private var predictionSettingsJob: Job? = null
 
-    init { retryPredictionSettings() }
+    private val mutableLiveUpdatesSettings = MutableStateFlow(LiveUpdatesSettingsUiState())
+    val liveUpdatesSettings = mutableLiveUpdatesSettings.asStateFlow()
+    private var liveUpdatesSettingsJob: Job? = null
+
+    init { retryPredictionSettings(); retryLiveUpdatesSettings() }
+
+    fun retryLiveUpdatesSettings() {
+        liveUpdatesSettingsJob?.cancel()
+        mutableLiveUpdatesSettings.value = mutableLiveUpdatesSettings.value.copy(ready = false, error = null)
+        liveUpdatesSettingsJob = viewModelScope.launch {
+            try {
+                prefs.liveUpdatesEnabled.collect {
+                    mutableLiveUpdatesSettings.value = LiveUpdatesSettingsUiState(enabled = it, ready = true)
+                }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) {
+                mutableLiveUpdatesSettings.value = mutableLiveUpdatesSettings.value.copy(
+                    ready = false, error = "读取失败，请重试")
+            }
+        }
+    }
+
+    fun setLiveUpdatesEnabled(enabled: Boolean) = launchSettingsWrite {
+        if (mutableLiveUpdatesSettings.value.ready) prefs.setLiveUpdatesEnabled(enabled)
+    }
 
     fun retryPredictionSettings() {
         predictionSettingsJob?.cancel()
@@ -235,3 +259,4 @@ class SettingsViewModel @Inject constructor(
     }
 }
 data class PredictionSettingsUiState(val maxTicks: Int? = null, val error: String? = null)
+data class LiveUpdatesSettingsUiState(val enabled: Boolean = true, val ready: Boolean = false, val error: String? = null)

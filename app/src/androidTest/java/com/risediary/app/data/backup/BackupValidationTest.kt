@@ -286,6 +286,26 @@ class BackupValidationTest {
         assertEquals(record, database.flightDao().getAll().single())
     }
 
+
+    @Test
+    fun liveUpdateSettingRoundTripsAndOldBackupUsesEnabledDefault() {
+        val legacy = """{
+            "username":"测试","ml_per_spurt":2.0,"daily_reminder_enabled":false,
+            "daily_reminder_time":"22:00","inactive_reminder_enabled":false,"inactive_reminder_days":7,
+            "monthly_length_reminder_enabled":false,"monthly_length_reminder_day":1,
+            "reminder_sound":true,"reminder_vibration":true,"theme_mode":"system",
+            "home_card_order":"[]","home_card_visibility":"{}","onboarding_completed":true
+        }"""
+        org.junit.Assert.assertTrue(manager.readBackup(ByteArrayInputStream(validArchive(legacy))).settings.liveUpdatesEnabled)
+        val settings = BackupJsonCodec.parseSettings(legacy)
+        val encoded = BackupJsonCodec.settingsToJson(settings.copy(liveUpdatesEnabled = false))
+        assertEquals(false, manager.readBackup(ByteArrayInputStream(validArchive(encoded.toString()))).settings.liveUpdatesEnabled)
+        encoded.put("live_updates_enabled", 1)
+        assertThrows(IllegalArgumentException::class.java) {
+            manager.readBackup(ByteArrayInputStream(validArchive(encoded.toString())))
+        }
+    }
+
     private fun videoFlight() = Flight(
         id=1, startTime=1000, endTime=61000, durationSeconds=60, spurtCount=null,
         semenVolumeMl=2.3f, volumeInputMode="estimated", predictionMaxTicks=80,

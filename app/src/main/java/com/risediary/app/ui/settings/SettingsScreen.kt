@@ -15,6 +15,13 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.LifecycleResumeEffect
+import com.risediary.app.service.TimerLiveUpdateSupport
+import com.risediary.app.service.TimerNotificationPolicy
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -42,6 +49,12 @@ fun SettingsScreen(
     vm: SettingsViewModel = hiltViewModel()
 ) {
     val navigator = LocalNavigator.current
+    val context = LocalContext.current
+    var capabilities by remember { mutableStateOf(TimerLiveUpdateSupport.capabilities(context)) }
+    LifecycleResumeEffect(context) {
+        capabilities = TimerLiveUpdateSupport.capabilities(context)
+        onPauseOrDispose { }
+    }
     val statusBarTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val listState = rememberLazyListState()
     PageTopBlurLayout(progress = rememberTopBlurProgress(listState)) {
@@ -105,12 +118,45 @@ fun SettingsScreen(
             item { SettingsGroupHeader(stringResource(R.string.settings_group_reminders)) }
             item {
                 Card(modifier = Modifier.fillMaxWidth()) {
-                    ArrowPreference(
-                        title = stringResource(R.string.settings_reminder_settings),
-                        summary = stringResource(R.string.settings_reminder_settings_summary),
-                        startAction = { SettingsIcon(AppIcons.NotificationsActive) },
-                        onClick = { navigator.push(Route.ReminderSettings) }
-                    )
+                    Column {
+                        ArrowPreference(
+                            title = stringResource(R.string.settings_reminder_settings),
+                            summary = stringResource(R.string.settings_reminder_settings_summary),
+                            startAction = { SettingsIcon(AppIcons.NotificationsActive) },
+                            onClick = { navigator.push(Route.ReminderSettings) }
+                        )
+                        val liveUpdates by vm.liveUpdatesSettings.collectAsStateWithLifecycle()
+                        val supported = TimerNotificationPolicy.supportsLiveUpdates(capabilities.sdkInt)
+                        SettingsToggleItem(
+                            icon = AppIcons.Schedule,
+                            title = stringResource(R.string.settings_live_updates),
+                            subtitle = stringResource(when {
+                                !liveUpdates.enabled -> R.string.settings_live_updates_off
+                                !capabilities.notificationsAllowed -> R.string.settings_live_updates_notifications_off
+                                !supported -> R.string.settings_live_updates_unsupported
+                                !capabilities.promotionAllowed || capabilities.channelImportance < 2 ->
+                                    R.string.settings_live_updates_restricted
+                                else -> R.string.settings_live_updates_summary
+                            }),
+                            checked = liveUpdates.enabled,
+                            onCheckedChange = vm::setLiveUpdatesEnabled,
+                            enabled = liveUpdates.ready
+                        )
+                        liveUpdates.error?.let {
+                            Text(it, modifier = Modifier.padding(horizontal = 16.dp))
+                            top.yukonga.miuix.kmp.basic.TextButton(
+                                text = stringResource(R.string.action_retry), onClick = vm::retryLiveUpdatesSettings)
+                        }
+                        if (liveUpdates.ready && liveUpdates.enabled &&
+                            (!capabilities.notificationsAllowed || (supported && (!capabilities.promotionAllowed || capabilities.channelImportance < 2)))) {
+                            ArrowPreference(
+                                title = stringResource(R.string.settings_live_updates_system),
+                                summary = stringResource(R.string.settings_live_updates_system_summary),
+                                startAction = { SettingsIcon(AppIcons.NotificationsActive) },
+                                onClick = { TimerLiveUpdateSupport.openSettings(context, capabilities.notificationsAllowed && capabilities.channelImportance >= 2) }
+                            )
+                        }
+                    }
                 }
             }
 
