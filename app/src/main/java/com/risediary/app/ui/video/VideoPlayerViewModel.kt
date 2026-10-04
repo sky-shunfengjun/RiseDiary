@@ -92,7 +92,7 @@ class VideoPlayerViewModel @Inject constructor(
                 val state = access.check(video)
                 if (state != VideoAccessState.READABLE) {
                     controller.pause()
-                    accessFailure.value = when (state) {
+                    accessFailure.value = if (recordId != null) "视频无法访问，请返回记录详情重新关联" else when (state) {
                         VideoAccessState.MISSING -> "原视频已删除或移动，请在编辑记录中更换"
                         VideoAccessState.PERMISSION_LOST -> "无法访问原视频，请在编辑记录中重新选择"
                         else -> "视频关联无效，请在编辑记录中更换"

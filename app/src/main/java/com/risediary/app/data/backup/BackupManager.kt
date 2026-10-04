@@ -1,5 +1,9 @@
 package com.risediary.app.data.backup
 
+import com.risediary.app.media.VideoFileAccess
+import com.risediary.app.media.AndroidVideoFileAccess
+import com.risediary.app.media.countUnavailableVideos
+import kotlinx.coroutines.CancellationException
 import android.content.ContentValues
 import android.content.Context
 import android.net.Uri
@@ -83,7 +87,8 @@ class BackupManager @Inject constructor(
     private val preferences: UserPreferences,
     private val clock: Clock,
     private val timerStore: com.risediary.app.service.TimerSessionStore,
-    private val timerHolder: com.risediary.app.service.TimerStateHolder
+    private val timerHolder: com.risediary.app.service.TimerStateHolder,
+    private val videoAccess: VideoFileAccess = AndroidVideoFileAccess(context)
 ) {
     val needsUserSelectedExportDestination: Boolean
         get() = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q
@@ -142,7 +147,18 @@ class BackupManager @Inject constructor(
             val input = context.contentResolver.openInputStream(uri) ?: error("无法读取所选文件")
             input.use(::readBackup)
         }.getOrElse { return@withContext BackupResult.Failure("备份无效：${it.readableMessage()}", it) }
-        replaceAll(imported, clearLock = false)
+        val result = replaceAll(imported, clearLock = false)
+        if (result !is BackupResult.Success) return@withContext result
+        // Data has already committed. An inspection failure must not report restore failure.
+        val unavailable = try {
+            videoAccess.countUnavailableVideos(imported.flights)
+        } catch (_: CancellationException) {
+            return@withContext result
+        } catch (_: Exception) {
+            return@withContext BackupResult.Success("数据恢复成功，视频可在记录详情中重新关联")
+        }
+        if (unavailable == 0) result
+        else BackupResult.Success("数据恢复成功，${unavailable}条记录的视频需重新关联")
     }
 
     suspend fun clearAll(): BackupResult = withContext(Dispatchers.IO) {

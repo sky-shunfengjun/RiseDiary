@@ -124,6 +124,23 @@ class BackupManagerRecoveryDeviceTest {
         } finally { f.close() }
     }
 
+    @Test fun restoredVideoCheckFailureDoesNotRollbackCommittedData() = runBlocking {
+        val f = Fixture.create()
+        try {
+            val record = f.original.copy(videoUri = "content://com.example.documents/document/missing",
+                videoDisplayName = "missing.mp4", videoMimeType = "video/mp4")
+            f.database.flightDao().update(record)
+            val uri = Uri.fromFile(File(f.context.cacheDir, "video-backup-${UUID.randomUUID()}.zip"))
+            assertTrue(f.manager.exportToUri(uri) is BackupResult.Success)
+            assertTrue(f.manager.clearAll() is BackupResult.Success)
+            val result = f.manager.restoreFromUri(uri)
+            assertTrue(result is BackupResult.Success)
+            assertTrue((result as BackupResult.Success).message.contains("重新关联"))
+            assertEquals(record, f.database.flightDao().getAll().single())
+            assertEquals(DataMaintenanceGate.State.IDLE, f.gate.state.value)
+        } finally { f.close() }
+    }
+
     @Test fun failedClearRestoresPendingDraftPreimageAsWellAsSavedTables() = runBlocking {
         val f = Fixture.create()
         try {

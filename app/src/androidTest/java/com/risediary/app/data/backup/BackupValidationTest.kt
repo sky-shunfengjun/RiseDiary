@@ -227,7 +227,8 @@ class BackupValidationTest {
 
     @Test
     fun exportedZipContainsOnlyJsonAndImportDoesNotAcquireVideoPermission() = kotlinx.coroutines.runBlocking {
-        val original = videoFlight()
+        val original = videoFlight().copy(endTime = 13_000L, durationSeconds = 8,
+            timingSource = "timer", recordDraftId = "video-session")
         database.flightDao().insert(original)
         val context = ApplicationProvider.getApplicationContext<Context>()
         val before = context.contentResolver.persistedUriPermissions.map { it.uri }.toSet()
@@ -245,6 +246,11 @@ class BackupValidationTest {
         assertEquals(setOf("flights.json", "length_records.json", "tags.json", "achievements.json", "settings.json"), entries)
         val restored = manager.readBackup(ByteArrayInputStream(bytes))
         assertEquals(original, restored.flights.single())
+        org.junit.Assert.assertTrue(manager.clearAll() is BackupResult.Success)
+        val result = manager.restoreFromUri(uri)
+        org.junit.Assert.assertTrue(result is BackupResult.Success)
+        org.junit.Assert.assertTrue((result as BackupResult.Success).message.contains("重新关联"))
+        assertEquals(original, database.flightDao().getAll().single())
         assertEquals(before, context.contentResolver.persistedUriPermissions.map { it.uri }.toSet())
     }
 
@@ -265,6 +271,19 @@ class BackupValidationTest {
         assertThrows(IllegalArgumentException::class.java) { manager.readBackup(ByteArrayInputStream(validArchive(settings, manual))) }
         val unknown = BackupJsonCodec.flightsToJson(listOf(record.copy(timingSource = "unknown"))).toString()
         assertThrows(IllegalArgumentException::class.java) { manager.readBackup(ByteArrayInputStream(validArchive(settings, unknown))) }
+    }
+
+    @Test
+    fun sameDeviceReadableVideoRestoreSucceedsWithoutRelinkNotice() = kotlinx.coroutines.runBlocking {
+        val record = videoFlight().copy(videoUri = com.risediary.app.media.TestVideoProvider.READABLE.toString())
+        database.flightDao().insert(record)
+        val uri = com.risediary.app.media.TestVideoProvider.BACKUP
+        org.junit.Assert.assertTrue(manager.exportToUri(uri) is BackupResult.Success)
+        org.junit.Assert.assertTrue(manager.clearAll() is BackupResult.Success)
+        val result = manager.restoreFromUri(uri)
+        org.junit.Assert.assertTrue(result is BackupResult.Success)
+        org.junit.Assert.assertFalse((result as BackupResult.Success).message.contains("重新关联"))
+        assertEquals(record, database.flightDao().getAll().single())
     }
 
     private fun videoFlight() = Flight(

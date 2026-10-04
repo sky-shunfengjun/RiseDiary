@@ -620,4 +620,6 @@
     <string name="video_switch_landscape">切换横屏</string>
     <string name="video_timer_expand">展开计时操作</string>
     <string name="video_timer_collapse">收起计时操作</string>
+    <string name="video_unavailable">视频无法访问</string>
+    <string name="video_relink">重新关联</string>
 </resources>

@@ -1,5 +1,15 @@
 package com.risediary.app.ui.records
 
+import android.app.Activity
+import android.content.Intent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.runtime.DisposableEffect
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.risediary.app.media.VideoAccessState
+import com.risediary.app.ui.components.LocalPageEffectsActive
 import com.risediary.app.ui.components.rememberTopBlurProgress
 import androidx.compose.foundation.ScrollState
 import com.risediary.app.util.formatRecordDuration
@@ -66,7 +76,37 @@ fun RecordDetailScreen(
     val deleted by viewModel.deleted.collectAsStateWithLifecycle()
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
-    LaunchedEffect(flightId) { viewModel.load(flightId) }
+    val videoAccess by viewModel.videoAccess.collectAsStateWithLifecycle()
+    val videoBusy by viewModel.videoBusy.collectAsStateWithLifecycle()
+    val error by viewModel.error.collectAsStateWithLifecycle()
+    val active = LocalPageEffectsActive.current
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val videoPicker = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        val data = result.data
+        val uri = data?.data
+        if (result.resultCode == Activity.RESULT_OK && uri != null) viewModel.selectVideo(uri.toString(), data.flags)
+        else viewModel.cancelVideoSelection()
+    }
+    fun pickVideo() {
+        if (!viewModel.beginVideoSelection()) return
+        try {
+            videoPicker.launch(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                addCategory(Intent.CATEGORY_OPENABLE)
+                type = "video/*"
+                putExtra(Intent.EXTRA_LOCAL_ONLY, true)
+                addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+            })
+        } catch (_: Exception) { viewModel.cancelVideoSelection() }
+    }
+
+    LaunchedEffect(flightId, active) { if (active) viewModel.load(flightId) }
+    DisposableEffect(lifecycle, active) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (active && event == Lifecycle.Event.ON_RESUME) viewModel.refresh()
+        }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer) }
+    }
     LaunchedEffect(deleted) {
         if (deleted) navigator.pop()
     }
@@ -80,13 +120,14 @@ fun RecordDetailScreen(
         actions = {
             flight?.let { value ->
                 IconButton(
+                    enabled = !videoBusy && !loading,
                     onClick = {
                         navigator.push(Route.RecordEdit(value.id))
                     }
                 ) {
                     Icon(AppIcons.Edit, contentDescription = stringResource(R.string.action_edit))
                 }
-                IconButton(onClick = { showDeleteConfirm = true }) {
+                IconButton(onClick = { showDeleteConfirm = true }, enabled = !videoBusy && !loading) {
                     Icon(
                         AppIcons.Delete,
                         contentDescription = stringResource(R.string.action_delete),
@@ -109,12 +150,18 @@ fun RecordDetailScreen(
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(stringResource(R.string.record_detail_missing))
+                Text(error ?: stringResource(R.string.record_detail_missing))
+                if (error != null) TextButton(text = stringResource(R.string.action_retry), onClick = viewModel::refresh)
             }
             else -> DetailContent(
                 flight = checkNotNull(flight),
                 contentPadding = padding,
-                scrollState = scrollState
+                scrollState = scrollState,
+                videoAccess = videoAccess,
+                videoBusy = videoBusy,
+                error = error,
+                onRelink = ::pickVideo,
+                onRetry = viewModel::refresh
             )
         }
     }
@@ -154,7 +201,12 @@ fun RecordDetailScreen(
 private fun DetailContent(
     flight: Flight,
     contentPadding: androidx.compose.foundation.layout.PaddingValues,
-    scrollState: ScrollState
+    scrollState: ScrollState,
+    videoAccess: VideoAccessState?,
+    videoBusy: Boolean,
+    error: String?,
+    onRelink: () -> Unit,
+    onRetry: () -> Unit
 ) {
     val calendar = LocalCalendarEnvironment.current
     val navigator = LocalNavigator.current
@@ -197,7 +249,17 @@ private fun DetailContent(
         }
 
         flight.localVideoRef()?.let { video ->
-            VideoAttachmentCard(video = video, onPlay = { navigator.push(Route.RecordVideo(flight.id)) })
+            VideoAttachmentCard(video = video,
+                onPlay = { navigator.push(Route.RecordVideo(flight.id)) },
+                onSelect = if (videoAccess != null && videoAccess != VideoAccessState.READABLE) onRelink else null,
+                selectLabel = stringResource(R.string.video_relink),
+                playEnabled = videoAccess == VideoAccessState.READABLE,
+                unavailable = videoAccess != null && videoAccess != VideoAccessState.READABLE,
+                busy = videoBusy, error = error)
+        }
+        if (error != null) {
+            if (flight.localVideoRef() == null) Text(error, color = MiuixTheme.colorScheme.error)
+            TextButton(text = stringResource(R.string.action_retry), onClick = onRetry, enabled = !videoBusy)
         }
 
         val tags = TagJson.decode(flight.methodTags)
