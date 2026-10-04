@@ -37,7 +37,12 @@ internal class FormRecordSaveWorkflow(
         val stored = if (existing == null) {
             insert(flight)
         } else {
-            flight.copy(id = existing.id).also { update(it) }
+            flight.copy(
+                id = existing.id,
+                globalId = existing.globalId,
+                recordSource = existing.recordSource,
+                sourceDeviceId = existing.sourceDeviceId
+            ).also { update(it) }
         }
         persistedFlight = stored
         val failures = mutableListOf<Exception>()

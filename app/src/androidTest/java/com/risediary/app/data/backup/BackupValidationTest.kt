@@ -228,7 +228,7 @@ class BackupValidationTest {
     @Test
     fun exportedZipContainsOnlyJsonAndImportDoesNotAcquireVideoPermission() = kotlinx.coroutines.runBlocking {
         val original = videoFlight().copy(endTime = 13_000L, durationSeconds = 8,
-            timingSource = "timer", recordDraftId = "video-session")
+            timingSource = "timer", recordDraftId = "video-session", recordSource = "wearable", sourceDeviceId = "band-app-1")
         database.flightDao().insert(original)
         val context = ApplicationProvider.getApplicationContext<Context>()
         val before = context.contentResolver.persistedUriPermissions.map { it.uri }.toSet()
@@ -305,6 +305,88 @@ class BackupValidationTest {
             manager.readBackup(ByteArrayInputStream(validArchive(encoded.toString())))
         }
     }
+
+    @Test
+    fun globalIdentityAndWearableOriginRoundTripWithoutChangingQuantityOrVideo() {
+        val original = videoFlight().copy(recordSource = "wearable", sourceDeviceId = "band-app-1",
+            legacySpurtCount = 3, legacyVolumeMl = 6f, legacyVolumeInputMode = "spurts")
+        val json = BackupJsonCodec.flightsToJson(listOf(original)).toString()
+        assertEquals(original, manager.readBackup(ByteArrayInputStream(validArchive(identitySettings(), json))).flights.single())
+    }
+
+    @Test
+    fun legacyBackupWithNoIdentityGetsNewIdWhichNextBackupPreserves() {
+        val original = videoFlight()
+        val old = BackupJsonCodec.flightToJson(original).apply {
+            remove("globalId"); remove("recordSource"); remove("sourceDeviceId")
+        }
+        val first = manager.readBackup(ByteArrayInputStream(validArchive(identitySettings(), JSONArray().put(old).toString()))).flights.single()
+        com.risediary.app.data.sync.RecordIdentity.requireValidRecords(listOf(first))
+        assertEquals(original.copy(globalId = first.globalId), first)
+        val newBackup = BackupJsonCodec.flightsToJson(listOf(first)).toString()
+        assertEquals(first, manager.readBackup(ByteArrayInputStream(validArchive(identitySettings(), newBackup))).flights.single())
+    }
+
+    @Test
+    fun partialNullOrWrongTypeIdentityIsRejectedRatherThanSilentlyReplaced() {
+        val encoded = BackupJsonCodec.flightToJson(videoFlight()).toString()
+        val invalid = listOf(
+            JSONObject(encoded).apply { remove("globalId") },
+            JSONObject(encoded).apply { remove("recordSource") },
+            JSONObject(encoded).apply { remove("sourceDeviceId") },
+            JSONObject(encoded).put("globalId", JSONObject.NULL),
+            JSONObject(encoded).put("recordSource", JSONObject.NULL),
+            JSONObject(encoded).put("globalId", 123),
+            JSONObject(encoded).put("recordSource", true),
+            JSONObject(encoded).put("sourceDeviceId", JSONArray())
+        )
+        invalid.forEach { value ->
+            assertThrows(IllegalArgumentException::class.java) {
+                manager.readBackup(ByteArrayInputStream(validArchive(identitySettings(), JSONArray().put(value).toString())))
+            }
+        }
+    }
+
+    @Test
+    fun invalidGlobalIdUnknownOriginAndInvalidDeviceIdAreRejected() {
+        val encoded = BackupJsonCodec.flightToJson(videoFlight()).toString()
+        val invalid = listOf(
+            JSONObject(encoded).put("globalId", ""),
+            JSONObject(encoded).put("globalId", "not-a-uuid"),
+            JSONObject(encoded).put("globalId", "00000000-0000-0000-0000-000000000000"),
+            JSONObject(encoded).put("globalId", "AE9675B5-6854-4DE6-85D7-28D2E899254A"),
+            JSONObject(encoded).put("recordSource", "unknown"),
+            JSONObject(encoded).put("sourceDeviceId", " "),
+            JSONObject(encoded).put("sourceDeviceId", "x".repeat(129))
+        )
+        invalid.forEach { value ->
+            assertThrows(IllegalArgumentException::class.java) {
+                manager.readBackup(ByteArrayInputStream(validArchive(identitySettings(), JSONArray().put(value).toString())))
+            }
+        }
+    }
+
+    @Test
+    fun duplicateGlobalIdentityRejectsRestoreBeforeExistingDataIsReplaced() = kotlinx.coroutines.runBlocking {
+        val existing = videoFlight()
+        database.flightDao().insert(existing)
+        val duplicate = listOf(existing, existing.copy(id = 2L))
+        val bytes = validArchive(identitySettings(), BackupJsonCodec.flightsToJson(duplicate).toString())
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val uri = com.risediary.app.media.TestVideoProvider.BACKUP
+        context.contentResolver.openOutputStream(uri, "w")!!.use { it.write(bytes) }
+        org.junit.Assert.assertTrue(manager.restoreFromUri(uri) is BackupResult.Failure)
+        assertEquals(listOf(existing), database.flightDao().getAll())
+    }
+
+    private fun identitySettings() = """{
+        "username":"测试","ml_per_spurt":2.0,"daily_reminder_enabled":false,
+        "daily_reminder_time":"22:00","inactive_reminder_enabled":false,"inactive_reminder_days":7,
+        "monthly_length_reminder_enabled":false,"monthly_length_reminder_day":1,
+        "reminder_sound":true,"reminder_vibration":true,"theme_mode":"system",
+        "home_card_order":"[]","home_card_visibility":"{}","onboarding_completed":true
+    }"""
+
 
     private fun videoFlight() = Flight(
         id=1, startTime=1000, endTime=61000, durationSeconds=60, spurtCount=null,

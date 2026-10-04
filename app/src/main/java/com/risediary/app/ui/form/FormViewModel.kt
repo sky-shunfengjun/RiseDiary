@@ -52,6 +52,8 @@ class FormViewModel @Inject constructor(
     private val videoGrants: VideoGrantRegistry,
     private val forms: RecordFormSessionStore
 ) : ViewModel() {
+    private val newRecordGlobalId = com.risediary.app.data.sync.RecordIdentity.newId()
+
     val tags: StateFlow<List<Tag>> = tagRepository.allTags.stateIn(
         viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList()
     )
@@ -519,7 +521,10 @@ class FormViewModel @Inject constructor(
                     videoDisplayName = video?.displayName,
                     videoMimeType = video?.mimeType,
                     recordDraftId = existing?.recordDraftId ?: formSnapshot?.submissionId,
-                    timingSource = timingSource
+                    timingSource = timingSource,
+                    globalId = existing?.globalId ?: newRecordGlobalId,
+                    recordSource = existing?.recordSource ?: com.risediary.app.data.sync.RecordIdentity.PHONE,
+                    sourceDeviceId = existing?.sourceDeviceId
                 ).let(quantityDraft::applyTo)
                 val followUps = mutableListOf<suspend () -> Unit>({ reminderScheduler.onFlightDataChanged() })
                 val result = recordSaver.save(

@@ -184,7 +184,7 @@ class FormPersistenceTest {
     @Test
     fun editingOnlyNotePreservesHistoricalQuantityAndSource() = runBlocking {
         preferences.setMlPerSpurt(4f)
-        val previous = historicalFlight()
+        val previous = historicalFlight().copy(recordSource = "wearable", sourceDeviceId = "band-app-1")
         val id = flights.insert(previous)
         val vm = newForm()
         awaitQuantitySettings(vm)
@@ -199,6 +199,9 @@ class FormPersistenceTest {
         assertEquals(3, stored.spurtCount)
         assertEquals(1.5f, stored.semenVolumeMl!!, 0.001f)
         assertEquals(RecordVolumeMode.MILLILITERS.storedValue, stored.volumeInputMode)
+        assertEquals(previous.globalId, stored.globalId)
+        assertEquals(previous.recordSource, stored.recordSource)
+        assertEquals(previous.sourceDeviceId, stored.sourceDeviceId)
     }
 
     @Test

@@ -332,6 +332,7 @@ class BackupManager @Inject constructor(
     }
 
     private fun validate(data: BackupData) {
+        com.risediary.app.data.sync.RecordIdentity.requireValidRecords(data.flights)
         require(data.flights.map(Flight::id).distinct().size == data.flights.size) {
             "飞行记录 ID 重复"
         }

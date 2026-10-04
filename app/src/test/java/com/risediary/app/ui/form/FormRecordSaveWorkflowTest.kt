@@ -90,6 +90,30 @@ class FormRecordSaveWorkflowTest {
         assertEquals(true, timerWasReset)
     }
 
+    @Test fun editingKeepsTheOriginalGlobalIdentityAndWearableOrigin() = runTest {
+        val original = flight().copy(id = 9L, recordSource = "wearable", sourceDeviceId = "band-app-1")
+        var current = original
+        val workflow = FormRecordSaveWorkflow(insert = { throw AssertionError("edit must not insert") },
+            update = { current = it }, readCurrent = { current })
+        workflow.loadOriginal(original)
+        val result = workflow.save(flight().copy(moodNote = "edited"))
+        assertEquals(original.globalId, result.flight.globalId)
+        assertEquals(original.recordSource, result.flight.recordSource)
+        assertEquals(original.sourceDeviceId, result.flight.sourceDeviceId)
+        assertEquals("edited", current.moodNote)
+    }
+
+    @Test fun retryAfterPostSaveFailureCannotReplaceTheCommittedIdentity() = runTest {
+        var current: Flight? = null
+        val workflow = FormRecordSaveWorkflow(insert = { it.copy(id = 4L).also { current = it } },
+            update = { current = it }, readCurrent = { current })
+        val first = workflow.save(flight(), afterInsert = { throw IOException("follow-up failed") })
+        val retried = workflow.save(flight().copy(moodNote = "retry"))
+        assertEquals(first.flight.globalId, retried.flight.globalId)
+        assertEquals(first.flight.recordSource, retried.flight.recordSource)
+    }
+
+
     private fun flight() = Flight(
         startTime = 1_000, endTime = 61_000, durationSeconds = 60,
         spurtCount = 3, semenVolumeMl = 6f, ejaculationDistanceCm = null,

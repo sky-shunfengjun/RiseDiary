@@ -14,6 +14,9 @@ import kotlin.math.abs
 internal object BackupJsonCodec {
     fun flightToJson(value: Flight) = JSONObject().apply {
         put("id", value.id)
+        put("globalId", value.globalId)
+        put("recordSource", value.recordSource)
+        put("sourceDeviceId", value.sourceDeviceId ?: JSONObject.NULL)
         put("startTime", value.startTime)
         put("endTime", value.endTime)
         put("durationSeconds", value.durationSeconds)
@@ -120,8 +123,16 @@ internal object BackupJsonCodec {
                 val hasHistoryFields = historyKeys.any { has(it) }
                 require(!hasHistoryFields || historyKeys.all { has(it) }) { "原数量信息不完整" }
                 require(hasHistoryFields || mode != RecordVolumeMode.ESTIMATED.storedValue) { "预测记录信息不完整" }
+                val identityKeys = listOf("globalId", "recordSource", "sourceDeviceId")
+                val hasIdentity = identityKeys.any { has(it) }
+                require(!hasIdentity || identityKeys.all { has(it) }) { "记录身份信息不完整" }
                 Flight(
                     id = getLong("id"),
+                    globalId = if (hasIdentity) requireNotNull(identityText("globalId")) { "记录固定编号不能为空" }
+                        else com.risediary.app.data.sync.RecordIdentity.newId(),
+                    recordSource = if (hasIdentity) requireNotNull(identityText("recordSource")) { "记录来源不能为空" }
+                        else com.risediary.app.data.sync.RecordIdentity.PHONE,
+                    sourceDeviceId = if (hasIdentity) identityText("sourceDeviceId") else null,
                     startTime = getLong("startTime"),
                     endTime = getLong("endTime"),
                     durationSeconds = getInt("durationSeconds"),
@@ -148,7 +159,7 @@ internal object BackupJsonCodec {
                     updatedAt = getLong("updatedAt")
                 )
             }
-        }
+        }.also(com.risediary.app.data.sync.RecordIdentity::requireValidRecords)
     }
 
     fun parseLengths(json: String): List<LengthRecord> {
@@ -222,6 +233,13 @@ internal object BackupJsonCodec {
             homeCardVisibility = getString("home_card_visibility"),
             onboardingCompleted = getBoolean("onboarding_completed")
         )
+    }
+
+    private fun JSONObject.identityText(key: String): String? {
+        if (isNull(key)) return null
+        val raw = get(key)
+        require(raw is String) { "记录编号或来源格式无效" }
+        return raw
     }
 
     private fun JSONObject.videoText(key: String): String? {

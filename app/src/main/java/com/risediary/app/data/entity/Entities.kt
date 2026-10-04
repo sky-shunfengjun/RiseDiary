@@ -21,7 +21,7 @@ enum class RecordVolumeMode(val storedValue: String) {
 
 @Entity(
     tableName = "flights",
-    indices = [Index(value = ["startTime"]), Index(value = ["recordDraftId"], unique = true)]
+    indices = [Index(value = ["startTime"]), Index(value = ["recordDraftId"], unique = true), Index(value = ["globalId"], unique = true)]
 )
 data class Flight(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -44,7 +44,10 @@ data class Flight(
     @ColumnInfo(defaultValue = "NULL") val videoDisplayName: String? = null,
     @ColumnInfo(defaultValue = "NULL") val videoMimeType: String? = null,
     @ColumnInfo(defaultValue = "NULL") val recordDraftId: String? = null,
-    @ColumnInfo(defaultValue = "'manual'") val timingSource: String = "manual"
+    @ColumnInfo(defaultValue = "'manual'") val timingSource: String = "manual",
+    @ColumnInfo(defaultValue = "''") val globalId: String = com.risediary.app.data.sync.RecordIdentity.newId(),
+    @ColumnInfo(defaultValue = "'phone'") val recordSource: String = com.risediary.app.data.sync.RecordIdentity.PHONE,
+    @ColumnInfo(defaultValue = "NULL") val sourceDeviceId: String? = null
 )
 
 @Entity(
