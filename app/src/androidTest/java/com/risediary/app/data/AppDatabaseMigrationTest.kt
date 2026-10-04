@@ -57,7 +57,7 @@ class AppDatabaseMigrationTest {
         }
 
         val database = Room.databaseBuilder(context, AppDatabase::class.java, databaseName)
-            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3)
+            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5, AppDatabase.MIGRATION_5_6)
             .allowMainThreadQueries()
             .build()
         val sqlite = database.openHelper.writableDatabase
@@ -98,7 +98,7 @@ class AppDatabaseMigrationTest {
         }
 
         val database = Room.databaseBuilder(context, AppDatabase::class.java, databaseName)
-            .addMigrations(AppDatabase.MIGRATION_2_3)
+            .addMigrations(AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5, AppDatabase.MIGRATION_5_6)
             .allowMainThreadQueries()
             .build()
         val sqlite = database.openHelper.writableDatabase
@@ -113,6 +113,82 @@ class AppDatabaseMigrationTest {
         )
         assertEquals(3, queryCount(sqlite, "SELECT spurtCount FROM flights WHERE id = 2"))
         database.close()
+    }
+
+    @Test
+    fun migrationFromThreeToFourArchivesValuesWithoutInventingMissingUnits() {
+        createVersionTwoDatabase(version = 3).use { db ->
+            db.execSQL("""
+                INSERT INTO flights(id, startTime, endTime, durationSeconds, spurtCount,
+                    semenVolumeMl, volumeInputMode, ejaculationDistanceCm, methodTags, moodNote, createdAt, updatedAt)
+                VALUES (1,1000,2000,1,3,6.0,'spurts',NULL,'[]','both',1000,2000),
+                       (2,3000,4000,1,4,NULL,'spurts',NULL,'[]','spurts',3000,4000),
+                       (3,5000,6000,1,NULL,1.55,'milliliters',NULL,'[]','ml',5000,6000)
+            """.trimIndent())
+        }
+        val database = Room.databaseBuilder(context, AppDatabase::class.java, databaseName)
+            .addMigrations(AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5, AppDatabase.MIGRATION_5_6).allowMainThreadQueries().build()
+        try {
+            val sqlite = database.openHelper.writableDatabase
+            assertEquals(6, sqlite.version)
+            assertEquals(3, queryCount(sqlite, "SELECT COUNT(*) FROM flights WHERE " +
+                "legacySpurtCount IS spurtCount AND legacyVolumeMl IS semenVolumeMl AND legacyVolumeInputMode = volumeInputMode"))
+            assertEquals(3, queryCount(sqlite, "SELECT COUNT(*) FROM flights WHERE predictionMaxTicks IS NULL"))
+            assertEquals(1, queryCount(sqlite, "SELECT COUNT(*) FROM flights WHERE id=2 AND semenVolumeMl IS NULL AND legacyVolumeMl IS NULL"))
+            assertEquals(1, queryCount(sqlite, "SELECT COUNT(*) FROM flights WHERE id=3 AND spurtCount IS NULL AND legacySpurtCount IS NULL"))
+        } finally { database.close() }
+    }
+
+    @Test
+    fun migrationFromFourToFiveAddsEmptyVideoWithoutChangingExistingRecordAndOtherTables() {
+        createVersionTwoDatabase(version = 4).use { db ->
+            db.execSQL("""
+                INSERT INTO flights(id,startTime,endTime,durationSeconds,spurtCount,semenVolumeMl,
+                    volumeInputMode,methodTags,moodNote,createdAt,updatedAt,legacySpurtCount,
+                    legacyVolumeMl,legacyVolumeInputMode,predictionMaxTicks)
+                VALUES (1,1000,61000,60,NULL,2.3,'estimated','["手动"]','keep',1000,61000,
+                    3,6.0,'spurts',80)
+            """.trimIndent())
+            db.execSQL("INSERT INTO length_records VALUES(1,1000,8.0,12.0,'length')")
+            db.execSQL("INSERT INTO tags VALUES(1,'手动','#FF9800',0)")
+            db.execSQL("INSERT INTO achievements VALUES(1,'milestone_1',1000,1)")
+        }
+        val database = Room.databaseBuilder(context, AppDatabase::class.java, databaseName)
+            .addMigrations(AppDatabase.MIGRATION_4_5, AppDatabase.MIGRATION_5_6).allowMainThreadQueries().build()
+        try {
+            val sqlite = database.openHelper.writableDatabase
+            assertEquals(6, sqlite.version)
+            assertEquals(1, queryCount(sqlite, """SELECT COUNT(*) FROM flights WHERE id=1 AND
+                startTime=1000 AND endTime=61000 AND durationSeconds=60 AND semenVolumeMl=2.3 AND
+                volumeInputMode='estimated' AND legacySpurtCount=3 AND legacyVolumeMl=6.0 AND
+                predictionMaxTicks=80 AND videoUri IS NULL AND videoDisplayName IS NULL AND videoMimeType IS NULL"""))
+            assertEquals("keep", queryString(sqlite, "SELECT moodNote FROM flights WHERE id=1"))
+            assertEquals(1, queryCount(sqlite, "SELECT COUNT(*) FROM length_records"))
+            assertEquals(1, queryCount(sqlite, "SELECT COUNT(*) FROM tags"))
+            assertEquals(1, queryCount(sqlite, "SELECT COUNT(*) FROM achievements"))
+        } finally { database.close() }
+    }
+
+    @Test
+    fun migrationFromFivePreservesVideoAndAddsManualSourceAndUniquePendingDraftSlot() {
+        createVersionTwoDatabase(version = 5).use { db ->
+            db.execSQL("""INSERT INTO flights(id,startTime,endTime,durationSeconds,spurtCount,semenVolumeMl,
+                volumeInputMode,methodTags,moodNote,createdAt,updatedAt,videoUri,videoDisplayName,videoMimeType)
+                VALUES (7,1000,9000,8,NULL,2.3,'milliliters','[]','keep',1000,9000,
+                'content://videos/document/1','video.mp4','video/mp4')""")
+        }
+        val database = Room.databaseBuilder(context, AppDatabase::class.java, databaseName)
+            .addMigrations(AppDatabase.MIGRATION_5_6).allowMainThreadQueries().build()
+        try {
+            val sqlite = database.openHelper.writableDatabase
+            assertEquals(6, sqlite.version)
+            assertEquals("manual", queryString(sqlite, "SELECT timingSource FROM flights WHERE id=7"))
+            assertEquals("content://videos/document/1", queryString(sqlite, "SELECT videoUri FROM flights WHERE id=7"))
+            assertEquals(1, queryCount(sqlite, "SELECT COUNT(*) FROM flights WHERE recordDraftId IS NULL"))
+            assertEquals(0, queryCount(sqlite, "SELECT COUNT(*) FROM record_drafts"))
+            sqlite.execSQL("INSERT INTO record_drafts VALUES('first',1,1,'{}',NULL)")
+            assertTrue(runCatching { sqlite.execSQL("INSERT INTO record_drafts VALUES('second',1,1,'{}',NULL)") }.isFailure)
+        } finally { database.close() }
     }
 
     private fun createVersionOneDatabase(): SupportSQLiteDatabase {
@@ -180,12 +256,15 @@ class AppDatabaseMigrationTest {
         return FrameworkSQLiteOpenHelperFactory().create(configuration).writableDatabase
     }
 
-    private fun createVersionTwoDatabase(): SupportSQLiteDatabase {
+    private fun createVersionTwoDatabase(version: Int = 2): SupportSQLiteDatabase {
         val configuration = SupportSQLiteOpenHelper.Configuration.builder(context)
             .name(databaseName)
-            .callback(object : SupportSQLiteOpenHelper.Callback(2) {
+            .callback(object : SupportSQLiteOpenHelper.Callback(version) {
                 override fun onCreate(db: SupportSQLiteDatabase) {
                     createVersionOneDatabaseSchema(db)
+                    if (version >= 3) AppDatabase.MIGRATION_2_3.migrate(db)
+                    if (version >= 4) AppDatabase.MIGRATION_3_4.migrate(db)
+                    if (version >= 5) AppDatabase.MIGRATION_4_5.migrate(db)
                     db.execSQL("CREATE INDEX index_flights_startTime ON flights(startTime)")
                     db.execSQL(
                         "CREATE INDEX index_length_records_recordDate ON length_records(recordDate)"

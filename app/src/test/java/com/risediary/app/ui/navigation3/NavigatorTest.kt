@@ -80,6 +80,66 @@ class NavigatorTest {
     }
 
     @Test
+    fun opening_video_again_creates_a_fresh_entry_even_when_an_older_player_is_retained() {
+        val navigator = Navigator(Route.Main)
+        navigator.push(Route.RecordVideo(7))
+        navigator.push(Route.RecordDetail(7))
+        navigator.push(Route.RecordVideo(7))
+        assertEquals(4, navigator.backStackSize())
+        assertEquals(Route.RecordDetail(7), navigator.backStack[2])
+    }
+
+    @Test
+    fun restoring_video_stack_preserves_the_current_opening_and_preview_reference() {
+        val navigator = Navigator(Route.Main)
+        navigator.push(Route.RecordVideo(7))
+        navigator.push(Route.VideoPreview(com.risediary.app.media.LocalVideoRef(
+            "content://com.android.providers.media.documents/document/video%3A12", "测试.mp4", "video/mp4")))
+        val scope = object : SaverScope { override fun canBeSaved(value: Any) = true }
+        val saved = requireNotNull(with(Navigator.Saver) { scope.save(navigator) })
+        val restored = requireNotNull(Navigator.Saver.restore(saved))
+        assertEquals(navigator.backStack.toList(), restored.backStack.toList())
+    }
+
+    @Test
+    fun timer_and_draft_identities_survive_navigation_restore() {
+        val navigator = Navigator(Route.Main)
+        navigator.push(Route.VideoTimer("session"))
+        navigator.push(Route.RecordForm(false, 0L, 0L, "draft"))
+        val scope = object : SaverScope { override fun canBeSaved(value: Any) = true }
+        val saved = requireNotNull(with(Navigator.Saver) { scope.save(navigator) })
+        val restored = requireNotNull(Navigator.Saver.restore(saved))
+        assertEquals(Route.VideoTimer("session"), restored.backStack[1])
+        assertEquals(Route.RecordForm(false, 0L, 0L, "draft"), restored.current())
+    }
+
+    @Test
+    fun a_new_draft_does_not_reuse_a_completed_form_entry() {
+        val navigator = Navigator(Route.Main)
+        navigator.push(Route.RecordForm(false, 0L, 0L, "first"))
+        navigator.push(Route.RecordForm(false, 0L, 0L, "second"))
+        assertEquals(3, navigator.backStackSize())
+        assertEquals(Route.RecordForm(false, 0L, 0L, "second"), navigator.current())
+    }
+
+    @Test fun missingFormAlsoRemovesItsUnsavedVideoPreview() {
+        val navigator = Navigator(Route.Main)
+        navigator.push(Route.ModeSelect)
+        navigator.push(Route.RecordForm(false, 0L, 0L, "expired"))
+        navigator.push(Route.VideoPreview(com.risediary.app.media.LocalVideoRef("content://video/1", "video", "video/mp4")))
+        navigator.discardExpiredForms { false }
+        assertEquals(Route.ModeSelect, navigator.current())
+        assertEquals(2, navigator.backStackSize())
+    }
+
+    @Test fun activityRecreationKeepsAStillLiveFormSession() {
+        val navigator = Navigator(Route.Main)
+        navigator.push(Route.RecordForm(false, 0L, 0L, "live"))
+        navigator.discardExpiredForms { it == "live" }
+        assertEquals(Route.RecordForm(false, 0L, 0L, "live"), navigator.current())
+    }
+
+    @Test
     fun replacing_the_root_preserves_the_main_page() {
         val navigator = Navigator(Route.Main)
         navigator.replace(Route.About)

@@ -24,6 +24,5 @@ internal fun isValidLockCredential(value: String): Boolean =
         }.getOrDefault(false))
 
 data class QuantitySettingsSnapshot(
-    val mlPerSpurt: Float = 2f,
-    val defaultVolumeMode: DefaultVolumeMode = DefaultVolumeMode.MILLILITERS
+    val predictionMaxTicks: Int = 80
 )

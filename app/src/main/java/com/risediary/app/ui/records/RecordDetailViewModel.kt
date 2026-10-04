@@ -12,12 +12,14 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import com.risediary.app.data.DataMaintenanceGate
+import com.risediary.app.media.VideoGrantRegistry
 
 @HiltViewModel
 class RecordDetailViewModel @Inject constructor(
     private val repository: FlightRepository,
     private val reminderScheduler: ReminderScheduler,
-    private val maintenanceGate: DataMaintenanceGate = DataMaintenanceGate()
+    private val maintenanceGate: DataMaintenanceGate = DataMaintenanceGate(),
+    private val videoGrants: VideoGrantRegistry
 ) : ViewModel() {
     private var flightId: Long? = null
 
@@ -49,6 +51,7 @@ class RecordDetailViewModel @Inject constructor(
         maintenanceGate.launchWrite(viewModelScope) {
             repository.delete(current)
             _deleted.value = true
+            videoGrants.requestCleanup()
             runCatching { reminderScheduler.onFlightDataChanged() }
         }
     }

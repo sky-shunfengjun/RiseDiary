@@ -5,7 +5,7 @@ import com.risediary.app.ui.components.PageTopBlurLayout
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
-import com.risediary.app.util.formatNaturalDuration
+import com.risediary.app.util.formatRecordDuration
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -47,7 +47,6 @@ import com.risediary.app.R
 import com.risediary.app.ui.navigation3.LocalNavigator
 import com.risediary.app.ui.navigation3.Route
 import com.risediary.app.data.entity.Flight
-import com.risediary.app.data.entity.RecordVolumeMode
 import com.risediary.app.data.repository.TagJson
 import com.risediary.app.ui.components.LiquidAlertDialog
 import com.risediary.app.ui.components.LiquidDateRangePickerDialog
@@ -400,15 +399,8 @@ private fun FlightCard(
                     StatItem(AppIcons.Timer, formatDuration(flight.durationSeconds))
                     StatItem(
                         AppIcons.WaterDrop,
-                        if (
-                            RecordVolumeMode.fromStoredValue(flight.volumeInputMode) ==
-                            RecordVolumeMode.SPURTS
-                        ) {
-                            stringResource(R.string.records_spurts_format, flight.spurtCount ?: 0)
-                        } else {
-                                "${flight.semenVolumeMl ?: 0f}ml"
-                            }
-                        )
+                        com.risediary.app.util.RecordQuantityDisplay.current(flight)
+                    )
                         flight.ejaculationDistanceCm?.let {
                             StatItem(AppIcons.Straighten, "${it}cm")
                         }
@@ -446,7 +438,7 @@ private fun StatItem(icon: ImageVector, text: String) {
 }
 
 private fun formatDuration(seconds: Int): String =
-    formatNaturalDuration(seconds)
+    formatRecordDuration(seconds)
 
 internal data class DateGroup(val header: String, val items: List<Flight>)
 

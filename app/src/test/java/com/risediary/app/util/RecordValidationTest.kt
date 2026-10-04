@@ -54,8 +54,16 @@ class RecordValidationTest {
         )
     }
 
+    @Test fun newDurationAcceptsTwentyFourHoursAndRejectsOneSecondMore() {
+        assertNull(RecordValidation.validate(1, null, 2f, null, false))
+        assertNull(RecordValidation.validate(86_400, null, 2f, null, false))
+        for (seconds in listOf(-1, 0, 86_401)) {
+            assertNotNull(RecordValidation.validate(seconds, null, 2f, null, false))
+        }
+    }
+
     @Test
-    fun rejectsDurationBeyondOneHundredTwentyMinutes() {
+    fun rejectsDurationBeyondTwentyFourHours() {
         assertNotNull(
             RecordValidation.validate(
                 durationSeconds = RecordValidation.MAX_DURATION_SECONDS + 1,

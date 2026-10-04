@@ -13,7 +13,7 @@ import java.io.IOException
 class FormRecordSaveWorkflowTest {
     @Test
     fun maintenanceBusyAfterPrimaryCommitIsAWarningNotLostIdentity() = runTest {
-        val workflow = FormRecordSaveWorkflow(insert = { 7 }, update = {}, readCurrent = { null })
+        val workflow = FormRecordSaveWorkflow(insert = { it.copy(id = 7) }, update = {}, readCurrent = { null })
         val result = workflow.save(flight(), afterInsert = { throw DataMaintenanceBusyException() })
         assertEquals(7L, result.flight.id)
         assertEquals(7L, workflow.persistedFlight!!.id)
@@ -24,7 +24,7 @@ class FormRecordSaveWorkflowTest {
         val stored = linkedMapOf<Long, Flight>()
         var nextId = 1L
         val workflow = FormRecordSaveWorkflow(
-            insert = { flight -> val id = nextId++; stored[id] = flight.copy(id = id); id },
+            insert = { flight -> val id = nextId++; flight.copy(id = id).also { stored[id] = it } },
             update = { stored[it.id] = it },
             readCurrent = { stored[it] }
         )
@@ -45,7 +45,7 @@ class FormRecordSaveWorkflowTest {
             insert = { value ->
                 if (fail) throw IOException("primary write failed")
                 stored += value.copy(id = 1)
-                1
+                value.copy(id = 1)
             },
             update = { throw AssertionError("new record must insert") },
             readCurrent = { null }
@@ -64,7 +64,7 @@ class FormRecordSaveWorkflowTest {
 
     @Test
     fun cancelledPostSaveWorkDoesNotEraseCommittedIdentity() = runTest {
-        val workflow = FormRecordSaveWorkflow(insert = { 42 }, update = {}, readCurrent = { null })
+        val workflow = FormRecordSaveWorkflow(insert = { it.copy(id = 42) }, update = {}, readCurrent = { null })
         try {
             workflow.save(flight(), afterInsert = { throw CancellationException("page disposed") })
             throw AssertionError("Cancellation must propagate")
@@ -76,7 +76,7 @@ class FormRecordSaveWorkflowTest {
     @Test
     fun reminderFailureStillRunsTimerCleanupAndPreservesAchievementResult() = runTest {
         var timerWasReset = false
-        val workflow = FormRecordSaveWorkflow(insert = { 1 }, update = {}, readCurrent = { null })
+        val workflow = FormRecordSaveWorkflow(insert = { it.copy(id = 1) }, update = {}, readCurrent = { null })
         val result = workflow.save(
             flight(),
             afterInsert = { listOf("milestone_1") },

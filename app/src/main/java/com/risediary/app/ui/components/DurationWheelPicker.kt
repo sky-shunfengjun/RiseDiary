@@ -21,6 +21,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kyant.capsule.ContinuousRoundedRectangle
 import com.risediary.app.R
+import com.risediary.app.util.DurationParts
+import com.risediary.app.util.DurationPolicy
+import com.risediary.app.util.durationPartsFromSeconds
+import com.risediary.app.util.durationPartsWithHours
+import com.risediary.app.util.durationSecondsFromParts
 import kotlin.math.abs
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.collectLatest
@@ -30,20 +35,16 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
-/**
- * Two-column number picker for selecting minutes and seconds.
- *
- * Controlled two-column duration selector.
- * @param onValueChange Called with (minutes, seconds) when selection changes
- */
+/** Controlled hour/minute/second selector; the final hour has no extra minutes or seconds. */
 @Composable
 fun DurationWheelPicker(
-    minutes: Int,
-    seconds: Int,
-    onValueChange: (minutes: Int, seconds: Int) -> Unit,
-    maxMinutes: Int = 120,
+    parts: DurationParts,
+    onValueChange: (DurationParts) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val maxHours = DurationPolicy.MAX_SECONDS / 3_600
+    val atLimit = parts.hours == maxHours
+    val hourFormat = stringResource(R.string.duration_picker_hour_format)
     val minuteFormat = stringResource(R.string.duration_picker_minute_format)
     val secondFormat = stringResource(R.string.duration_picker_second_format)
     Row(
@@ -52,11 +53,19 @@ fun DurationWheelPicker(
         verticalAlignment = Alignment.CenterVertically
     ) {
         NumberPicker(
-            value = minutes.coerceIn(0, maxMinutes),
-            onValueChange = {
-                onValueChange(it, if (it == maxMinutes) 0 else seconds)
-            },
-            range = 0..maxMinutes,
+            value = parts.hours,
+            onValueChange = { onValueChange(durationPartsWithHours(parts, it)) },
+            range = 0..maxHours,
+            label = { hourFormat.format(it) },
+            visibleItemCount = 3,
+            wrapAround = false,
+            textStyle = MiuixTheme.textStyles.title2,
+            modifier = Modifier.weight(1f)
+        )
+        NumberPicker(
+            value = if (atLimit) 0 else parts.minutes,
+            onValueChange = { onValueChange(parts.copy(minutes = if (atLimit) 0 else it)) },
+            range = if (atLimit) 0..0 else 0..59,
             label = { minuteFormat.format(it) },
             visibleItemCount = 3,
             wrapAround = false,
@@ -64,9 +73,9 @@ fun DurationWheelPicker(
             modifier = Modifier.weight(1f)
         )
         NumberPicker(
-            value = if (minutes >= maxMinutes) 0 else seconds.coerceIn(0, 59),
-            onValueChange = { onValueChange(minutes, it) },
-            range = if (minutes >= maxMinutes) 0..0 else 0..59,
+            value = if (atLimit) 0 else parts.seconds,
+            onValueChange = { onValueChange(parts.copy(seconds = if (atLimit) 0 else it)) },
+            range = if (atLimit) 0..0 else 0..59,
             label = { secondFormat.format(it) },
             visibleItemCount = 3,
             wrapAround = false,
@@ -83,9 +92,8 @@ fun DurationPickerBottomSheet(
     onDismiss: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val initial = totalSeconds.coerceIn(0, 120 * 60)
-    var minutes by remember(initial) { mutableIntStateOf(initial / 60) }
-    var seconds by remember(initial) { mutableIntStateOf(initial % 60) }
+    val initial = durationPartsFromSeconds(totalSeconds)
+    var parts by remember(initial) { mutableStateOf(initial) }
     LiquidDialog(
         onDismissRequest = onDismiss,
         alignment = Alignment.Center,
@@ -110,12 +118,8 @@ fun DurationPickerBottomSheet(
             )
             Spacer(modifier = Modifier.height(12.dp))
             DurationWheelPicker(
-                minutes = minutes,
-                seconds = seconds,
-                onValueChange = { newMinutes, newSeconds ->
-                    minutes = newMinutes
-                    seconds = if (newMinutes == 120) 0 else newSeconds
-                },
+                parts = parts,
+                onValueChange = { parts = it },
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(modifier = Modifier.height(12.dp))
@@ -134,8 +138,8 @@ fun DurationPickerBottomSheet(
                         .background(MiuixTheme.colorScheme.onSurface.copy(alpha = 0.045f))
                 )
                 Button(
-                    onClick = { onConfirm(minutes * 60 + seconds) },
-                    enabled = minutes > 0 || seconds > 0,
+                    onClick = { onConfirm(durationSecondsFromParts(parts)) },
+                    enabled = durationSecondsFromParts(parts) > 0,
                     modifier = Modifier
                         .weight(1f)
                         .height(48.dp),

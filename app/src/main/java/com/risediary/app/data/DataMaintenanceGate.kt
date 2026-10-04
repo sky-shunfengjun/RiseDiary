@@ -40,6 +40,13 @@ class DataMaintenanceGate @Inject constructor() {
         }
     }
 
+    fun snapshotGeneration(): Long = synchronized(guard) { generation }
+
+    /** The caller holds write(); an old form cannot repopulate newly restored or cleared data. */
+    fun requireGeneration(expected: Long) = synchronized(guard) {
+        if (expected != generation || mutableState.value != State.IDLE) rejectBusyWrite()
+    }
+
     private class Permit(val owner: DataMaintenanceGate, val generation: Long) :
         AbstractCoroutineContextElement(Key) {
         companion object Key : CoroutineContext.Key<Permit>

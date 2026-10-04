@@ -2,7 +2,7 @@ package com.risediary.app.ui.records
 
 import com.risediary.app.ui.components.rememberTopBlurProgress
 import androidx.compose.foundation.ScrollState
-import com.risediary.app.util.formatNaturalDuration
+import com.risediary.app.util.formatRecordDuration
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -35,6 +35,8 @@ import com.risediary.app.R
 import com.risediary.app.ui.navigation3.LocalNavigator
 import com.risediary.app.ui.navigation3.Route
 import com.risediary.app.data.entity.Flight
+import com.risediary.app.media.localVideoRef
+import com.risediary.app.ui.video.VideoAttachmentCard
 import com.risediary.app.data.repository.TagJson
 import com.risediary.app.ui.components.SecondaryPageScaffold
 import com.risediary.app.ui.components.LiquidAlertDialog
@@ -155,6 +157,7 @@ private fun DetailContent(
     scrollState: ScrollState
 ) {
     val calendar = LocalCalendarEnvironment.current
+    val navigator = LocalNavigator.current
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -178,20 +181,23 @@ private fun DetailContent(
                 )
                 DetailRow(
                     stringResource(R.string.record_detail_duration),
-                    formatNaturalDuration(flight.durationSeconds)
+                    formatRecordDuration(flight.durationSeconds)
                 )
                 DetailRow(
                     stringResource(R.string.record_detail_volume),
-                    stringResource(
-                        R.string.record_detail_volume_value,
-                        flight.semenVolumeMl ?: 0f,
-                        flight.spurtCount ?: 0
-                    )
+                    com.risediary.app.util.RecordQuantityDisplay.current(flight)
                 )
+                com.risediary.app.util.RecordQuantityDisplay.original(flight)?.let {
+                    DetailRow(stringResource(R.string.record_detail_original_quantity), it)
+                }
                 flight.ejaculationDistanceCm?.let {
                     DetailRow(stringResource(R.string.record_detail_distance), "$it cm")
                 }
             }
+        }
+
+        flight.localVideoRef()?.let { video ->
+            VideoAttachmentCard(video = video, onPlay = { navigator.push(Route.RecordVideo(flight.id)) })
         }
 
         val tags = TagJson.decode(flight.methodTags)

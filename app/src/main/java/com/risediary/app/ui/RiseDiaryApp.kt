@@ -266,6 +266,7 @@ private fun MainAppContent(
     updateViewModel: UpdateViewModel
 ) {
     val navigator = rememberNavigator(Route.Main)
+    remember(navigator) { navigator.discardExpiredForms(timerCoordinator::isFormLive); true }
     val timerSession by timerCoordinator.session.collectAsStateWithLifecycle()
     val snackbarHostState = remember { androidx.compose.material3.SnackbarHostState() }
     val pagerState = rememberPagerState(pageCount = { 3 })
@@ -300,18 +301,6 @@ private fun MainAppContent(
 
     val returningToRoot by remember(navigationMotion, navigationKeys) {
         derivedStateOf { isMain && !navigationMotion.rootPageReady }
-    }
-
-    LaunchedEffect(timerSession.status) {
-        if (timerSession.status == TimerStatus.LIMIT_REACHED) {
-            navigator.push(
-                Route.RecordForm(
-                    isTimer = true,
-                    duration = timerSession.elapsedMillis,
-                    startTime = timerSession.startedAtEpochMillis
-                )
-            )
-        }
     }
 
     LaunchedEffect(notificationDestination, interactionsBlocked) {
@@ -399,13 +388,23 @@ private fun MainAppContent(
                                         }
                                         pageEntry<Route.ModeSelect>(navigationMotion) { ModeSelectScreen() }
                                         pageEntry<Route.Timer>(navigationMotion) { TimerScreen() }
+                                        pageEntry<Route.VideoTimer>(navigationMotion) { route ->
+                                            com.risediary.app.ui.video.VideoTimerScreen(route)
+                                        }
                                         pageEntry<Route.RecordForm>(navigationMotion) { route ->
                                             RecordFormScreen(
                                                 isTimer = route.isTimer,
                                                 durationMillis = route.duration,
                                                 timerStartTimeMillis = route.startTime,
+                                                formSessionId = route.formSessionId,
                                                 flightId = null
                                             )
+                                        }
+                                        pageEntry<Route.RecordVideo>(navigationMotion) { route ->
+                                            com.risediary.app.ui.video.VideoPlayerScreen(route)
+                                        }
+                                        pageEntry<Route.VideoPreview>(navigationMotion) { route ->
+                                            com.risediary.app.ui.video.VideoPlayerScreen(route)
                                         }
                                         pageEntry<Route.RecordDetail>(navigationMotion) { route ->
                                             RecordDetailScreen(flightId = route.flightId)
@@ -568,84 +567,4 @@ private fun Modifier.blockInteractionsAndAccessibility(blocked: Boolean): Modifi
             }
         }
     }.clearAndSetSemantics { }
-}
-
-@Composable
-fun ModeSelectScreen() {
-    val navigator = LocalNavigator.current
-    SecondaryPageScaffold(
-        title = stringResource(R.string.mode_select_title),
-        onBack = { navigator.pop() }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            RiseCard(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = {
-                    navigator.push(Route.Timer)
-                }
-            ) {
-                Row(
-                    modifier = Modifier.padding(20.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        AppIcons.Schedule, null,
-                        modifier = Modifier.size(40.dp),
-                        tint = MiuixTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(stringResource(R.string.mode_select_timer),
-                            fontSize = MiuixTheme.textStyles.title4.fontSize,
-                            color = MiuixTheme.colorScheme.onSurface)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(stringResource(R.string.mode_select_timer_summary),
-                            fontSize = MiuixTheme.textStyles.body2.fontSize,
-                            color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.5f))
-                    }
-                    Icon(
-                        AppIcons.ChevronRight, contentDescription = null,
-                        tint = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-                    )
-                }
-            }
-
-            RiseCard(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = {
-                    navigator.push(Route.RecordForm(isTimer = false, duration = 0L, startTime = 0L))
-                }
-            ) {
-                Row(
-                    modifier = Modifier.padding(20.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        AppIcons.Edit, null,
-                        modifier = Modifier.size(40.dp),
-                        tint = MiuixTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(stringResource(R.string.mode_select_manual),
-                            fontSize = MiuixTheme.textStyles.title4.fontSize,
-                            color = MiuixTheme.colorScheme.onSurface)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(stringResource(R.string.mode_select_manual_summary),
-                            fontSize = MiuixTheme.textStyles.body2.fontSize,
-                            color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.5f))
-                    }
-                    Icon(
-                        AppIcons.ChevronRight, contentDescription = null,
-                        tint = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-                    )
-                }
-            }
-        }
-    }
 }

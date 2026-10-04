@@ -40,6 +40,7 @@
             android:name=".MainActivity"
             android:exported="true"
             android:theme="@style/Theme.RiseDiary"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize"
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

@@ -13,6 +13,7 @@ interface FlightRepository {
     val allFlights: Flow<List<Flight>>
 
     suspend fun insert(flight: Flight): Long
+    suspend fun insertOnce(flight: Flight): Flight
     suspend fun update(flight: Flight)
     suspend fun delete(flight: Flight)
     suspend fun getById(id: Long): Flight?
@@ -53,6 +54,7 @@ class RoomFlightRepository @Inject constructor(
     override val allFlights: Flow<List<Flight>> = dao.getAllFlow()
 
     override suspend fun insert(flight: Flight): Long = maintenanceGate.write { dao.insert(flight) }
+    override suspend fun insertOnce(flight: Flight): Flight = maintenanceGate.write { dao.insertOnce(flight) }
     override suspend fun update(flight: Flight) = maintenanceGate.write { dao.update(flight) }
     override suspend fun delete(flight: Flight) = maintenanceGate.write {
         maintenanceGate.requireCurrent(flight, dao.getById(flight.id))

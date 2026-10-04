@@ -8,6 +8,10 @@ import com.risediary.app.data.AppDatabase
 import com.risediary.app.data.DefaultVolumeMode
 import com.risediary.app.data.UserPreferences
 import com.risediary.app.data.entity.RecordVolumeMode
+import com.risediary.app.data.entity.Flight
+import org.json.JSONObject
+import org.json.JSONArray
+import org.junit.Assert.assertNull
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertThrows
@@ -27,7 +31,11 @@ class BackupValidationTest {
 
     @Before
     fun setUp() {
-        val context = ApplicationProvider.getApplicationContext<Context>()
+        val base = ApplicationProvider.getApplicationContext<Context>()
+        val files = java.io.File(base.cacheDir, "backup-video-" + java.util.UUID.randomUUID())
+        val context = object : android.content.ContextWrapper(base) {
+            override fun getFilesDir(): java.io.File = files
+        }
         database = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
             .allowMainThreadQueries()
             .build()
@@ -35,7 +43,10 @@ class BackupValidationTest {
             context = context,
             database = database,
             preferences = UserPreferences(context),
-            clock = Clock.systemUTC()
+            clock = Clock.systemUTC(),
+            timerStore = com.risediary.app.service.TimerSessionStore(context, com.risediary.app.service.BootIdentityProvider { 1 },
+                object : com.risediary.app.service.ElapsedRealtimeClock { override fun millis() = 1_000L }, Clock.systemUTC()),
+            timerHolder = com.risediary.app.service.TimerStateHolder()
         )
     }
 
@@ -111,6 +122,9 @@ class BackupValidationTest {
 
         val restored = manager.readBackup(ByteArrayInputStream(archive))
 
+        assertEquals(80, restored.settings.predictionMaxTicks)
+        assertEquals(3, restored.flights.single().legacySpurtCount)
+        assertNull(restored.flights.single().legacyVolumeMl)
         assertEquals(DefaultVolumeMode.MILLILITERS, restored.settings.defaultVolumeMode)
         assertEquals(
             RecordVolumeMode.SPURTS.storedValue,
@@ -148,6 +162,118 @@ class BackupValidationTest {
 
         assertEquals(DefaultVolumeMode.SPURTS, restored.settings.defaultVolumeMode)
     }
+
+    @Test
+    fun predictionRoundTripPreservesRecordedRangeAndExplicitNullHistory() {
+        val original = Flight(id=1, startTime=1000, endTime=2000, durationSeconds=1,
+            spurtCount=null, semenVolumeMl=2.3f, volumeInputMode="estimated", predictionMaxTicks=200,
+            ejaculationDistanceCm=null, methodTags="[]", moodNote="", createdAt=1000, updatedAt=2000)
+        val parsed = BackupJsonCodec.parseFlights(BackupJsonCodec.flightsToJson(listOf(original)).toString()).single()
+        assertEquals(original, parsed)
+        assertNull(parsed.legacyVolumeInputMode)
+    }
+
+    @Test
+    fun modifiedLegacyQuantityRoundTripsWithoutOverwritingHistory() {
+        val original = Flight(id=1, startTime=1000, endTime=2000, durationSeconds=1,
+            spurtCount=null, semenVolumeMl=9.5f, volumeInputMode="milliliters",
+            legacySpurtCount=3, legacyVolumeMl=6f, legacyVolumeInputMode="spurts",
+            ejaculationDistanceCm=null, methodTags="[]", moodNote="", createdAt=1000, updatedAt=2000)
+        assertEquals(original, BackupJsonCodec.parseFlights(BackupJsonCodec.flightsToJson(listOf(original)).toString()).single())
+    }
+
+    @Test
+    fun unknownExplicitRecordModeAndFractionalPredictionRangeAreRejected() {
+        val value = BackupJsonCodec.flightToJson(Flight(id=1, startTime=1000, endTime=2000, durationSeconds=1,
+            spurtCount=null, semenVolumeMl=2.3f, volumeInputMode="estimated", predictionMaxTicks=80,
+            ejaculationDistanceCm=null, methodTags="[]", moodNote="", createdAt=1000, updatedAt=2000))
+        value.put("volumeInputMode", "unknown")
+        assertThrows(IllegalArgumentException::class.java) { BackupJsonCodec.parseFlights(JSONArray().put(value).toString()) }
+        value.put("volumeInputMode", "estimated").put("predictionMaxTicks", 80.5)
+        assertThrows(IllegalArgumentException::class.java) { BackupJsonCodec.parseFlights(JSONArray().put(value).toString()) }
+    }
+
+    @Test
+    fun videoAssociationRoundTripsEvenWhenOriginalFileDoesNotExist() {
+        val original = videoFlight()
+        val parsed = BackupJsonCodec.parseFlights(BackupJsonCodec.flightsToJson(listOf(original)).toString()).single()
+        assertEquals(original, parsed)
+        val old = BackupJsonCodec.flightToJson(original).apply {
+            remove("videoUri"); remove("videoDisplayName"); remove("videoMimeType")
+        }
+        val legacy = BackupJsonCodec.parseFlights(JSONArray().put(old).toString()).single()
+        assertNull(legacy.videoUri)
+        assertNull(legacy.videoDisplayName)
+        assertNull(legacy.videoMimeType)
+    }
+
+    @Test
+    fun invalidOrPartialVideoMetadataIsRejectedWithoutDiscardingValidMissingFileReferences() {
+        val source = BackupJsonCodec.flightToJson(videoFlight()).toString()
+        val invalid = listOf(
+            JSONObject(source).put("videoUri", "https://example.com/video.mp4"),
+            JSONObject(source).put("videoUri", JSONObject.NULL),
+            JSONObject(source).put("videoUri", 3),
+            JSONObject(source).put("videoDisplayName", ""),
+            JSONObject(source).put("videoDisplayName", JSONObject.NULL),
+            JSONObject(source).put("videoMimeType", "image/jpeg")
+        )
+        invalid.forEach { value ->
+            assertThrows(IllegalArgumentException::class.java) {
+                BackupJsonCodec.parseFlights(JSONArray().put(value).toString())
+            }
+        }
+    }
+
+    @Test
+    fun exportedZipContainsOnlyJsonAndImportDoesNotAcquireVideoPermission() = kotlinx.coroutines.runBlocking {
+        val original = videoFlight()
+        database.flightDao().insert(original)
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        val before = context.contentResolver.persistedUriPermissions.map { it.uri }.toSet()
+        val uri = com.risediary.app.media.TestVideoProvider.BACKUP
+        org.junit.Assert.assertTrue(manager.exportToUri(uri) is BackupResult.Success)
+        val bytes = context.contentResolver.openInputStream(uri)!!.use { it.readBytes() }
+        val entries = mutableSetOf<String>()
+        java.util.zip.ZipInputStream(ByteArrayInputStream(bytes)).use { zip ->
+            while (true) {
+                val entry = zip.nextEntry ?: break
+                entries += entry.name
+                zip.closeEntry()
+            }
+        }
+        assertEquals(setOf("flights.json", "length_records.json", "tags.json", "achievements.json", "settings.json"), entries)
+        val restored = manager.readBackup(ByteArrayInputStream(bytes))
+        assertEquals(original, restored.flights.single())
+        assertEquals(before, context.contentResolver.persistedUriPermissions.map { it.uri }.toSet())
+    }
+
+    @Test
+    fun timedRecordKeepsPauseSpanAndCommitIdentityInBackup() {
+        val record = videoFlight().copy(endTime = 13_000L, durationSeconds = 8,
+            timingSource = "timer", recordDraftId = "session")
+        val json = BackupJsonCodec.flightsToJson(listOf(record)).toString()
+        val settings = """{
+            "username":"测试","ml_per_spurt":2.0,"daily_reminder_enabled":false,
+            "daily_reminder_time":"22:00","inactive_reminder_enabled":false,"inactive_reminder_days":7,
+            "monthly_length_reminder_enabled":false,"monthly_length_reminder_day":1,
+            "reminder_sound":true,"reminder_vibration":true,"theme_mode":"system",
+            "home_card_order":"[]","home_card_visibility":"{}","onboarding_completed":true
+        }"""
+        assertEquals(record, manager.readBackup(ByteArrayInputStream(validArchive(settings, json))).flights.single())
+        val manual = BackupJsonCodec.flightsToJson(listOf(record.copy(timingSource = "manual"))).toString()
+        assertThrows(IllegalArgumentException::class.java) { manager.readBackup(ByteArrayInputStream(validArchive(settings, manual))) }
+        val unknown = BackupJsonCodec.flightsToJson(listOf(record.copy(timingSource = "unknown"))).toString()
+        assertThrows(IllegalArgumentException::class.java) { manager.readBackup(ByteArrayInputStream(validArchive(settings, unknown))) }
+    }
+
+    private fun videoFlight() = Flight(
+        id=1, startTime=1000, endTime=61000, durationSeconds=60, spurtCount=null,
+        semenVolumeMl=2.3f, volumeInputMode="estimated", predictionMaxTicks=80,
+        ejaculationDistanceCm=null, methodTags="[]", moodNote="", createdAt=1000, updatedAt=61000,
+        videoUri="content://com.example.documents/document/deleted-video",
+        videoDisplayName="video.mp4", videoMimeType="video/mp4"
+    )
 
     private fun validArchive(settings: String, flights: String = "[]"): ByteArray = zipOf(
         "flights.json" to flights,

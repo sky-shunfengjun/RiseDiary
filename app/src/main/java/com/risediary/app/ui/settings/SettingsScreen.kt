@@ -26,7 +26,6 @@ import com.risediary.app.ui.navigation3.LocalNavigator
 import com.risediary.app.ui.navigation3.Route
 import com.risediary.app.BuildConfig
 import com.risediary.app.R
-import com.risediary.app.data.DefaultVolumeMode
 import com.risediary.app.data.UsernamePolicy
 import com.risediary.app.ui.components.mainPageBottomSpacing
 import top.yukonga.miuix.kmp.basic.Card
@@ -36,7 +35,6 @@ import top.yukonga.miuix.kmp.preference.OverlayDropdownPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
-import java.text.DecimalFormat
 import com.risediary.app.ui.icons.AppIcons
 
 @Composable
@@ -88,25 +86,11 @@ fun SettingsScreen(
                             placeholder = stringResource(R.string.settings_username_placeholder),
                             inputTransform = UsernamePolicy::limit
                         )
-                        val defaultVolumeMode by vm.defaultVolumeMode.collectAsStateWithLifecycle()
-                        SettingsVolumeModeItem(
-                            value = defaultVolumeMode,
-                            onSelect = vm::setDefaultVolumeMode
-                        )
-                        val mlPerSpurt by vm.mlPerSpurt.collectAsStateWithLifecycle()
-                        if (defaultVolumeMode == DefaultVolumeMode.SPURTS) {
-                            SettingsSliderItem(
-                                icon = AppIcons.WaterDrop,
-                                title = stringResource(R.string.settings_ml_conversion),
-                                subtitle = stringResource(
-                                    R.string.settings_ml_conversion_summary,
-                                    DecimalFormat("0.#").format(mlPerSpurt)
-                                ),
-                                value = mlPerSpurt,
-                                valueRange = 1f..10f,
-                                steps = 8,
-                                onValueChange = vm::setMlPerSpurt
-                            )
+                        val predictionSettings by vm.predictionSettings.collectAsStateWithLifecycle()
+                        PredictionMaximumItem(value = predictionSettings.maxTicks, onValueChange = vm::setPredictionMaxTicks)
+                        predictionSettings.error?.let {
+                            Text(it, modifier = Modifier.padding(horizontal = 16.dp))
+                            top.yukonga.miuix.kmp.basic.TextButton(text = "重试读取设置", onClick = vm::retryPredictionSettings)
                         }
                         ArrowPreference(
                             title = stringResource(R.string.settings_manage_tags),

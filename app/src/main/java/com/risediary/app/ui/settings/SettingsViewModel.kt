@@ -5,8 +5,8 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.risediary.app.R
+import com.risediary.app.data.DataMaintenanceBusyException
 import com.risediary.app.data.BackgroundLockMode
-import com.risediary.app.data.DefaultVolumeMode
 import com.risediary.app.data.UserPreferences
 import com.risediary.app.reminder.ReminderNotifier
 import com.risediary.app.reminder.ReminderScheduler
@@ -40,13 +40,22 @@ class SettingsViewModel @Inject constructor(
     // --- State holders ---
     private val sharing = SharingStarted.WhileSubscribed(5_000)
     val username = prefs.username.stateIn(viewModelScope, sharing, "机长")
-    val mlPerSpurt = prefs.mlPerSpurt.stateIn(viewModelScope, sharing, 2.0f)
-    val defaultVolumeMode =
-        prefs.defaultVolumeMode.stateIn(
-            viewModelScope,
-            sharing,
-            DefaultVolumeMode.MILLILITERS
-        )
+    private val mutablePredictionSettings = MutableStateFlow(PredictionSettingsUiState())
+    val predictionSettings = mutablePredictionSettings.asStateFlow()
+    private var predictionSettingsJob: Job? = null
+
+    init { retryPredictionSettings() }
+
+    fun retryPredictionSettings() {
+        predictionSettingsJob?.cancel()
+        predictionSettingsJob = viewModelScope.launch {
+            mutablePredictionSettings.value = PredictionSettingsUiState()
+            try {
+                prefs.predictionMaxTicks.collect { mutablePredictionSettings.value = PredictionSettingsUiState(it) }
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { mutablePredictionSettings.value = PredictionSettingsUiState(error = "读取失败，请重试") }
+        }
+    }
 
     val dailyReminderEnabled = prefs.dailyReminderEnabled.stateIn(viewModelScope, sharing, false)
     val dailyReminderTime = prefs.dailyReminderTime.stateIn(viewModelScope, sharing, "22:00")
@@ -75,9 +84,16 @@ class SettingsViewModel @Inject constructor(
 
     // --- Setters ---
     fun setUsername(value: String) = launchSettingsWrite { prefs.setUsername(value) }
-    fun setMlPerSpurt(value: Float) = launchSettingsWrite { prefs.setMlPerSpurt(value) }
-    fun setDefaultVolumeMode(mode: DefaultVolumeMode) =
-        launchSettingsWrite { prefs.setDefaultVolumeMode(mode) }
+    fun setPredictionMaxTicks(value: Int) = launchSettingsWrite {
+        prefs.setPredictionMaxTicks(value)
+        if (predictionSettingsJob?.isActive != true) retryPredictionSettings()
+    }.also { job ->
+        job.invokeOnCompletion { cause ->
+            if (cause is DataMaintenanceBusyException) viewModelScope.launch {
+                android.widget.Toast.makeText(context, "数据恢复或清除中，请稍后再保存设置。", android.widget.Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
 
     fun applyRecommendedReminders(enabled: Boolean, time: String = "22:00") =
         queueOnboardingWrite {
@@ -218,3 +234,4 @@ class SettingsViewModel @Inject constructor(
         return job
     }
 }
+data class PredictionSettingsUiState(val maxTicks: Int? = null, val error: String? = null)

@@ -49,14 +49,12 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kyant.backdrop.Backdrop
 import com.risediary.app.R
-import com.risediary.app.data.DefaultVolumeMode
 import com.risediary.app.ui.components.LiquidBackButton
 import com.risediary.app.ui.components.LiquidGlassButton
 import com.risediary.app.ui.settings.SettingsDivider
 import com.risediary.app.ui.settings.SettingsSliderItem
 import com.risediary.app.ui.settings.SettingsThemeItem
 import com.risediary.app.ui.settings.SettingsToggleItem
-import com.risediary.app.ui.settings.SettingsVolumeModeItem
 import com.risediary.app.ui.settings.SettingsReminderAccuracyNotice
 import com.risediary.app.ui.theme.CardBlue
 import com.risediary.app.ui.theme.CardGreen
@@ -405,7 +403,8 @@ internal fun SetupBottomActions(
     onLater: () -> Unit,
     onContinue: () -> Unit,
     laterLabel: String = stringResource(R.string.onboarding_later),
-    continueLabel: String = stringResource(R.string.onboarding_save_continue)
+    continueLabel: String = stringResource(R.string.onboarding_save_continue),
+    continueEnabled: Boolean = true
 ) {
     Row(
         modifier = Modifier
@@ -426,6 +425,8 @@ internal fun SetupBottomActions(
         Box(modifier = Modifier.weight(1.35f).padding(4.dp)) {
             LiquidGlassButton(
                 onClick = onContinue,
+                enabled = continueEnabled,
+                isInteractive = continueEnabled,
                 backdrop = backdrop,
                 tint = CardBlue,
                 modifier = Modifier.fillMaxWidth()

@@ -28,7 +28,7 @@ class TimerActionDockAnimationTest {
         override val scaleFactor = 1f
     })
 
-    @Test fun startPauseResumeFinishAndRestartKeepTheirRebound() {
+    @Test fun startPauseAndResumeKeepTheirReboundAndFinishOpensTheForm() {
         val status = mutableStateOf(TimerStatus.IDLE)
         val actions = mutableListOf<String>()
         fun transition(action: String, next: TimerStatus) {
@@ -47,8 +47,7 @@ class TimerActionDockAnimationTest {
                         onPause = { transition("pause", TimerStatus.PAUSED) },
                         onResume = { transition("resume", TimerStatus.RUNNING) },
                         onFinish = { transition("finish", TimerStatus.FINISHED) },
-                        onReset = { transition("reset", TimerStatus.IDLE) },
-                        onRecord = { actions += "record" },
+                        onRetry = { actions += "retry" },
                     )
                 }
             }
@@ -58,9 +57,14 @@ class TimerActionDockAnimationTest {
         clickAndCheckRebound(hasText("开始计时"), hasText("暂停"))
         clickAndCheckRebound(hasText("暂停"), hasText("继续"))
         clickAndCheckRebound(hasText("继续"), hasText("暂停"))
-        clickAndCheckRebound(hasContentDescription("结束计时"), hasText("填写记录"))
-        clickAndCheckRebound(hasText("重新计时"), hasText("开始计时"))
-        assertEquals(listOf("start", "pause", "resume", "finish", "reset"), actions)
+        compose.onNode(hasText("我已起飞")).assertDoesNotExist()
+        clickAndCheckRebound(hasText("暂停"), hasText("继续"))
+        compose.onNode(hasText("我已起飞")).performTouchInput { down(center); up() }
+        compose.mainClock.advanceTimeBy(1_200)
+        compose.onNode(hasText("正在打开…")).assertExists()
+        compose.onNode(hasText("填写记录")).assertDoesNotExist()
+        compose.onNode(hasText("重新计时")).assertDoesNotExist()
+        assertEquals(listOf("start", "pause", "resume", "pause", "finish"), actions)
     }
 
     private fun clickAndCheckRebound(before: SemanticsMatcher, after: SemanticsMatcher) {

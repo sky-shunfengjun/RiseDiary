@@ -13,13 +13,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.kyant.backdrop.Backdrop
 import com.risediary.app.R
-import com.risediary.app.data.DefaultVolumeMode
 import com.risediary.app.ui.components.LiquidGlassButton
 import com.risediary.app.ui.settings.SettingsDivider
 import com.risediary.app.ui.settings.SettingsReminderAccuracyNotice
 import com.risediary.app.ui.settings.SettingsSliderItem
 import com.risediary.app.ui.settings.SettingsToggleItem
-import com.risediary.app.ui.settings.SettingsVolumeModeItem
 import com.risediary.app.ui.theme.CardBlue
 import com.risediary.app.ui.theme.CardGreen
 import com.risediary.app.ui.theme.CardOrange
@@ -28,39 +26,24 @@ import com.risediary.app.ui.theme.RiseCard
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import java.text.DecimalFormat
 import com.risediary.app.ui.icons.AppIcons
 
 @Composable
 internal fun RecordingOnboardingPage(
-    volumeMode: DefaultVolumeMode,
-    mlPerSpurt: Float,
+    predictionMaxTicks: Int?,
     backdrop: Backdrop,
-    onVolumeModeSelected: (DefaultVolumeMode) -> Unit,
-    onMlPerSpurtChange: (Float) -> Unit
+    onPredictionMaximumChange: (Int) -> Unit
 ) {
     SetupPage(
         icon = AppIcons.EditNote,
         title = stringResource(R.string.onboarding_recording_title),
-        subtitle = stringResource(R.string.onboarding_recording_subtitle)
+        subtitle = stringResource(R.string.onboarding_prediction_subtitle)
     ) {
         RiseCard(modifier = Modifier.fillMaxWidth()) {
-            SettingsVolumeModeItem(value = volumeMode, onSelect = onVolumeModeSelected)
-            if (volumeMode == DefaultVolumeMode.SPURTS) {
-                SettingsDivider()
-                SettingsSliderItem(
-                    icon = AppIcons.Tune,
-                    title = stringResource(R.string.settings_ml_conversion),
-                    subtitle = stringResource(
-                        R.string.settings_ml_conversion_summary,
-                        DecimalFormat("0.#").format(mlPerSpurt)
-                    ),
-                    value = mlPerSpurt,
-                    valueRange = 1f..10f,
-                    steps = 8,
-                    onValueChange = onMlPerSpurtChange
-                )
-            }
+            com.risediary.app.ui.settings.PredictionMaximumItem(
+                value = predictionMaxTicks,
+                onValueChange = onPredictionMaximumChange
+            )
         }
         Row(
             modifier = Modifier.fillMaxWidth(),

@@ -120,7 +120,23 @@ class BackupManagerRecoveryDeviceTest {
             assertEquals(501, f.database.flightDao().getAll().single().spurtCount)
             assertEquals(1002f, f.database.flightDao().getAll().single().semenVolumeMl!!, 0f)
             assertEquals(10_001, f.database.flightDao().getAll().single().moodNote.length)
-            assertEquals(20f, f.preferences.quantitySettings.first().mlPerSpurt, 0f)
+            assertEquals(20f, f.preferences.mlPerSpurt.first(), 0f)
+        } finally { f.close() }
+    }
+
+    @Test fun failedClearRestoresPendingDraftPreimageAsWellAsSavedTables() = runBlocking {
+        val f = Fixture.create()
+        try {
+            val snapshot = com.risediary.app.data.draft.RecordDraftSnapshot("pending", revision = 1L,
+                startTime = 1_700_000_000_000L, endTime = 1_700_000_060_000L, durationSeconds = 60,
+                quantity = com.risediary.app.ui.form.QuantityDraftSnapshot("estimated", 23, "9.5", 80, true))
+            val row = com.risediary.app.data.draft.RecordDraftEntity("pending", 1, 1,
+                com.risediary.app.data.draft.RecordDraftCodec.encode(snapshot), null)
+            f.database.recordDraftDao().insert(row)
+            f.storage.failOn(1)
+            assertTrue(f.manager.clearAll() is BackupResult.Failure)
+            f.assertOriginalTables()
+            assertEquals(listOf(row), f.database.recordDraftDao().getAll())
         } finally { f.close() }
     }
 
@@ -162,7 +178,11 @@ class BackupManagerRecoveryDeviceTest {
         private val length = LengthRecord(4L, 1_700_000_000_000L, 10f, 15f, "旧长度")
         private val achievement = Achievement(5L, "milestone_1", 1_700_000_000_000L, true)
         val manager = BackupManager(context, database, preferences,
-            Clock.fixed(Instant.ofEpochMilli(1_700_000_100_000L), ZoneOffset.UTC))
+            Clock.fixed(Instant.ofEpochMilli(1_700_000_100_000L), ZoneOffset.UTC),
+            com.risediary.app.service.TimerSessionStore(context, com.risediary.app.service.BootIdentityProvider { 1 },
+                object : com.risediary.app.service.ElapsedRealtimeClock { override fun millis() = 1_000L },
+                Clock.fixed(Instant.ofEpochMilli(1_700_000_100_000L), ZoneOffset.UTC)),
+            com.risediary.app.service.TimerStateHolder())
 
         suspend fun assertOriginalTables() {
             assertEquals(listOf(original), database.flightDao().getAll())

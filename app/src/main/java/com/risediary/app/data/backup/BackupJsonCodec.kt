@@ -20,6 +20,15 @@ internal object BackupJsonCodec {
         put("spurtCount", value.spurtCount ?: JSONObject.NULL)
         put("semenVolumeMl", value.semenVolumeMl ?: JSONObject.NULL)
         put("volumeInputMode", value.volumeInputMode)
+        put("legacySpurtCount", value.legacySpurtCount ?: JSONObject.NULL)
+        put("legacyVolumeMl", value.legacyVolumeMl ?: JSONObject.NULL)
+        put("legacyVolumeInputMode", value.legacyVolumeInputMode ?: JSONObject.NULL)
+        put("predictionMaxTicks", value.predictionMaxTicks ?: JSONObject.NULL)
+        put("videoUri", value.videoUri ?: JSONObject.NULL)
+        put("videoDisplayName", value.videoDisplayName ?: JSONObject.NULL)
+        put("videoMimeType", value.videoMimeType ?: JSONObject.NULL)
+        put("recordDraftId", value.recordDraftId ?: JSONObject.NULL)
+        put("timingSource", value.timingSource)
         put("ejaculationDistanceCm", value.ejaculationDistanceCm ?: JSONObject.NULL)
         put("methodTags", value.methodTags)
         put("moodNote", value.moodNote)
@@ -67,6 +76,7 @@ internal object BackupJsonCodec {
 
     fun settingsToJson(value: SettingsSnapshot) = JSONObject().apply {
         put("username", value.username)
+        put("prediction_max_ticks", value.predictionMaxTicks)
         put("ml_per_spurt", value.mlPerSpurt)
         put("default_volume_mode", value.defaultVolumeMode.storedValue)
         put("daily_reminder_enabled", value.dailyReminderEnabled)
@@ -94,6 +104,21 @@ internal object BackupJsonCodec {
                 val spurtCount = if (isNull("spurtCount")) null else getInt("spurtCount")
                 val semenVolumeMl = if (isNull("semenVolumeMl")) null
                     else getDouble("semenVolumeMl").toFloat()
+                val mode = if (has("volumeInputMode")) {
+                    val stored = getString("volumeInputMode")
+                    require(stored in RecordVolumeMode.entries.map { it.storedValue }) { "飞行记录录入模式无效" }
+                    stored
+                } else RecordVolumeMode.inferLegacy(spurtCount, semenVolumeMl).storedValue
+                val videoUri = videoText("videoUri")
+                val videoName = videoText("videoDisplayName")
+                val videoMime = videoText("videoMimeType")
+                require(com.risediary.app.media.validateLocalVideoFields(videoUri, videoName, videoMime) == null) {
+                    "视频关联信息无效"
+                }
+                val historyKeys = listOf("legacySpurtCount", "legacyVolumeMl", "legacyVolumeInputMode")
+                val hasHistoryFields = historyKeys.any { has(it) }
+                require(!hasHistoryFields || historyKeys.all { has(it) }) { "原数量信息不完整" }
+                require(hasHistoryFields || mode != RecordVolumeMode.ESTIMATED.storedValue) { "预测记录信息不完整" }
                 Flight(
                     id = getLong("id"),
                     startTime = getLong("startTime"),
@@ -101,11 +126,19 @@ internal object BackupJsonCodec {
                     durationSeconds = getInt("durationSeconds"),
                     spurtCount = spurtCount,
                     semenVolumeMl = semenVolumeMl,
-                    volumeInputMode = if (has("volumeInputMode")) {
-                        RecordVolumeMode.fromStoredValue(optString("volumeInputMode")).storedValue
-                    } else {
-                        RecordVolumeMode.inferLegacy(spurtCount, semenVolumeMl).storedValue
-                    },
+                    volumeInputMode = mode,
+                    legacySpurtCount = if (!hasHistoryFields) spurtCount else
+                        if (isNull("legacySpurtCount")) null else getInt("legacySpurtCount"),
+                    legacyVolumeMl = if (!hasHistoryFields) semenVolumeMl else
+                        if (isNull("legacyVolumeMl")) null else getDouble("legacyVolumeMl").toFloat(),
+                    legacyVolumeInputMode = if (!hasHistoryFields) mode else
+                        if (isNull("legacyVolumeInputMode")) null else getString("legacyVolumeInputMode"),
+                    predictionMaxTicks = if (isNull("predictionMaxTicks")) null else strictTicks("predictionMaxTicks"),
+                    videoUri = videoUri,
+                    videoDisplayName = videoName,
+                    videoMimeType = videoMime,
+                    recordDraftId = videoText("recordDraftId")?.also { require(it.isNotBlank() && it.length <= 128) },
+                    timingSource = if (has("timingSource")) requireNotNull(videoText("timingSource")) else "manual",
                     ejaculationDistanceCm = if (isNull("ejaculationDistanceCm")) null
                         else getDouble("ejaculationDistanceCm").toFloat(),
                     methodTags = getString("methodTags"),
@@ -162,6 +195,7 @@ internal object BackupJsonCodec {
 
     fun parseSettings(json: String): SettingsSnapshot = JSONObject(json).run {
         SettingsSnapshot(
+            predictionMaxTicks = if (has("prediction_max_ticks")) strictTicks("prediction_max_ticks") else 80,
             username = getString("username"),
             mlPerSpurt = getDouble("ml_per_spurt").toFloat(),
             defaultVolumeMode = parseBackupDefaultVolumeMode(
@@ -186,6 +220,21 @@ internal object BackupJsonCodec {
             homeCardVisibility = getString("home_card_visibility"),
             onboardingCompleted = getBoolean("onboarding_completed")
         )
+    }
+
+    private fun JSONObject.videoText(key: String): String? {
+        if (isNull(key)) return null
+        val raw = get(key)
+        require(raw is String) { "视频信息格式无效" }
+        return raw
+    }
+
+    private fun JSONObject.strictTicks(key: String): Int {
+        val raw = get(key)
+        require(raw is Int || raw is Long) { "预测最大值格式无效" }
+        val ticks = (raw as Number).toLong()
+        require(ticks in 1L..10_000L) { "预测最大值超出范围" }
+        return ticks.toInt()
     }
 
     private fun normalizeBackupInactiveDays(value: Int): Int {

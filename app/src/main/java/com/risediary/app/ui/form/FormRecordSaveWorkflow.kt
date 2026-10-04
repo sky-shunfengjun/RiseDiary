@@ -14,7 +14,7 @@ internal class StaleRecordDraftException : IllegalStateException("The stored rec
 
 /** Caller holds the write permit across reading, comparing and committing. */
 internal class FormRecordSaveWorkflow(
-    private val insert: suspend (Flight) -> Long,
+    private val insert: suspend (Flight) -> Flight,
     private val update: suspend (Flight) -> Unit,
     private val readCurrent: suspend (Long) -> Flight?
 ) {
@@ -35,7 +35,7 @@ internal class FormRecordSaveWorkflow(
             throw StaleRecordDraftException()
         }
         val stored = if (existing == null) {
-            flight.copy(id = insert(flight))
+            insert(flight)
         } else {
             flight.copy(id = existing.id).also { update(it) }
         }

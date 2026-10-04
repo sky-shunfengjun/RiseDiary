@@ -7,49 +7,32 @@ import android.view.WindowManager
 import com.risediary.app.ui.components.PageBackHandler as BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
-import androidx.compose.animation.togetherWith
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -61,12 +44,7 @@ import com.risediary.app.ui.navigation3.Route
 import com.risediary.app.service.TimerMath
 import com.risediary.app.service.TimerSession
 import com.risediary.app.service.TimerStatus
-import com.risediary.app.ui.components.LiquidAlertDialog
 import com.risediary.app.ui.components.SecondaryPageScaffold
-import com.risediary.app.ui.components.liquidDialogCancelButtonColors
-import com.risediary.app.ui.components.liquidDialogConfirmButtonColors
-import com.risediary.app.util.formatTimerClock
-import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -77,10 +55,26 @@ fun TimerScreen(
 ) {
     val navigator = LocalNavigator.current
     val context = LocalContext.current
-    val session by viewModel.session.collectAsStateWithLifecycle()
+    val liveSession by viewModel.session.collectAsStateWithLifecycle()
+    val session = viewModel.discardDisplaySession ?: viewModel.handoffSession ?: liveSession
     val persistenceError by viewModel.persistenceError.collectAsStateWithLifecycle()
-    var showFinishConfirm by remember { mutableStateOf(false) }
-    var showLeaveConfirm by remember { mutableStateOf(false) }
+    val commandError by viewModel.commandError.collectAsStateWithLifecycle()
+    var showLeaveConfirm by rememberSaveable { mutableStateOf(false) }
+    var leaveSessionId by rememberSaveable { mutableStateOf<String?>(null) }
+    LaunchedEffect(viewModel.nextRoute) {
+        viewModel.nextRoute?.let {
+            showLeaveConfirm = false
+            navigator.replace(it)
+            viewModel.consumeRoute()
+        }
+    }
+    LaunchedEffect(viewModel.discardComplete) {
+        if (viewModel.discardComplete) {
+            showLeaveConfirm = false
+            navigator.pop()
+            viewModel.consumeDiscard()
+        }
+    }
 
     val permissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
@@ -102,20 +96,12 @@ fun TimerScreen(
         }
     }
 
-    fun openRecord() {
-        val duration = session.elapsedMillis
-        val startTime = session.startedAtEpochMillis
-        navigator.push(
-            Route.RecordForm(
-                isTimer = true,
-                duration = duration,
-                startTime = startTime
-            )
-        )
-    }
 
-    BackHandler(enabled = session.isActive) {
-        showLeaveConfirm = true
+    BackHandler(enabled = session.isActive || viewModel.busy || viewModel.finishing || viewModel.discarding) {
+        if (!viewModel.finishing && !viewModel.busy && !viewModel.discarding) {
+            leaveSessionId = viewModel.session.value.sessionId
+            showLeaveConfirm = true
+        }
     }
 
     val isRunning = session.status == TimerStatus.RUNNING
@@ -128,7 +114,11 @@ fun TimerScreen(
     SecondaryPageScaffold(
         title = stringResource(R.string.timer_title),
         onBack = {
-            if (session.isActive) showLeaveConfirm = true
+            if (viewModel.finishing || viewModel.busy || viewModel.discarding) Unit
+            else if (viewModel.session.value.isActive) {
+                leaveSessionId = viewModel.session.value.sessionId
+                showLeaveConfirm = true
+            }
             else navigator.pop()
         },
         bottomAction = { backdrop ->
@@ -138,9 +128,11 @@ fun TimerScreen(
                 onStart = ::startTimer,
                 onPause = viewModel::pause,
                 onResume = viewModel::resume,
-                onFinish = { showFinishConfirm = true },
-                onReset = viewModel::reset,
-                onRecord = ::openRecord
+                onFinish = viewModel::requestFinish,
+                onRetry = viewModel::openRecord,
+                transferring = viewModel.finishing,
+                transferFailed = viewModel.transferFailed,
+                enabled = !viewModel.busy && !viewModel.discarding && (!persistenceError || viewModel.transferFailed)
             )
         }
     ) { innerPadding ->
@@ -170,6 +162,10 @@ fun TimerScreen(
                 .padding(innerPadding)
                 .background(glowBrush)
         ) {
+            val problem = viewModel.error ?: commandError
+            if (problem != null) {
+                Column(Modifier.align(Alignment.TopCenter)) { Text(problem, color = MiuixTheme.colorScheme.error) }
+            }
             if (persistenceError) {
                 Column(Modifier.align(Alignment.TopCenter), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(stringResource(R.string.timer_error_save), color = MiuixTheme.colorScheme.error)
@@ -185,209 +181,11 @@ fun TimerScreen(
         }
     }
 
-    if (showFinishConfirm) {
-        LiquidAlertDialog(
-            onDismissRequest = { showFinishConfirm = false },
-            title = { Text(stringResource(R.string.timer_end_timing)) },
-            text = { Text(stringResource(R.string.timer_finish_dialog_message)) },
-            confirmButton = {
-                TextButton(
-                    text = stringResource(R.string.timer_confirm_end),
-                    onClick = {
-                        showFinishConfirm = false
-                        viewModel.finish()
-                    },
-                    colors = ButtonDefaults.textButtonColors(
-                        color = Color.Transparent,
-                        disabledColor = Color.Transparent,
-                        textColor = MiuixTheme.colorScheme.error,
-                        disabledTextColor = MiuixTheme.colorScheme.error
-                    )
-                )
-            },
-            dismissButton = {
-                TextButton(
-                    text = stringResource(R.string.timer_continue_timing),
-                    onClick = { showFinishConfirm = false },
-                    colors = liquidDialogCancelButtonColors()
-                )
-            }
-        )
-    }
+    TimerFinishDialogs(session, persistenceError, viewModel)
 
     if (showLeaveConfirm) {
-        LiquidAlertDialog(
-            onDismissRequest = { showLeaveConfirm = false },
-            title = { Text(stringResource(R.string.timer_leave_dialog_title)) },
-            text = { Text(stringResource(R.string.timer_leave_dialog_message)) },
-            confirmButton = {
-                TextButton(
-                    text = stringResource(R.string.timer_leave_confirm),
-                    onClick = {
-                        showLeaveConfirm = false
-                        navigator.pop()
-                    },
-                    colors = liquidDialogConfirmButtonColors()
-                )
-            },
-            dismissButton = {
-                TextButton(
-                    text = stringResource(R.string.timer_leave_cancel),
-                    onClick = { showLeaveConfirm = false },
-                    colors = liquidDialogCancelButtonColors()
-                )
-            }
-        )
-    }
-}
-
-@Composable
-private fun TimerInstrument(
-    session: TimerSession,
-    modifier: Modifier = Modifier
-) {
-    val statusText = when (session.status) {
-        TimerStatus.IDLE -> stringResource(R.string.timer_status_idle)
-        TimerStatus.RUNNING -> stringResource(R.string.timer_status_running)
-        TimerStatus.PAUSED -> stringResource(R.string.notification_timer_paused_title)
-        TimerStatus.FINISHED -> stringResource(R.string.timer_status_finished)
-        TimerStatus.LIMIT_REACHED -> stringResource(R.string.notification_timer_limit_title)
-    }
-    val statusColor = when (session.status) {
-        TimerStatus.RUNNING -> MiuixTheme.colorScheme.primary
-        TimerStatus.LIMIT_REACHED -> MiuixTheme.colorScheme.error
-        else -> MiuixTheme.colorScheme.onSurfaceVariantSummary
-    }
-
-    Column(
-        modifier = modifier.padding(horizontal = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text(
-            text = statusText,
-            modifier = Modifier
-                .clip(RoundedCornerShape(50))
-                .background(statusColor.copy(alpha = 0.09f))
-                .padding(horizontal = 14.dp, vertical = 7.dp),
-            color = statusColor,
-            fontSize = MiuixTheme.textStyles.headline2.fontSize,
-            fontWeight = FontWeight.Medium
-        )
-        Spacer(modifier = Modifier.height(26.dp))
-        RollingTimerDigits(formatTimerClock(session.elapsedMillis))
-        Spacer(modifier = Modifier.height(28.dp))
-        MinuteSecondTrack(
-            second = ((session.elapsedMillis / 1_000L) % 60L).toInt(),
-            modifier = Modifier.fillMaxWidth()
-        )
-        Spacer(modifier = Modifier.height(10.dp))
-        Text(
-            text = stringResource(R.string.timer_track_caption),
-            fontSize = MiuixTheme.textStyles.footnote1.fontSize,
-            color = MiuixTheme.colorScheme.onSurfaceVariantSummary.copy(alpha = 0.72f)
-        )
-    }
-}
-
-@Composable
-private fun RollingTimerDigits(value: String) {
-    Row(
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        value.forEachIndexed { index, character ->
-            if (character == ':') {
-                Text(
-                    text = ":",
-                    modifier = Modifier.width(15.dp),
-                    style = timerDigitStyle(),
-                    textAlign = TextAlign.Center,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                )
-            } else {
-                AnimatedContent(
-                    targetState = character,
-                    modifier = Modifier.width(38.dp),
-                    transitionSpec = {
-                        (
-                            slideInVertically(tween(120)) { height -> height / 3 } +
-                                fadeIn(tween(90))
-                            ) togetherWith (
-                            slideOutVertically(tween(120)) { height -> -height / 3 } +
-                                fadeOut(tween(90))
-                            ) using SizeTransform(clip = true)
-                    },
-                    contentAlignment = Alignment.Center,
-                    label = "timer_digit_$index"
-                ) { digit ->
-                    Text(
-                        text = digit.toString(),
-                        style = timerDigitStyle(),
-                        color = MiuixTheme.colorScheme.onSurface,
-                        textAlign = TextAlign.Center,
-                        maxLines = 1
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun timerDigitStyle(): TextStyle =
-    MiuixTheme.textStyles.title1.copy(
-        fontSize = 52.sp,
-        lineHeight = 60.sp,
-        fontFamily = FontFamily.SansSerif,
-        fontWeight = FontWeight.Light,
-        fontFeatureSettings = "tnum"
-    )
-
-@Composable
-private fun MinuteSecondTrack(
-    second: Int,
-    modifier: Modifier = Modifier
-) {
-    val animatedSecond by animateFloatAsState(
-        targetValue = second.coerceIn(0, 59).toFloat(),
-        animationSpec = if (second == 0) snap() else tween(180),
-        label = "second_track"
-    )
-    val primary = MiuixTheme.colorScheme.primary
-    val track = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.12f)
-    val minor = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.2f)
-
-    Canvas(modifier = modifier.height(48.dp)) {
-        val inset = 8.dp.toPx()
-        val availableWidth = size.width - inset * 2
-        val baseY = size.height * 0.68f
-        drawLine(
-            color = track,
-            start = androidx.compose.ui.geometry.Offset(inset, baseY),
-            end = androidx.compose.ui.geometry.Offset(size.width - inset, baseY),
-            strokeWidth = 1.dp.toPx()
-        )
-        repeat(60) { index ->
-            val x = inset + availableWidth * index / 59f
-            val isMajor = index % 5 == 0
-            val tickHeight = if (isMajor) 13.dp.toPx() else 6.dp.toPx()
-            drawLine(
-                color = if (isMajor) minor.copy(alpha = 0.52f) else minor,
-                start = androidx.compose.ui.geometry.Offset(x, baseY - tickHeight / 2),
-                end = androidx.compose.ui.geometry.Offset(x, baseY + tickHeight / 2),
-                strokeWidth = if (isMajor) 1.5.dp.toPx() else 1.dp.toPx()
-            )
-        }
-        val cursorX = inset + availableWidth * animatedSecond / 59f
-        drawCircle(
-            color = primary.copy(alpha = 0.18f),
-            radius = 7.dp.toPx(),
-            center = androidx.compose.ui.geometry.Offset(cursorX, baseY)
-        )
-        drawCircle(
-            color = primary,
-            radius = 3.dp.toPx(),
-            center = androidx.compose.ui.geometry.Offset(cursorX, baseY)
-        )
+        TimerLeaveDialog(liveSession, leaveSessionId, viewModel,
+            onLeave = { showLeaveConfirm = false; navigator.pop() },
+            onDismiss = { showLeaveConfirm = false })
     }
 }

@@ -114,10 +114,14 @@ class AppGatePersistenceTest {
     private class IdleTimer : TimerController {
         override val state = MutableStateFlow(TimerSession())
         override fun restore() = Unit
-        override fun start() = Unit
-        override fun pause() = Unit
-        override fun resume() = Unit
-        override fun finish() = Unit
-        override fun reset() = Unit
+        override fun start(request: com.risediary.app.service.TimerStartRequest) = Unit
+        override fun pause(sessionId: String) = Unit
+        override fun resume(sessionId: String) = Unit
+        override fun requestFinish(sessionId: String, wallClockNow: Long, elapsedRealtimeNow: Long, candidate: com.risediary.app.service.TimerFinishCandidate?) = Unit
+        override fun confirmFinish(sessionId: String) = Unit
+        override fun cancelFinish(sessionId: String) = Unit
+        override fun updatePlayback(sessionId: String, snapshot: com.risediary.app.media.VideoPlaybackSnapshot, immediate: Boolean) = Unit
+        override fun discard(sessionId: String) = Unit
+        override fun reset(sessionId: String) = Unit
     }
 }

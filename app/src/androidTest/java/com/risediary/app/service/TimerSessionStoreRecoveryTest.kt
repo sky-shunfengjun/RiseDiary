@@ -3,6 +3,17 @@ package com.risediary.app.service
 import android.content.Context
 import android.content.ContextWrapper
 import androidx.test.core.app.ApplicationProvider
+import androidx.datastore.preferences.core.PreferenceDataStoreFactory
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
+import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.flow.first
 import java.io.File
 import java.time.Clock
 import java.time.Instant
@@ -23,6 +34,35 @@ class TimerSessionStoreRecoveryTest {
         return TimerSessionStore(isolated, BootIdentityProvider { boot },
             object : ElapsedRealtimeClock { override fun millis() = now },
             Clock.fixed(Instant.ofEpochMilli(9_999_999L), ZoneOffset.UTC))
+    }
+
+    @Test fun oldLimitFileUpgradesAtomicallyToFinishedAndStaysFinished() = runBlocking {
+        val base = ApplicationProvider.getApplicationContext<Context>()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+        val data = PreferenceDataStoreFactory.create(scope = scope, produceFile = {
+            File(base.cacheDir, "old-timer-${UUID.randomUUID()}.preferences_pb")
+        })
+        try {
+            data.edit {
+                it[stringPreferencesKey("status")] = "LIMIT_REACHED"
+                it[longPreferencesKey("started_at_epoch")] = 123_000L
+                it[longPreferencesKey("elapsed_millis")] = 7_200_000L
+                it[intPreferencesKey("notified_milestones")] = 15
+            }
+            val store = TimerSessionStore(data, BootIdentityProvider { 5 },
+                object : ElapsedRealtimeClock { override fun millis() = 50_000_000L },
+                Clock.fixed(Instant.ofEpochMilli(9_999_999L), ZoneOffset.UTC))
+            val restored = store.load()
+            assertEquals(TimerStatus.FINISHED, restored.status)
+            assertEquals(7_200_000L, restored.elapsedMillis)
+            assertEquals(7, restored.notifiedMilestonesMask)
+            val persisted = data.data.first()
+            assertEquals(2, persisted[intPreferencesKey("duration_policy_version")])
+            assertEquals("FINISHED", persisted[stringPreferencesKey("status")])
+            assertEquals(restored, store.load())
+        } finally {
+            scope.coroutineContext[Job]?.cancelAndJoin()
+        }
     }
 
     @Test fun persistedDifferentBootWithGreaterUptimeReturnsPaused() = runBlocking {

@@ -91,9 +91,8 @@ class UserPreferences internal constructor(
     }
 
     val quantitySettings: Flow<QuantitySettingsSnapshot> = dataStore.data.map { prefs ->
-        val factor = prefs[KEY_ML_PER_SPURT] ?: 2f
-        check(factor.isFinite() && factor in 0.1f..100f) { "数量换算设置无效，请检查设置" }
-        QuantitySettingsSnapshot(factor, DefaultVolumeMode.fromStoredValue(prefs[KEY_DEFAULT_VOLUME_MODE]))
+        val ticks = com.risediary.app.util.PredictionQuantitySettings.normalizeStoredMaximum(prefs[KEY_PREDICTION_MAX_TICKS] ?: 80)
+        QuantitySettingsSnapshot(predictionMaxTicks = ticks)
     }
 
     internal suspend fun rawSnapshot(): Preferences = dataStore.data.first().toPreferences()
@@ -104,6 +103,7 @@ class UserPreferences internal constructor(
     internal fun settingsSnapshot(prefs: Preferences): com.risediary.app.data.backup.SettingsSnapshot =
         com.risediary.app.data.backup.SettingsSnapshot(
             username = UsernamePolicy.normalize(prefs[KEY_USERNAME].orEmpty()),
+            predictionMaxTicks = com.risediary.app.util.PredictionQuantitySettings.normalizeStoredMaximum(prefs[KEY_PREDICTION_MAX_TICKS] ?: 80),
             mlPerSpurt = prefs[KEY_ML_PER_SPURT] ?: 2f,
             defaultVolumeMode = DefaultVolumeMode.fromStoredValue(prefs[KEY_DEFAULT_VOLUME_MODE]),
             dailyReminderEnabled = prefs[KEY_DAILY_REMINDER_ENABLED] ?: false,
@@ -252,6 +252,13 @@ class UserPreferences internal constructor(
 
     suspend fun setUsername(value: String) {
         edit { it[KEY_USERNAME] = UsernamePolicy.normalize(value) }
+    }
+
+    val predictionMaxTicks: Flow<Int> = quantitySettings.map { it.predictionMaxTicks }
+
+    suspend fun setPredictionMaxTicks(value: Int) {
+        com.risediary.app.util.PredictionQuantitySettings.requireSettingMaximum(value)
+        edit { it[KEY_PREDICTION_MAX_TICKS] = value }
     }
 
     suspend fun setMlPerSpurt(value: Float) {
@@ -506,6 +513,7 @@ class UserPreferences internal constructor(
     internal suspend fun applySettingsForMaintenance(settings: com.risediary.app.data.backup.SettingsSnapshot) {
         dataStore.edit { prefs ->
             prefs[KEY_USERNAME] = UsernamePolicy.normalize(settings.username)
+            prefs[KEY_PREDICTION_MAX_TICKS] = com.risediary.app.util.PredictionQuantitySettings.normalizeStoredMaximum(settings.predictionMaxTicks)
             prefs[KEY_ML_PER_SPURT] = settings.mlPerSpurt
             prefs[KEY_DEFAULT_VOLUME_MODE] = settings.defaultVolumeMode.storedValue
             prefs[KEY_DAILY_REMINDER_ENABLED] = settings.dailyReminderEnabled
@@ -611,6 +619,7 @@ class UserPreferences internal constructor(
 
     companion object {
         private val KEY_USERNAME = stringPreferencesKey("username")
+        private val KEY_PREDICTION_MAX_TICKS = intPreferencesKey("prediction_max_ticks")
         private val KEY_ML_PER_SPURT = floatPreferencesKey("ml_per_spurt")
         private val KEY_DEFAULT_VOLUME_MODE = stringPreferencesKey("default_volume_mode")
         private val KEY_DAILY_REMINDER_ENABLED = booleanPreferencesKey("daily_reminder_enabled")

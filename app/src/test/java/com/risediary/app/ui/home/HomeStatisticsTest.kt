@@ -14,6 +14,17 @@ class HomeStatisticsTest {
     private val flight = Flight(1, now, now + 600_000, 600, 10, 20f,
         ejaculationDistanceCm = 30f, methodTags = "[]", moodNote = "")
 
+    @Test fun sumsOnlyCurrentMillilitersAcrossBothNewModesAndOldMissingQuantities() {
+        val calendar = LocalCalendarSnapshot(LocalDate.parse("2026-10-02"), ZoneId.of("Asia/Shanghai"), 0)
+        val estimated = flight.copy(spurtCount=null, semenVolumeMl=2.3f, volumeInputMode="estimated", predictionMaxTicks=80,
+            legacySpurtCount=15, legacyVolumeMl=30f, legacyVolumeInputMode="spurts")
+        val manual = flight.copy(id=2, spurtCount=null, semenVolumeMl=9.5f)
+        val old = flight.copy(id=3, spurtCount=3, semenVolumeMl=null, volumeInputMode="spurts")
+        val statistics = HomeStatistics.calculate(listOf(estimated, manual, old), emptyList(), calendar, now)
+        assertEquals(11.8f, statistics.weekVolumeSum, 0.001f)
+        assertEquals(3, statistics.weekSpurtSum)
+    }
+
     @Test fun deletionAndUndoRecalculateEveryFieldFromSameDataSnapshot() {
         val calendar = LocalCalendarSnapshot(LocalDate.parse("2026-10-02"), ZoneId.of("Asia/Shanghai"), 0)
         val before = HomeStatistics.calculate(listOf(flight), emptyList(), calendar, now)

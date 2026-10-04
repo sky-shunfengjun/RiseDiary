@@ -31,6 +31,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -73,8 +74,11 @@ fun LiquidSlider(
     valueRange: ClosedFloatingPointRange<Float>,
     steps: Int,
     backdrop: Backdrop,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onValueChangeFinished: (() -> Unit)? = null
 ) {
+    val changeValue by rememberUpdatedState(onValueChange)
+    val finishChange by rememberUpdatedState(onValueChangeFinished)
     val isLightTheme = !LocalRiseDarkTheme.current
     val accentColor = if (isLightTheme) Color(0xFF0088FF) else Color(0xFF0091FF)
     val trackColor = if (isLightTheme) {
@@ -101,7 +105,8 @@ fun LiquidSlider(
             .semantics {
                 progressBarRangeInfo = ProgressBarRangeInfo(value(), valueRange, steps)
                 setProgress { requested ->
-                    onValueChange(snap(requested))
+                    changeValue(snap(requested))
+                    finishChange?.invoke()
                     true
                 }
             },
@@ -119,7 +124,8 @@ fun LiquidSlider(
                 animationScope = animationScope,
                 initialValue = currentValue,
                 valueRange = valueRange,
-                visibilityThreshold = interval.coerceAtLeast(0.001f),
+                // Continuous progress uses the demo's 0.001 threshold; discrete forms keep one step.
+                visibilityThreshold = if (steps > 0) interval.coerceAtLeast(0.001f) else 0.001f,
                 initialScale = 1f,
                 pressedScale = 1.5f,
                 onDragStarted = {},
@@ -137,7 +143,7 @@ fun LiquidSlider(
                 val snapped = snap(rawDragValue)
                 if (snapped != emittedValue) {
                     emittedValue = snapped
-                    onValueChange(snapped)
+                    changeValue(snapped)
                 }
                 dampedDragAnimation.updateValue(rawDragValue)
             }
@@ -169,14 +175,15 @@ fun LiquidSlider(
                         val snapped = snap(rawDragValue)
                         if (snapped != emittedValue) {
                             emittedValue = snapped
-                            onValueChange(snapped)
+                            changeValue(snapped)
                         }
                         dampedDragAnimation.updateValue(snapped)
                         didDrag = false
                         dampedDragAnimation.release()
+                        finishChange?.invoke()
                     }
                 )
-                .pointerInput(animationScope) {
+                .pointerInput(animationScope, trackWidth, valueRange, isLtr) {
                     detectTapGestures { position ->
                         if (trackWidth <= 0) return@detectTapGestures
                         val delta = (valueRange.endInclusive - valueRange.start) *
@@ -189,7 +196,8 @@ fun LiquidSlider(
                         val snapped = snap(target)
                         emittedValue = snapped
                         dampedDragAnimation.animateToValue(snapped)
-                        onValueChange(snapped)
+                        changeValue(snapped)
+                        finishChange?.invoke()
                     }
                 },
             contentAlignment = Alignment.Center

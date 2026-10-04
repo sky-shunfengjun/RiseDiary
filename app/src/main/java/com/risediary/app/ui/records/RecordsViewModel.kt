@@ -19,6 +19,8 @@ import java.time.LocalDate
 import com.risediary.app.util.LocalCalendarContext
 import javax.inject.Inject
 import com.risediary.app.data.DataMaintenanceGate
+import com.risediary.app.media.VideoGrantRegistry
+import java.util.UUID
 
 @HiltViewModel
 class RecordsViewModel @Inject constructor(
@@ -26,7 +28,8 @@ class RecordsViewModel @Inject constructor(
     tagRepo: TagRepository,
     private val calendar: LocalCalendarContext,
     private val reminderScheduler: ReminderScheduler,
-    private val maintenanceGate: DataMaintenanceGate = DataMaintenanceGate()
+    private val maintenanceGate: DataMaintenanceGate = DataMaintenanceGate(),
+    private val videoGrants: VideoGrantRegistry
 ) : ViewModel() {
 
     val calendarState = calendar.state
@@ -43,6 +46,8 @@ class RecordsViewModel @Inject constructor(
     private val _pendingDeletions = MutableStateFlow<List<PendingDeletion>>(emptyList())
     internal val pendingDeletions: StateFlow<List<PendingDeletion>> = _pendingDeletions.asStateFlow()
     private val deletionOperations = PendingDeletionOperations()
+    private val deletionOwner = "deletion:" + UUID.randomUUID()
+    private fun videoOwner(flightId: Long) = "$deletionOwner:$flightId"
 
     // Main.immediate may emit the current maintenance state during construction.
     // Initialize pending entries before the collector is allowed to clear them.
@@ -75,6 +80,7 @@ class RecordsViewModel @Inject constructor(
                 val entry = _pendingDeletions.value.firstOrNull { it.flight.id == flight.id }
                     ?: return@run
                 if (!entry.cancelled && !entry.completed) {
+                    videoGrants.retain(videoOwner(flight.id), setOfNotNull(flight.videoUri))
                     flightRepo.delete(flight)
                     entry.completed = true
                 }
@@ -120,12 +126,16 @@ class RecordsViewModel @Inject constructor(
     }
 
     fun clearPendingDeletions() {
+        _pendingDeletions.value.forEach { videoGrants.forget(videoOwner(it.flight.id)) }
         _pendingDeletions.value = emptyList()
     }
 
     private fun removePendingDeletion(flightId: Long) {
         _pendingDeletions.update { removePendingDeletion(it, flightId) }
+        videoGrants.forget(videoOwner(flightId))
     }
+
+    override fun onCleared() { clearPendingDeletions() }
 
     fun filter(flights: List<Flight>, zoneId: java.time.ZoneId = calendar.current().zoneId): List<Flight> {
         return flights.filter { flight ->

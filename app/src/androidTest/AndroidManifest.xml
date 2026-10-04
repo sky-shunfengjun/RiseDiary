@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <provider
+            android:name="com.risediary.app.media.TestVideoProvider"
+            android:authorities="com.risediary.app.dev.test.video"
+            android:exported="true"
+            android:grantUriPermissions="true" />
+    </application>
+</manifest>

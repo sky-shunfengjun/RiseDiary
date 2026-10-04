@@ -3,7 +3,6 @@ package com.risediary.app.ui.onboarding
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.risediary.app.data.DataMaintenanceBusyException
-import com.risediary.app.data.DefaultVolumeMode
 import com.risediary.app.data.UserPreferences
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
@@ -28,9 +27,8 @@ class OnboardingViewModel @Inject constructor(
         preferences.setThemeMode(themeMode)
     }
 
-    fun saveRecordingPreferences(mode: DefaultVolumeMode, mlPerSpurt: Float, onSaved: () -> Unit) = saveSetting(onSaved) {
-        preferences.setDefaultVolumeMode(mode)
-        preferences.setMlPerSpurt(mlPerSpurt.coerceIn(1f, 10f))
+    fun saveRecordingPreferences(predictionMaxTicks: Int, onSaved: () -> Unit) = saveSetting(onSaved) {
+        preferences.setPredictionMaxTicks(predictionMaxTicks)
     }
 
     private fun saveSetting(onSaved: () -> Unit, action: suspend () -> Unit): Job {

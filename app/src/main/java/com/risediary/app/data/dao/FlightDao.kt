@@ -6,9 +6,19 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface FlightDao {
+    @Query("SELECT * FROM flights WHERE recordDraftId = :draftId LIMIT 1")
+    suspend fun getByRecordDraftId(draftId: String): Flight?
+
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(flight: Flight): Long
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertNew(flight: Flight): Long
+
+    @Transaction
+    suspend fun insertOnce(flight: Flight): Flight =
+        com.risediary.app.data.repository.commitNewFlightOnce(flight, ::getByRecordDraftId, ::insertNew)
 
     @Update
     suspend fun update(flight: Flight)
@@ -24,6 +34,9 @@ interface FlightDao {
 
     @Query("SELECT * FROM flights ORDER BY startTime DESC")
     suspend fun getAll(): List<Flight>
+
+    @Query("SELECT DISTINCT videoUri FROM flights WHERE videoUri IS NOT NULL")
+    suspend fun getVideoUris(): List<String>
 
     // --- Statistics queries ---
 

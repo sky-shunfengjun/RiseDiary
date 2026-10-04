@@ -16,6 +16,9 @@ class TimerStateHolder @Inject constructor() {
     private val mutablePersistenceError = MutableStateFlow(false)
     val persistenceError: StateFlow<Boolean> = mutablePersistenceError.asStateFlow()
 
+    private val mutableCommandError = MutableStateFlow<String?>(null)
+    val commandError: StateFlow<String?> = mutableCommandError.asStateFlow()
+    fun setCommandError(message: String?) { mutableCommandError.value = message }
     fun setPersistenceError(failed: Boolean) { mutablePersistenceError.value = failed }
 
     fun set(session: TimerSession) {

@@ -15,6 +15,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -30,6 +33,10 @@ import com.kyant.capsule.ContinuousCapsule
 import com.risediary.app.R
 import com.risediary.app.ui.components.LiquidSegmentOption
 import com.risediary.app.ui.components.LiquidSegmentedControl
+import com.risediary.app.ui.components.LiquidSlider
+import com.risediary.app.ui.theme.LocalRiseDarkTheme
+import com.risediary.app.util.PredictionQuantitySettings
+import kotlin.math.roundToInt
 import com.risediary.app.util.formatFormDuration
 import java.time.Instant
 import java.time.ZoneId
@@ -42,7 +49,7 @@ import top.yukonga.miuix.kmp.utils.PressFeedbackType
 import com.risediary.app.ui.icons.AppIcons
 
 @Composable
-internal fun FormSectionTitle(icon: ImageVector, title: String, subtitle: String) {
+internal fun FormSectionTitle(icon: ImageVector, title: String, subtitle: String? = null) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -58,11 +65,13 @@ internal fun FormSectionTitle(icon: ImageVector, title: String, subtitle: String
         }
         Column {
             Text(title, style = MiuixTheme.textStyles.title4, fontWeight = FontWeight.SemiBold)
-            Text(
-                subtitle,
-                style = MiuixTheme.textStyles.body2,
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-            )
+            subtitle?.let {
+                Text(
+                    it,
+                    style = MiuixTheme.textStyles.body2,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                )
+            }
         }
     }
 }
@@ -152,8 +161,8 @@ internal fun DurationValueButton(
 
 @Composable
 internal fun VolumeModeSelector(
-    useSpurtMode: Boolean,
-    onSelectSpurtMode: (Boolean) -> Unit
+    useEstimatedMode: Boolean,
+    onSelectEstimatedMode: (Boolean) -> Unit
 ) {
     val backdrop = rememberLayerBackdrop()
     Box(modifier = Modifier.fillMaxWidth().height(56.dp)) {
@@ -168,11 +177,11 @@ internal fun VolumeModeSelector(
         )
         LiquidSegmentedControl(
             options = listOf(
-                LiquidSegmentOption(stringResource(R.string.form_volume_mode_ml), AppIcons.WaterDrop),
-                LiquidSegmentOption(stringResource(R.string.form_volume_mode_spurts), AppIcons.Numbers)
+                LiquidSegmentOption(stringResource(R.string.form_volume_mode_estimated), AppIcons.WaterDrop),
+                LiquidSegmentOption(stringResource(R.string.form_volume_mode_ml), AppIcons.Numbers)
             ),
-            selectedIndex = if (useSpurtMode) 1 else 0,
-            onSelected = { onSelectSpurtMode(it == 1) },
+            selectedIndex = if (useEstimatedMode) 0 else 1,
+            onSelected = { onSelectEstimatedMode(it == 0) },
             backdrop = backdrop,
             modifier = Modifier.align(Alignment.Center).fillMaxWidth(),
             containerHeight = 40.dp,
@@ -180,6 +189,47 @@ internal fun VolumeModeSelector(
             showIcons = false,
             labelFontSize = 13.sp
         )
+    }
+}
+
+@Composable
+internal fun PredictionVolumeSlider(
+    ticks: Int,
+    maximumTicks: Int,
+    onValueChange: (Int) -> Unit
+) {
+    val surface by rememberUpdatedState(
+        if (LocalRiseDarkTheme.current) Color(0xFF20242B) else Color(0xF7FFFFFF)
+    )
+    val backdrop = rememberLayerBackdrop {
+        drawRect(surface)
+        drawContent()
+    }
+    Box(Modifier.fillMaxWidth()) {
+        Column(Modifier.fillMaxWidth().layerBackdrop(backdrop)) {
+            Spacer(Modifier.height(48.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text("0 ml", style = MiuixTheme.textStyles.body2, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
+                Text(
+                    PredictionQuantitySettings.formatTicks(maximumTicks) + " ml",
+                    style = MiuixTheme.textStyles.body2,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                )
+            }
+        }
+        key(maximumTicks) {
+            LiquidSlider(
+                value = { ticks / 10f },
+                onValueChange = { onValueChange((it * 10).roundToInt().coerceIn(0, maximumTicks)) },
+                valueRange = 0f..maximumTicks / 10f,
+                steps = maximumTicks - 1,
+                backdrop = backdrop,
+                modifier = Modifier.align(Alignment.TopCenter).padding(horizontal = 8.dp)
+            )
+        }
     }
 }
 

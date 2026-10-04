@@ -72,7 +72,8 @@ data class SettingsSnapshot(
     val themeMode: String,
     val homeCardOrder: String,
     val homeCardVisibility: String,
-    val onboardingCompleted: Boolean
+    val onboardingCompleted: Boolean,
+    val predictionMaxTicks: Int = 80
 )
 
 @Singleton
@@ -80,7 +81,9 @@ class BackupManager @Inject constructor(
     @ApplicationContext private val context: Context,
     private val database: AppDatabase,
     private val preferences: UserPreferences,
-    private val clock: Clock
+    private val clock: Clock,
+    private val timerStore: com.risediary.app.service.TimerSessionStore,
+    private val timerHolder: com.risediary.app.service.TimerStateHolder
 ) {
     val needsUserSelectedExportDestination: Boolean
         get() = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q
@@ -128,7 +131,9 @@ class BackupManager @Inject constructor(
         }.getOrElse { BackupResult.Failure("导出失败：${it.readableMessage()}", it) }
     }
 
-    private data class Preimage(val data: BackupData, val preferences: Preferences)
+    private data class Preimage(val data: BackupData, val preferences: Preferences,
+        val drafts: List<com.risediary.app.data.draft.RecordDraftEntity>,
+        val timer: com.risediary.app.service.TimerSession)
     private var recoveryPreimage: Preimage? = null
     val maintenanceState get() = preferences.maintenanceGate.state
 
@@ -146,13 +151,17 @@ class BackupManager @Inject constructor(
 
     private suspend fun replaceAll(replacement: BackupData, clearLock: Boolean): BackupResult = try {
         preferences.maintenanceGate.maintenance {
+            val currentTimer = timerStore.load()
+            check(!currentTimer.isActive) { "请先处理当前计时，再恢复或清除数据" }
             val raw = preferences.rawSnapshot()
-            val original = Preimage(snapshotLocked(raw), raw)
+            val original = Preimage(snapshotLocked(raw), raw, database.recordDraftDao().getAll(), currentTimer)
             recoveryPreimage = original
             try {
                 replaceDatabase(replacement)
                 preferences.applySettingsForMaintenance(replacement.settings)
                 if (clearLock) preferences.clearAppLockForMaintenance()
+                timerStore.save(com.risediary.app.service.TimerSession())
+                timerHolder.set(com.risediary.app.service.TimerSession())
                 recoveryPreimage = null
                 BackupResult.Success(if (clearLock) "所有数据已清除" else "数据恢复成功")
             } catch (failure: Throwable) {
@@ -185,8 +194,10 @@ class BackupManager @Inject constructor(
     }
 
     private suspend fun restorePreimage(original: Preimage) {
-        replaceDatabase(original.data)
+        replaceDatabase(original.data, original.drafts)
         preferences.restoreRaw(original.preferences)
+        timerStore.save(original.timer)
+        timerHolder.set(original.timer)
     }
 
     private suspend fun snapshot(): BackupData = preferences.maintenanceGate.write {
@@ -200,8 +211,9 @@ class BackupManager @Inject constructor(
             preferences.settingsSnapshot(raw)
         )
     }
-    private suspend fun replaceDatabase(data: BackupData) {
+    private suspend fun replaceDatabase(data: BackupData, drafts: List<com.risediary.app.data.draft.RecordDraftEntity> = emptyList()) {
         database.withTransaction {
+            database.recordDraftDao().nuke()
             database.flightDao().nuke()
             database.lengthRecordDao().nuke()
             database.tagDao().nuke()
@@ -210,6 +222,7 @@ class BackupManager @Inject constructor(
             data.lengthRecords.forEach { database.lengthRecordDao().insert(it) }
             data.tags.forEach { database.tagDao().insert(it) }
             data.achievements.forEach { database.achievementDao().insert(it) }
+            drafts.forEach { database.recordDraftDao().insert(it) }
         }
     }
 
@@ -305,15 +318,23 @@ class BackupManager @Inject constructor(
         require(data.flights.map(Flight::id).distinct().size == data.flights.size) {
             "飞行记录 ID 重复"
         }
+        val draftKeys = data.flights.mapNotNull { it.recordDraftId }
+        require(draftKeys.distinct().size == draftKeys.size && draftKeys.all { it.isNotBlank() && it.length <= 128 }) {
+            "记录提交编号无效或重复"
+        }
         data.flights.forEach { flight ->
             require(flight.id >= 0L) { "飞行记录 ID 无效" }
             require(flight.startTime > 0L && flight.endTime >= flight.startTime) {
                 "飞行记录时间无效"
             }
-            require(flight.durationSeconds in 1..86_400) { "飞行时长超出范围" }
-            require(
-                abs((flight.endTime - flight.startTime) / 1_000L - flight.durationSeconds) <= 1L
-            ) { "飞行记录时间与时长不一致" }
+            require(flight.durationSeconds in 1..com.risediary.app.util.DurationPolicy.MAX_SECONDS) { "飞行时长超出范围" }
+            require(com.risediary.app.util.RecordTimingPolicy.validate(
+                flight.startTime, flight.endTime, flight.durationSeconds, flight.timingSource) == null) {
+                "飞行记录时间与时长不一致"
+            }
+            require(com.risediary.app.media.validateLocalVideoFields(flight.videoUri, flight.videoDisplayName, flight.videoMimeType) == null) {
+                "视频关联信息无效"
+            }
             require(RecordValidation.validateStoredQuantity(flight.spurtCount, flight.semenVolumeMl) == null) { "射精量超出存储范围" }
             require(flight.semenVolumeMl?.let { it.isFinite() && it > 0f && it <= 100_000f } != false) {
                 "射精量超出范围"
@@ -324,6 +345,21 @@ class BackupManager @Inject constructor(
             require(
                 flight.volumeInputMode in RecordVolumeMode.entries.map { it.storedValue }
             ) { "飞行记录录入单位无效" }
+            if (flight.legacyVolumeInputMode != null) {
+                require(flight.legacyVolumeInputMode in listOf("spurts", "milliliters")) { "原数量模式无效" }
+                require(RecordValidation.validateStoredQuantity(flight.legacySpurtCount, flight.legacyVolumeMl) == null) { "原数量信息无效" }
+            } else {
+                require(flight.legacySpurtCount == null && flight.legacyVolumeMl == null) { "原数量缺少模式" }
+            }
+            if (flight.volumeInputMode == RecordVolumeMode.ESTIMATED.storedValue) {
+                val maximum = flight.predictionMaxTicks
+                require(maximum != null && maximum in 1..10_000) { "预测记录缺少有效上限" }
+                val volume = flight.semenVolumeMl
+                require(flight.spurtCount == null && volume != null && volume in 0.1f..(maximum / 10f)) { "预测数量超出范围" }
+                require(abs(volume * 10 - kotlin.math.round(volume * 10)) < 0.001f) { "预测数量最多保留一位小数" }
+            } else {
+                require(flight.predictionMaxTicks == null) { "毫升或旧股数记录不能含预测上限" }
+            }
             require(flight.ejaculationDistanceCm?.let { it in 0f..1_000f } != false) {
                 "射精距离超出范围"
             }
@@ -380,6 +416,7 @@ class BackupManager @Inject constructor(
 
     private fun validateSettings(settings: SettingsSnapshot) {
         require(UsernamePolicy.isWithinLimit(settings.username)) { "用户名过长" }
+        com.risediary.app.util.PredictionQuantitySettings.requireMaximum(settings.predictionMaxTicks)
         require(settings.mlPerSpurt in 0.1f..100f) { "每股换算值无效" }
         require(settings.dailyReminderTime.matches(Regex("""([01]\d|2[0-3]):[0-5]\d"""))) {
             "提醒时间无效"

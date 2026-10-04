@@ -1,6 +1,11 @@
 package com.risediary.app.ui.form
 
 import com.risediary.app.ui.components.rememberTopBlurProgress
+import android.app.Activity
+import android.content.Intent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import com.risediary.app.ui.video.VideoAttachmentCard
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -55,6 +60,9 @@ import com.risediary.app.ui.LocalMainPagerState
 import com.risediary.app.ui.navigation3.LocalNavigator
 import com.risediary.app.ui.navigation3.Route
 import com.kyant.capsule.ContinuousCapsule
+import com.risediary.app.data.entity.RecordVolumeMode
+import com.risediary.app.util.PredictionQuantitySettings
+
 import com.risediary.app.R
 import com.risediary.app.ui.achievement.AchievementCatalog
 import com.risediary.app.ui.components.DurationPickerBottomSheet
@@ -86,10 +94,16 @@ fun RecordFormScreen(
     durationMillis: Long = 0L,
     timerStartTimeMillis: Long = 0L,
     flightId: Long? = null,
+    formSessionId: String? = null,
     vm: FormViewModel = hiltViewModel()
 ) {
     val navigator = LocalNavigator.current
     val context = LocalContext.current
+    val videoPicker = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            result.data?.let { data -> data.data?.let { vm.selectVideo(it, data.flags) } }
+        }
+    }
     val scrollState = rememberScrollState()
     val tags by vm.tags.collectAsStateWithLifecycle()
     var showDatePicker by remember { mutableStateOf(false) }
@@ -97,7 +111,6 @@ fun RecordFormScreen(
     var showDurationPicker by remember { mutableStateOf(false) }
 
     val formScope = rememberCoroutineScope()
-    val spurtFieldRequester = remember { BringIntoViewRequester() }
     val volumeFieldRequester = remember { BringIntoViewRequester() }
     val distanceFieldRequester = remember { BringIntoViewRequester() }
     val noteFieldRequester = remember { BringIntoViewRequester() }
@@ -110,20 +123,23 @@ fun RecordFormScreen(
         }
     }
 
-    LaunchedEffect(isTimer, durationMillis, timerStartTimeMillis, flightId) {
-        when {
-            flightId != null -> vm.initForEdit(flightId)
-            isTimer -> vm.initFromTimer(durationMillis, timerStartTimeMillis)
-            else -> vm.initDirect()
-        }
+    LaunchedEffect(flightId, formSessionId) {
+        if (flightId != null) vm.initForEdit(flightId) else vm.initSession(formSessionId)
     }
+    LaunchedEffect(vm.sessionExpired) {
+        if (vm.sessionExpired) navigator.pop()
+    }
+    // Let NavDisplay own the gesture whenever leaving does not need confirmation.
+    com.risediary.app.ui.components.PageBackHandler(
+        enabled = !vm.formReady || vm.isLoading || vm.isSaving || vm.isSelectingVideo ||
+            vm.hasUnsavedContent || vm.showDiscard
+    ) { vm.leave { navigator.pop() } }
 
     val activeAchievement = vm.newAchievementKeys.firstOrNull()
     val mainPagerState = LocalMainPagerState.current
     LaunchedEffect(vm.saved, activeAchievement, vm.saveWarning) {
         if (vm.saved && activeAchievement == null && vm.saveWarning == null) {
-            // Pop exactly one level so a manual draft form pushed below the
-            // timer form is never destroyed by a popUntil(Main).
+            // Return to the page that opened this form.
             if (navigator.backStackSize() > 1) {
                 navigator.pop()
             }
@@ -140,17 +156,17 @@ fun RecordFormScreen(
         } else {
             stringResource(R.string.form_edit_record)
         },
-        onBack = { navigator.pop() },
+        onBack = { vm.leave { navigator.pop() } },
         reserveBottomActionSpace = false,
         bottomAction = { backdrop ->
             LiquidGlassButton(
                 onClick = {
-                    if (!vm.isSaving && !vm.isLoading && vm.quantitySettingsReady) vm.save()
+                    if (!vm.isSaving && !vm.isLoading && !vm.isSelectingVideo && vm.quantitySettingsReady && vm.formReady) vm.save()
                 },
                 backdrop = backdrop,
                 modifier = Modifier.widthIn(min = 184.dp, max = 224.dp),
-                isInteractive = !vm.isSaving && !vm.isLoading && vm.quantitySettingsReady,
-                enabled = !vm.isSaving && !vm.isLoading && vm.quantitySettingsReady,
+                isInteractive = !vm.isSaving && !vm.isLoading && !vm.isSelectingVideo && vm.quantitySettingsReady && vm.formReady,
+                enabled = !vm.isSaving && !vm.isLoading && !vm.isSelectingVideo && vm.quantitySettingsReady && vm.formReady,
                 tint = MiuixTheme.colorScheme.primary.copy(alpha = 0.075f),
                 height = 56.dp,
                 highlightIntensity = 0.38f,
@@ -183,6 +199,14 @@ fun RecordFormScreen(
                 .consumeWindowInsets(formContentPadding),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
+            if (vm.isLoading) {
+                top.yukonga.miuix.kmp.basic.CircularProgressIndicator()
+                return@Column
+            }
+            if (!vm.formReady && flightId == null) {
+                Text(vm.errorMessage ?: "正在打开填写页面")
+                return@Column
+            }
             RiseCard(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier.padding(18.dp),
@@ -190,8 +214,7 @@ fun RecordFormScreen(
                 ) {
                     FormSectionTitle(
                         icon = AppIcons.Tune,
-                        title = stringResource(R.string.form_time_section),
-                        subtitle = stringResource(R.string.form_time_section_subtitle)
+                        title = stringResource(R.string.form_time_section)
                     )
 
                     Row(
@@ -227,95 +250,74 @@ fun RecordFormScreen(
                 ) {
                     FormSectionTitle(
                         icon = AppIcons.WaterDrop,
-                        title = stringResource(R.string.form_data_section),
-                        subtitle = stringResource(R.string.form_data_subtitle)
+                        title = stringResource(R.string.form_data_section)
                     )
-                    Text(
-                        text = stringResource(R.string.form_quick_input_note),
-                        style = MiuixTheme.textStyles.body2,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                    )
+
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(
                             stringResource(R.string.form_volume_label),
                             style = MiuixTheme.textStyles.subtitle,
                             fontWeight = FontWeight.SemiBold
                         )
-                        VolumeModeSelector(
-                            useSpurtMode = vm.useSpurtMode,
-                            onSelectSpurtMode = { shouldUseSpurt ->
-                                if (shouldUseSpurt != vm.useSpurtMode) vm.toggleSpurtMode()
-                            }
-                        )
-
-                        if (vm.useSpurtMode) {
-                            TextField(
-                                value = vm.spurtCount,
-                                onValueChange = vm::setSpurtCountInput,
-                                label = stringResource(R.string.form_spurt_count_label),
-                                leadingIcon = {
-                                    Icon(
-                                        AppIcons.Numbers,
-                                        contentDescription = null,
-                                        tint = MiuixTheme.colorScheme.primary,
-                                        modifier = Modifier
-                                            .padding(start = 16.dp, end = 10.dp)
-                                            .size(20.dp)
-                                    )
-                                },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .onFocusChanged { focusState ->
-                                        focusedFieldRequester =
-                                            if (focusState.isFocused) spurtFieldRequester else null
-                                    }
-                                    .bringIntoViewRequester(spurtFieldRequester),
-                                keyboardOptions = KeyboardOptions(
-                                    keyboardType = KeyboardType.Number
-                                ),
-                                cornerRadius = 16.dp,
-                                singleLine = true
-                            )
-                            QuickChoices(
-                                values = listOf(1, 3, 5, 8, 10),
-                                suffix = stringResource(R.string.form_spurt_suffix),
-                                selected = vm.quickSpurtSelection,
-                                onClick = vm::quickSpurt
-                            )
+                        if (vm.isLoading || !vm.quantitySettingsReady) {
+                            Text(stringResource(R.string.settings_prediction_loading), style = MiuixTheme.textStyles.body2)
+                        } else if (vm.isLegacyQuantityReadOnly) {
+                            Text(vm.legacyQuantityText, style = MiuixTheme.textStyles.title3)
+                            Text(stringResource(R.string.form_legacy_quantity_note), style = MiuixTheme.textStyles.body2)
+                            TextButton(text = stringResource(R.string.form_change_quantity), onClick = vm::beginLegacyQuantityEdit)
                         } else {
-                            TextField(
-                                value = vm.volumeMl,
-                                onValueChange = vm::setVolumeInput,
-                                label = stringResource(R.string.form_volume_ml_label),
-                                leadingIcon = {
-                                    Icon(
-                                        AppIcons.WaterDrop,
-                                        contentDescription = null,
-                                        tint = MiuixTheme.colorScheme.primary,
-                                        modifier = Modifier
-                                            .padding(start = 16.dp, end = 10.dp)
-                                            .size(20.dp)
-                                    )
-                                },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .onFocusChanged { focusState ->
-                                        focusedFieldRequester =
-                                            if (focusState.isFocused) volumeFieldRequester else null
-                                    }
-                                    .bringIntoViewRequester(volumeFieldRequester),
-                                keyboardOptions = KeyboardOptions(
-                                    keyboardType = KeyboardType.Decimal
-                                ),
-                                cornerRadius = 16.dp,
-                                singleLine = true
+                            VolumeModeSelector(
+                                useEstimatedMode = vm.useEstimatedMode,
+                                onSelectEstimatedMode = { estimated ->
+                                    vm.selectVolumeMode(if (estimated) RecordVolumeMode.ESTIMATED else RecordVolumeMode.MILLILITERS)
+                                }
                             )
-                            QuickChoices(
-                                values = listOf(1, 3, 5, 10),
-                                suffix = "ml",
-                                selected = vm.quickVolumeSelection,
-                                onClick = vm::quickVolume
-                            )
+                            if (vm.useEstimatedMode) {
+                                Text(
+                                    stringResource(R.string.form_estimated_amount, PredictionQuantitySettings.formatTicks(vm.estimatedTicks)),
+                                    style = MiuixTheme.textStyles.title3,
+                                    color = MiuixTheme.colorScheme.primary
+                                )
+                                PredictionVolumeSlider(
+                                    ticks = vm.estimatedTicks,
+                                    maximumTicks = vm.predictionMaxTicks,
+                                    onValueChange = vm::updateEstimatedTicks
+                                )
+                            } else {
+                                TextField(
+                                    value = vm.volumeMl,
+                                    onValueChange = vm::updateManualVolume,
+                                    label = stringResource(R.string.form_volume_ml_label),
+                                    leadingIcon = {
+                                        Icon(
+                                            AppIcons.WaterDrop,
+                                            contentDescription = null,
+                                            tint = MiuixTheme.colorScheme.primary,
+                                            modifier = Modifier
+                                                .padding(start = 16.dp, end = 10.dp)
+                                                .size(20.dp)
+                                        )
+                                    },
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .onFocusChanged { focusState ->
+                                            focusedFieldRequester =
+                                                if (focusState.isFocused) volumeFieldRequester else null
+                                        }
+                                        .bringIntoViewRequester(volumeFieldRequester),
+                                    keyboardOptions = KeyboardOptions(
+                                        keyboardType = KeyboardType.Decimal
+                                    ),
+                                    cornerRadius = 16.dp,
+                                    singleLine = true
+                                )
+                                QuickChoices(
+                                    values = listOf(1, 3, 5, 10),
+                                    suffix = "ml",
+                                    selected = vm.quickVolumeSelection,
+                                    onClick = vm::quickVolume
+                                )
+                            }
                         }
                     }
 
@@ -361,6 +363,22 @@ fun RecordFormScreen(
                     }
                 }
             }
+
+            VideoAttachmentCard(
+                video = vm.video,
+                onPlay = { vm.video?.let { navigator.push(Route.VideoPreview(it)) } },
+                onSelect = {
+                    videoPicker.launch(Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                        addCategory(Intent.CATEGORY_OPENABLE)
+                        type = "video/*"
+                        putExtra(Intent.EXTRA_LOCAL_ONLY, true)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_GRANT_PERSISTABLE_URI_PERMISSION)
+                    })
+                },
+                onRemove = vm::removeVideo,
+                busy = vm.isSelectingVideo || vm.isLoading || vm.isSaving,
+                error = vm.videoError
+            )
 
             RiseCard(modifier = Modifier.fillMaxWidth()) {
                 Column(
@@ -628,6 +646,20 @@ fun RecordFormScreen(
         }
     }
 
+    if (vm.showDiscard) {
+        LiquidAlertDialog(
+            onDismissRequest = vm::cancelDiscard,
+            title = { Text("放弃填写？") },
+            text = { Text("未保存的内容将被丢弃。") },
+            confirmButton = {
+                TextButton("放弃", { vm.discardAndLeave { navigator.pop() } },
+                    colors = liquidDialogConfirmButtonColors())
+            },
+            dismissButton = {
+                TextButton("继续填写", vm::cancelDiscard, colors = liquidDialogCancelButtonColors())
+            }
+        )
+    }
     if (activeAchievement != null) {
         val key = activeAchievement
         val definition = AchievementCatalog.find(key)

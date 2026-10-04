@@ -55,6 +55,30 @@ class OnboardingPersistenceTest {
     }
 
     @Test
+    fun recordingWriteFailureKeepsMaximumDraftAndCanRetry() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val store = FailingStore().also { it.writeFailure = IOException("storage unavailable") }
+        val prefs = UserPreferences(store, DataMaintenanceGate())
+        val vm = OnboardingViewModel(prefs)
+        try {
+            var advanced = false
+            vm.saveRecordingPreferences(123) { advanced = true }
+            runCurrent()
+            assertFalse(advanced)
+            assertNotNull(vm.errorMessage.value)
+            assertEquals(80, prefs.quantitySettings.first().predictionMaxTicks)
+            store.writeFailure = null
+            vm.saveRecordingPreferences(123) { advanced = true }
+            runCurrent()
+            assertTrue(advanced)
+            assertEquals(123, prefs.quantitySettings.first().predictionMaxTicks)
+        } finally {
+            vm.viewModelScope.cancel()
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
     fun themeWriteFailureDoesNotAdvanceOrReplaceStoredTheme() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val store = FailingStore().also { it.writeFailure = IOException("storage unavailable") }

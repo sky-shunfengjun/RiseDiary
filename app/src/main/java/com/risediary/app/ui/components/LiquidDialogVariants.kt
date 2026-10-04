@@ -33,7 +33,8 @@ fun LiquidAlertDialog(
     icon: (@Composable () -> Unit)? = null,
     title: (@Composable () -> Unit)? = null,
     text: (@Composable () -> Unit)? = null,
-    containerColor: Color = Color.Unspecified
+    containerColor: Color = Color.Unspecified,
+    neutralButton: (@Composable () -> Unit)? = null
 ) {
     LiquidDialog(
         onDismissRequest = onDismissRequest,
@@ -71,7 +72,8 @@ fun LiquidAlertDialog(
         LiquidDialogActions(
             confirmButton = confirmButton,
             dismissButton = dismissButton,
-            modifier = Modifier.padding(start = 24.dp, top = 12.dp, end = 24.dp, bottom = 24.dp)
+            modifier = Modifier.padding(start = 24.dp, top = 12.dp, end = 24.dp, bottom = 24.dp),
+            neutralButton = neutralButton
         )
     }
 }
@@ -105,55 +107,41 @@ fun LiquidDatePickerDialog(
 private fun LiquidDialogActions(
     confirmButton: @Composable () -> Unit,
     dismissButton: (@Composable () -> Unit)?,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    neutralButton: (@Composable () -> Unit)? = null
 ) {
     val dark = LocalRiseDarkTheme.current
     val contentColor = if (dark) Color.White else Color.Black
     val accentColor = if (dark) Color(0xFF0091FF) else Color(0xFF0088FF)
-    val containerColor = if (dark) {
-        Color(0xFF121212).copy(alpha = 0.20f)
-    } else {
-        Color(0xFFFAFAFA).copy(alpha = 0.20f)
-    }
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        if (dismissButton != null) {
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(48.dp)
-                    .clip(ContinuousCapsule)
-                    .background(containerColor),
-                contentAlignment = Alignment.Center
-            ) {
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .height(48.dp)
-                        .graphicsLayer(colorFilter = ColorFilter.tint(contentColor))
-                ) {
-                    ForceFillAction(dismissButton)
-                }
+    val containerColor = if (dark) Color(0xFF121212).copy(alpha = 0.20f)
+        else Color(0xFFFAFAFA).copy(alpha = 0.20f)
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        neutralButton?.let { action ->
+            Box(Modifier.fillMaxWidth().height(48.dp).clip(ContinuousCapsule).background(containerColor),
+                contentAlignment = Alignment.Center) {
+                ForceFillAction(action)
             }
         }
-        Box(
-            modifier = Modifier
-                .weight(1f)
-                .height(48.dp)
-                .clip(ContinuousCapsule)
-                .background(accentColor),
-            contentAlignment = Alignment.Center
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .height(48.dp)
-                    .graphicsLayer(colorFilter = ColorFilter.tint(Color.White))
-            ) {
-                ForceFillAction(confirmButton)
+            if (dismissButton != null) {
+                Box(Modifier.weight(1f).height(48.dp).clip(ContinuousCapsule).background(containerColor),
+                    contentAlignment = Alignment.Center) {
+                    Box(Modifier.fillMaxWidth().height(48.dp)
+                        .graphicsLayer(colorFilter = ColorFilter.tint(contentColor))) {
+                        ForceFillAction(dismissButton)
+                    }
+                }
+            }
+            Box(Modifier.weight(1f).height(48.dp).clip(ContinuousCapsule).background(accentColor),
+                contentAlignment = Alignment.Center) {
+                Box(Modifier.fillMaxWidth().height(48.dp)
+                    .graphicsLayer(colorFilter = ColorFilter.tint(Color.White))) {
+                    ForceFillAction(confirmButton)
+                }
             }
         }
     }

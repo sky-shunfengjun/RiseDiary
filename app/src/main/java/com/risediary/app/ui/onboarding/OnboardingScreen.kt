@@ -60,7 +60,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.risediary.app.R
-import com.risediary.app.data.DefaultVolumeMode
 import com.risediary.app.reminder.ReminderType
 import com.risediary.app.ui.components.LiquidAlertDialog
 import com.risediary.app.ui.components.LiquidDialogHost
@@ -110,9 +109,7 @@ fun OnboardingScreen(
 
     val persistedUsername by settingsViewModel.username.collectAsStateWithLifecycle()
     val persistedTheme by settingsViewModel.themeMode.collectAsStateWithLifecycle()
-    val persistedVolumeMode by
-        settingsViewModel.defaultVolumeMode.collectAsStateWithLifecycle()
-    val persistedMlPerSpurt by settingsViewModel.mlPerSpurt.collectAsStateWithLifecycle()
+    val persistedPredictionSettings by settingsViewModel.predictionSettings.collectAsStateWithLifecycle()
     val appLockEnabled by settingsViewModel.appLockEnabled.collectAsStateWithLifecycle()
     val biometricEnabled by
         settingsViewModel.biometricUnlockEnabled.collectAsStateWithLifecycle()
@@ -132,8 +129,7 @@ fun OnboardingScreen(
     var usernameDirty by rememberSaveable { mutableStateOf(false) }
     var themeDraft by rememberSaveable { mutableStateOf(persistedTheme) }
     var themeDirty by rememberSaveable { mutableStateOf(false) }
-    var volumeModeDraft by rememberSaveable { mutableStateOf(persistedVolumeMode) }
-    var mlPerSpurtDraft by rememberSaveable { mutableFloatStateOf(persistedMlPerSpurt) }
+    var predictionMaxDraft by rememberSaveable { mutableIntStateOf(persistedPredictionSettings.maxTicks ?: 80) }
     var recordingDirty by rememberSaveable { mutableStateOf(false) }
     var reminderTimeDraft by rememberSaveable { mutableStateOf(dailyReminderTime) }
     var reminderTimeDirty by rememberSaveable { mutableStateOf(false) }
@@ -152,11 +148,8 @@ fun OnboardingScreen(
     LaunchedEffect(persistedTheme) {
         if (!themeDirty) themeDraft = persistedTheme
     }
-    LaunchedEffect(persistedVolumeMode, persistedMlPerSpurt) {
-        if (!recordingDirty) {
-            volumeModeDraft = persistedVolumeMode
-            mlPerSpurtDraft = persistedMlPerSpurt
-        }
+    LaunchedEffect(persistedPredictionSettings.maxTicks) {
+        persistedPredictionSettings.maxTicks?.let { if (!recordingDirty) predictionMaxDraft = it }
     }
     LaunchedEffect(dailyReminderTime) {
         if (!reminderTimeDirty) reminderTimeDraft = dailyReminderTime
@@ -336,17 +329,9 @@ fun OnboardingScreen(
                                 }
                             )
                             RECORDING_PAGE -> RecordingOnboardingPage(
-                                volumeMode = volumeModeDraft,
-                                mlPerSpurt = mlPerSpurtDraft,
+                                predictionMaxTicks = if (recordingDirty) predictionMaxDraft else persistedPredictionSettings.maxTicks,
                                 backdrop = backdrop,
-                                onVolumeModeSelected = {
-                                    recordingDirty = true
-                                    volumeModeDraft = it
-                                },
-                                onMlPerSpurtChange = {
-                                    recordingDirty = true
-                                    mlPerSpurtDraft = it
-                                }
+                                onPredictionMaximumChange = { recordingDirty = true; predictionMaxDraft = it }
                             )
                             else -> PrivacyOnboardingPage(
                                 appLockEnabled = appLockEnabled,
@@ -411,17 +396,15 @@ fun OnboardingScreen(
                     )
                     RECORDING_PAGE -> SetupBottomActions(
                         backdrop = backdrop,
+                        continueEnabled = recordingDirty || persistedPredictionSettings.maxTicks != null,
                         onLater = {
-                            volumeModeDraft = persistedVolumeMode
-                            mlPerSpurtDraft = persistedMlPerSpurt
+                            predictionMaxDraft = persistedPredictionSettings.maxTicks ?: 80
                             recordingDirty = false
                             page = PRIVACY_PAGE
                         },
                         onContinue = {
-                            viewModel.saveRecordingPreferences(
-                                mode = volumeModeDraft,
-                                mlPerSpurt = mlPerSpurtDraft
-                            ) {
+                            val ticks = if (recordingDirty) predictionMaxDraft else persistedPredictionSettings.maxTicks
+                            if (ticks != null) viewModel.saveRecordingPreferences(predictionMaxTicks = ticks) {
                                 recordingDirty = false
                                 page = PRIVACY_PAGE
                             }
