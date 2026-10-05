@@ -33,7 +33,6 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.kyant.backdrop.Backdrop
 import com.kyant.backdrop.drawBackdrop
 import com.kyant.backdrop.effects.blur
@@ -41,10 +40,8 @@ import com.kyant.backdrop.effects.lens
 import com.kyant.backdrop.effects.vibrancy
 import com.risediary.app.R
 import com.risediary.app.service.TimerSession
-import com.risediary.app.ui.icons.AppIcons
 import com.risediary.app.ui.timer.TimerInstrument
 import kotlin.math.roundToInt
-import top.yukonga.miuix.kmp.basic.Text
 
 /** The transparent clock stays anchored while a glass surface expands around it. */
 @Composable
@@ -121,15 +118,8 @@ internal fun FloatingTimerCapsule(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         if (!above) Box(Modifier.fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.10f)))
-                        listOfNotNull(error, notice).distinct().forEach {
-                            Text(it, color = Color.White, fontSize = 12.sp)
-                        }
-                        if (persistenceError) {
-                            Text(stringResource(R.string.timer_error_save), color = Color.White, fontSize = 12.sp)
-                            VideoGlassButton(onRetryPersistence, backdrop, icon = AppIcons.Refresh,
-                                description = stringResource(R.string.action_retry), fullScreen = true, enabled = expanded,
-                                modifier = Modifier.size(52.dp))
-                        }
+                        VideoTimerProblems(notice, error, persistenceError, true, backdrop,
+                            onRetryPersistence, enabled = expanded)
                         actions()
                         if (above) Box(Modifier.fillMaxWidth().height(1.dp).background(Color.White.copy(alpha = 0.10f)))
                     }

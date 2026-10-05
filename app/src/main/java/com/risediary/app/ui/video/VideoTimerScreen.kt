@@ -29,6 +29,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.risediary.app.service.TimerStatus
 import com.risediary.app.ui.components.LocalPageEffectsActive
+import com.risediary.app.ui.components.AnimatedUiVisibility
 import com.risediary.app.ui.navigation3.*
 import com.risediary.app.ui.timer.TimerFinishDialogs
 import com.risediary.app.ui.timer.TimerViewModel
@@ -56,7 +57,11 @@ fun VideoTimerScreen(route: Route.VideoTimer,
     val persistenceError by timerVm.persistenceError.collectAsStateWithLifecycle()
     val commandError by timerVm.commandError.collectAsStateWithLifecycle()
     val active = LocalPageEffectsActive.current && navigator.current() == route
+    var chooserOpen by rememberSaveable { mutableStateOf(false) }
+    val canChooseVideo = active && !started && !starting && !loading && !selectingVideo &&
+        !chooserOpen && !timerVm.busy && !timerVm.finishing && !timerVm.discarding
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        chooserOpen = false
         if (result.resultCode == Activity.RESULT_OK) result.data?.let { data ->
             data.data?.let { vm.selectVideo(it, data.flags) }
         }
@@ -73,6 +78,8 @@ fun VideoTimerScreen(route: Route.VideoTimer,
         launchVideoPicker()
     }
     fun choose() {
+        if (!canChooseVideo || chooserOpen || vm.loading.value || vm.started.value || vm.starting.value) return
+        chooserOpen = true
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED)
             permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
@@ -106,7 +113,7 @@ fun VideoTimerScreen(route: Route.VideoTimer,
         if (!started) {
             VideoGlassButton(
                 onClick = ::choose, backdrop = backdrop, fullScreen = fullscreen,
-                icon = AppIcons.Video, large = true, accent = true, enabled = !loading,
+                icon = AppIcons.Video, large = true, accent = true, enabled = canChooseVideo,
                 label = stringResource(if (snapshot == null) R.string.video_select else R.string.video_change),
                 modifier = Modifier.fillMaxWidth()
             )
@@ -124,13 +131,16 @@ fun VideoTimerScreen(route: Route.VideoTimer,
         }
     }
     val extra: @Composable (Boolean, Backdrop) -> Unit = { _, backdrop ->
-        if (started) {
-            VideoTimerSummary(session, false, notice, timerVm.error ?: commandError,
-                persistenceError, backdrop, timerVm::retryPersistence)
-        } else if (snapshot != null) {
-            Text(stringResource(R.string.video_start_hint), fontSize = 12.sp,
-                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-                modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+        Column(Modifier.fillMaxWidth()) {
+            AnimatedUiVisibility(visible = started) { active ->
+                VideoTimerSummary(session, false, notice, timerVm.error ?: commandError,
+                    persistenceError, backdrop, timerVm::retryPersistence, enabled = active)
+            }
+            AnimatedUiVisibility(visible = !started && snapshot != null) {
+                Text(stringResource(R.string.video_start_hint), fontSize = 12.sp,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+            }
         }
     }
     val overlay: (@Composable (Backdrop) -> Unit)? = if (!started) null else { backdrop ->
@@ -153,6 +163,7 @@ fun VideoTimerScreen(route: Route.VideoTimer,
         bottomAction = { backdrop -> actions(backdrop, false) },
         loadingIndicator = showVideoLoadingIndicator(loading, true, snapshot != null, started, selectingVideo),
         fullscreenOverlay = overlay,
+        onChooseVideo = if (canChooseVideo) ::choose else null,
         collapseFullscreenOverlay = {
             val wasExpanded = capsuleExpanded
             capsuleExpanded = false

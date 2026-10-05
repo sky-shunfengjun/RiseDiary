@@ -1,9 +1,11 @@
 package com.risediary.app.ui.video
 
-import android.app.Activity
-import android.content.Context
-import android.content.ContextWrapper
-import android.content.pm.ActivityInfo
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -38,29 +40,25 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.*
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 
 import androidx.compose.ui.unit.dp
-import androidx.core.view.ViewCompat
-import androidx.core.view.WindowCompat
-import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.WindowInsetsControllerCompat
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.Lifecycle
 
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.risediary.app.ui.components.LocalPageEffectsActive
+import com.risediary.app.ui.components.AnimatedUiVisibility
+import com.risediary.app.ui.components.LiquidActionButton
 import com.risediary.app.ui.components.PageBackHandler
 import com.risediary.app.ui.components.SecondaryPageScaffold
 import com.risediary.app.ui.navigation3.LocalNavigator
@@ -96,112 +94,23 @@ internal fun VideoPlayerPage(
     interceptBack: Boolean = false,
     fullscreenOverlay: (@Composable (Backdrop) -> Unit)? = null,
     collapseFullscreenOverlay: () -> Boolean = { false },
-    loadingIndicator: Boolean = loading
+    loadingIndicator: Boolean = loading,
+    onChooseVideo: (() -> Unit)? = null
 ) {
     val navigator = LocalNavigator.current
-    val activity = LocalContext.current.findVideoActivity()
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    val configuration = LocalConfiguration.current
     val active = LocalPageEffectsActive.current && navigator.current() == route
-    var fullscreenPhase by rememberSaveable { mutableStateOf(FullscreenEntryPhase.CLOSED) }
-
-    val fullscreenSession = fullscreenPhase != FullscreenEntryPhase.CLOSED
-    val windowDirection = when (configuration.orientation) {
-        android.content.res.Configuration.ORIENTATION_LANDSCAPE -> VideoOrientation.LANDSCAPE
-        android.content.res.Configuration.ORIENTATION_PORTRAIT -> VideoOrientation.PORTRAIT
-        else -> null
-    }
-    var orientation by rememberSaveable(stateSaver = androidx.compose.runtime.saveable.Saver(
-        save = { listOf(it.direction.ordinal, if (it.autoDecided) 1 else 0, if (it.manual) 1 else 0) },
-        restore = { VideoOrientationSession(VideoOrientation.entries[it[0]], it[1] == 1, it[2] == 1) }
-    )) { mutableStateOf(VideoOrientationSession(VideoOrientation.PORTRAIT)) }
-    // Use the matching configuration in this frame, before the effect commits OPEN.
-    val fullScreen = completeFullscreenEntry(fullscreenPhase, orientation.direction, windowDirection) == FullscreenEntryPhase.OPEN
-    var originalOrientation by rememberSaveable { mutableIntStateOf(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED) }
-    var originalStatusVisible by rememberSaveable { mutableStateOf(true) }
-    var originalNavVisible by rememberSaveable { mutableStateOf(true) }
-    var originalBarsBehavior by rememberSaveable { mutableIntStateOf(WindowInsetsControllerCompat.BEHAVIOR_DEFAULT) }
-    val player = controller.player
-    var videoSize by remember(player) { mutableStateOf(player.videoSize) }
+    val fullscreen = rememberVideoFullscreenState(controller, active)
+    val fullScreen = fullscreen.fullScreen
+    val fullscreenSession = fullscreen.inSession
     val snapshot by controller.playback.collectAsStateWithLifecycle()
-    DisposableEffect(player) {
-        val listener = object : androidx.media3.common.Player.Listener {
-            override fun onVideoSizeChanged(size: androidx.media3.common.VideoSize) { videoSize = size }
-        }
-        player.addListener(listener)
-        onDispose { player.removeListener(listener) }
-    }
-    fun requestDirection(direction: VideoOrientation) {
-        val requested = if (direction == VideoOrientation.LANDSCAPE)
-            ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE else ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
-        activity?.let { if (it.requestedOrientation != requested) it.requestedOrientation = requested }
-    }
-    fun enterFullscreen() {
-        if (fullscreenPhase != FullscreenEntryPhase.CLOSED || !active) return
-        val window = activity?.window
-        val insets = window?.decorView?.let(ViewCompat::getRootWindowInsets)
-        originalOrientation = activity?.requestedOrientation ?: ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-        originalStatusVisible = insets?.isVisible(WindowInsetsCompat.Type.statusBars()) ?: true
-        originalNavVisible = insets?.isVisible(WindowInsetsCompat.Type.navigationBars()) ?: true
-        originalBarsBehavior = window?.let { WindowCompat.getInsetsController(it, it.decorView).systemBarsBehavior }
-            ?: WindowInsetsControllerCompat.BEHAVIOR_DEFAULT
-        val size = player.videoSize
-        orientation = beginVideoOrientation(size.width, size.height, size.pixelWidthHeightRatio,
-            if (configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE)
-                VideoOrientation.LANDSCAPE else VideoOrientation.PORTRAIT)
-        // Request the target first; keep the normal layout until configuration catches up.
-        requestDirection(orientation.direction)
-        fullscreenPhase = beginFullscreenEntry(orientation.direction, windowDirection)
-    }
-    LaunchedEffect(fullscreenSession, videoSize) {
-        if (fullscreenSession) orientation = resolveVideoOrientation(orientation,
-            videoSize.width, videoSize.height, videoSize.pixelWidthHeightRatio)
-    }
-    LaunchedEffect(fullscreenPhase, windowDirection, orientation.direction, active) {
-        if (fullscreenPhase == FullscreenEntryPhase.WAITING_FOR_ROTATION && active) {
-            val ready = completeFullscreenEntry(fullscreenPhase, orientation.direction, windowDirection)
-            if (ready == FullscreenEntryPhase.OPEN) fullscreenPhase = ready
-            else {
-                // Some multi-window/device policies ignore orientation. Do not leave entry stuck.
-                kotlinx.coroutines.delay(900L)
-                fullscreenPhase = completeFullscreenEntry(fullscreenPhase, orientation.direction,
-                    windowDirection, timedOut = true)
-            }
-        }
-    }
-    LaunchedEffect(activity, fullscreenSession, active, orientation.direction) {
-        if (fullscreenSession && active) requestDirection(orientation.direction)
-    }
-    LaunchedEffect(activity, fullScreen, active) {
-        if (fullScreen && active) activity?.window?.let {
-            WindowCompat.getInsetsController(it, it.decorView).apply {
-                systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-                hide(WindowInsetsCompat.Type.systemBars())
-            }
-        }
-    }
     LaunchedEffect(active) { if (!active) onPause() }
     DisposableEffect(lifecycle, controller) {
         val observer = VideoPlaybackLifecycleObserver(controller)
         lifecycle.addObserver(observer)
         onDispose { lifecycle.removeObserver(observer); onPause() }
     }
-    DisposableEffect(activity, fullscreenSession, active) {
-        val window = activity?.window
-        val bars = window?.let { WindowCompat.getInsetsController(it, it.decorView) }
-        val ownsWindow = fullscreenSession && active
-        onDispose {
-            if (ownsWindow && activity?.isChangingConfigurations != true) {
-                activity?.requestedOrientation = originalOrientation
-                if (originalStatusVisible) bars?.show(WindowInsetsCompat.Type.statusBars())
-                else bars?.hide(WindowInsetsCompat.Type.statusBars())
-                if (originalNavVisible) bars?.show(WindowInsetsCompat.Type.navigationBars())
-                else bars?.hide(WindowInsetsCompat.Type.navigationBars())
-                bars?.systemBarsBehavior = originalBarsBehavior
-            }
-        }
-    }
-    fun exitFullscreen() { collapseFullscreenOverlay(); fullscreenPhase = FullscreenEntryPhase.CLOSED }
+    fun exitFullscreen() { collapseFullscreenOverlay(); fullscreen.exit() }
     PageBackHandler(enabled = fullscreenSession || interceptBack) {
         if (fullscreenSession) {
             if (!fullScreen || !collapseFullscreenOverlay()) exitFullscreen()
@@ -213,10 +122,10 @@ internal fun VideoPlayerPage(
     DisposableEffect(surfaceOwner) { onDispose { surfaceOwner.release() } }
     val videoContent: @Composable () -> Unit = {
         LocalVideoPlayer(controller, surfaceOwner, fullScreen,
-            { if (fullScreen) exitFullscreen() else enterFullscreen() },
+            { if (fullScreen) exitFullscreen() else fullscreen.enter() },
             if (fullScreen) Modifier.fillMaxSize() else Modifier.fillMaxWidth(),
-            onToggleOrientation = { orientation = toggleVideoOrientation(orientation) },
-            direction = orientation.direction, fullscreenOverlay = fullscreenOverlay,
+            onToggleOrientation = fullscreen.toggleOrientation,
+            direction = fullscreen.direction, fullscreenOverlay = fullscreenOverlay,
             onBlankTap = collapseFullscreenOverlay)
     }
     val fullBackdrop = rememberLayerBackdrop { drawRect(Color.Black); drawContent() }
@@ -228,24 +137,20 @@ internal fun VideoPlayerPage(
                 Column(Modifier.fillMaxSize().safeDrawingPadding().padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                     VideoStateContent(loadingIndicator, problem, true, bottomAction != null,
-                        fullBackdrop, onRetry, ::exitFullscreen)
+                        fullBackdrop, onRetry, onExitFullScreen = ::exitFullscreen)
                 }
                 fullscreenOverlay?.invoke(fullBackdrop)
             }
         } else videoContent()
     } else {
-        SecondaryPageScaffold(title = title, onBack = onBack, bottomAction = bottomAction) { padding ->
+        SecondaryPageScaffold(title = title, onBack = onBack, bottomAction = bottomAction,
+            adaptiveBottomActionSpace = true) { padding ->
             val backdrop = requireNotNull(LocalPageBackdrop.current)
             BoxWithConstraints(Modifier.fillMaxSize().padding(padding)) {
                 val videoOrState: @Composable () -> Unit = {
                     if (loading || problem != null || snapshot == null) {
-                        RiseCard(Modifier.fillMaxWidth(), allowContentOverflow = true) {
-                            Column(Modifier.fillMaxWidth().heightIn(min = 250.dp).padding(24.dp),
-                                horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.Center) {
-                                VideoStateContent(loadingIndicator, problem, false, bottomAction != null, backdrop, onRetry)
-                            }
-                        }
+                        VideoPlaceholderCard(loading, loadingIndicator, problem, bottomAction != null,
+                            backdrop, onRetry, onChooseVideo = onChooseVideo)
                     } else videoContent()
                 }
                 if (maxWidth >= 640.dp && maxWidth > maxHeight && bottomAction != null) {
@@ -265,53 +170,90 @@ internal fun VideoPlayerPage(
     }
 }
 
+/** The complete empty card is a selection target; loading/error previews retain their own actions. */
 @Composable
-private fun VideoStateContent(
+internal fun VideoPlaceholderCard(
+    loading: Boolean,
+    loadingIndicator: Boolean,
+    problem: String?,
+    timerMode: Boolean,
+    backdrop: Backdrop,
+    onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
+    onChooseVideo: (() -> Unit)? = null
+) {
+    val selectable = !loading && problem == null && onChooseVideo != null
+    val description = stringResource(R.string.video_select)
+    RiseCard(modifier.fillMaxWidth().then(if (selectable) Modifier.semantics(mergeDescendants = true) {
+        contentDescription = description
+    } else Modifier),
+        onClick = onChooseVideo?.takeIf { selectable }, allowContentOverflow = true) {
+        Column(Modifier.fillMaxWidth().heightIn(min = 250.dp).padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center) {
+            VideoStateContent(loadingIndicator, problem, false, timerMode, backdrop, onRetry)
+        }
+    }
+}
+
+@Composable
+internal fun VideoStateContent(
     loading: Boolean,
     problem: String?,
     fullScreen: Boolean,
     timerMode: Boolean,
     backdrop: Backdrop,
     onRetry: () -> Unit,
+    modifier: Modifier = Modifier,
     onExitFullScreen: (() -> Unit)? = null
 ) {
     val colors = MiuixTheme.colorScheme
     val foreground = if (fullScreen) Color.White else colors.onSurface
     val secondary = if (fullScreen) Color.White.copy(alpha = 0.7f) else colors.onSurfaceVariantSummary
-    Column(horizontalAlignment = Alignment.CenterHorizontally,
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        if (loading) {
-            CircularProgressIndicator()
-            Text(stringResource(R.string.video_loading), fontSize = 14.sp, color = secondary)
-        } else {
-            Box(Modifier.size(76.dp).background(colors.primary.copy(alpha = 0.08f), RoundedCornerShape(24.dp)),
-                contentAlignment = Alignment.Center) {
-                Icon(if (problem == null) AppIcons.Video else AppIcons.Info,
-                    contentDescription = null, tint = if (fullScreen) Color.White else colors.primary,
-                    modifier = Modifier.size(32.dp))
+        // Animate only Compose status content, never the AndroidView or player ownership branch.
+        AnimatedContent(targetState = loading to problem, label = "video_state_content",
+            transitionSpec = {
+                (fadeIn(tween(170)) togetherWith fadeOut(tween(120)))
+                    .using(SizeTransform(clip = false, sizeAnimationSpec = { _, _ -> tween(190) }))
+            }) { (stateLoading, stateProblem) ->
+            Column(horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                if (stateLoading) {
+                    CircularProgressIndicator()
+                    Text(stringResource(R.string.video_loading), fontSize = 14.sp, color = secondary)
+                } else {
+                    Box(Modifier.size(76.dp).background(colors.primary.copy(alpha = 0.08f), RoundedCornerShape(24.dp)),
+                        contentAlignment = Alignment.Center) {
+                        Icon(if (stateProblem == null) AppIcons.Video else AppIcons.Info,
+                            contentDescription = null, tint = if (fullScreen) Color.White else colors.primary,
+                            modifier = Modifier.size(32.dp))
+                    }
+                    Text(stateProblem ?: stringResource(R.string.video_empty_title), color = foreground,
+                        fontSize = if (stateProblem == null) 17.sp else 14.sp,
+                        fontWeight = if (stateProblem == null) FontWeight.SemiBold else FontWeight.Normal,
+                        textAlign = TextAlign.Center)
+                    if (stateProblem == null && timerMode) {
+                        Text(stringResource(R.string.video_start_hint), color = secondary, fontSize = 12.sp)
+                    }
+                }
             }
-            Text(problem ?: stringResource(R.string.video_empty_title), color = foreground,
-                fontSize = if (problem == null) 17.sp else 14.sp,
-                fontWeight = if (problem == null) FontWeight.SemiBold else FontWeight.Normal,
-                textAlign = TextAlign.Center)
-            if (problem != null) {
+        }
+        AnimatedUiVisibility(visible = !loading && problem != null) { active ->
+            if (fullScreen) {
                 VideoGlassButton(onRetry, backdrop, icon = AppIcons.Refresh,
-                    label = stringResource(R.string.action_retry), accent = true, fullScreen = fullScreen,
-                    modifier = Modifier.width(132.dp))
-            } else if (timerMode) {
-                Text(stringResource(R.string.video_start_hint), color = secondary, fontSize = 12.sp)
+                    description = stringResource(R.string.action_retry), accent = true, fullScreen = true,
+                    enabled = active, dimWhenDisabled = false, modifier = Modifier.size(52.dp))
+            } else {
+                LiquidActionButton(stringResource(R.string.action_retry), AppIcons.Refresh, onRetry,
+                    backdrop, enabled = active)
             }
         }
         onExitFullScreen?.let {
             VideoGlassButton(it, backdrop, icon = AppIcons.ExitFullscreen,
-                label = stringResource(R.string.video_exit_fullscreen), fullScreen = true)
+                description = stringResource(R.string.video_exit_fullscreen), fullScreen = true,
+                modifier = Modifier.size(52.dp))
         }
     }
-}
-
-
-private tailrec fun Context.findVideoActivity(): Activity? = when (this) {
-    is Activity -> this
-    is ContextWrapper -> baseContext.findVideoActivity()
-    else -> null
 }

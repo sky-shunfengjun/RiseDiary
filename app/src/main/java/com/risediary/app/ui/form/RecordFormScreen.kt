@@ -35,6 +35,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -53,6 +54,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -67,6 +69,12 @@ import com.risediary.app.R
 import com.risediary.app.ui.achievement.AchievementCatalog
 import com.risediary.app.ui.components.DurationPickerBottomSheet
 import com.risediary.app.ui.components.LiquidGlassButton
+import com.risediary.app.ui.components.AnimatedUiVisibility
+import com.risediary.app.ui.components.InlineStatusContent
+import com.risediary.app.ui.components.LiquidActionButton
+import com.risediary.app.ui.components.uiActionHeightDp
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.risediary.app.ui.components.LiquidAlertDialog
 import com.risediary.app.ui.components.liquidDialogCancelButtonColors
 import com.risediary.app.ui.components.liquidDialogConfirmButtonColors
@@ -99,6 +107,7 @@ fun RecordFormScreen(
 ) {
     val navigator = LocalNavigator.current
     val context = LocalContext.current
+    val saveButtonHeight = maxOf(56.dp, uiActionHeightDp(LocalDensity.current.fontScale).dp)
     val videoPicker = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
         if (result.resultCode == Activity.RESULT_OK) {
             result.data?.let { data -> data.data?.let { vm.selectVideo(it, data.flags) } }
@@ -106,6 +115,8 @@ fun RecordFormScreen(
     }
     val scrollState = rememberScrollState()
     val tags by vm.tags.collectAsStateWithLifecycle()
+    var retainedFormError by remember { mutableStateOf(vm.errorMessage) }
+    SideEffect { vm.errorMessage?.let { retainedFormError = it } }
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
     var showDurationPicker by remember { mutableStateOf(false) }
@@ -168,7 +179,7 @@ fun RecordFormScreen(
                 isInteractive = !vm.isSaving && !vm.isLoading && !vm.isSelectingVideo && vm.quantitySettingsReady && vm.formReady,
                 enabled = !vm.isSaving && !vm.isLoading && !vm.isSelectingVideo && vm.quantitySettingsReady && vm.formReady,
                 tint = MiuixTheme.colorScheme.primary.copy(alpha = 0.075f),
-                height = 56.dp,
+                height = saveButtonHeight,
                 highlightIntensity = 0.38f,
                 highlightRadiusMultiplier = 1f,
                 pressExpansion = 2.dp
@@ -259,12 +270,23 @@ fun RecordFormScreen(
                             style = MiuixTheme.textStyles.subtitle,
                             fontWeight = FontWeight.SemiBold
                         )
-                        if (vm.isLoading || !vm.quantitySettingsReady) {
-                            Text(stringResource(R.string.settings_prediction_loading), style = MiuixTheme.textStyles.body2)
+                        if (!vm.quantitySettingsReady) {
+                            InlineStatusContent(
+                                messages = listOf(vm.quantitySettingsError ?: stringResource(R.string.settings_prediction_loading)),
+                                onRetry = if (vm.quantitySettingsError != null) vm::retryQuantitySettings else null,
+                                enabled = !vm.isQuantitySettingsLoading && !vm.isSaving,
+                                error = vm.quantitySettingsError != null
+                            )
                         } else if (vm.isLegacyQuantityReadOnly) {
                             Text(vm.legacyQuantityText, style = MiuixTheme.textStyles.title3)
                             Text(stringResource(R.string.form_legacy_quantity_note), style = MiuixTheme.textStyles.body2)
-                            TextButton(text = stringResource(R.string.form_change_quantity), onClick = vm::beginLegacyQuantityEdit)
+                            val actionSurface = MiuixTheme.colorScheme.surface
+                            val actionBackdrop = rememberLayerBackdrop { drawRect(actionSurface); drawContent() }
+                            Box(Modifier.fillMaxWidth()) {
+                                Box(Modifier.matchParentSize().layerBackdrop(actionBackdrop))
+                                LiquidActionButton(stringResource(R.string.form_change_quantity), AppIcons.Edit,
+                                    vm::beginLegacyQuantityEdit, actionBackdrop, enabled = !vm.isSaving)
+                            }
                         } else {
                             VolumeModeSelector(
                                 useEstimatedMode = vm.useEstimatedMode,
@@ -272,7 +294,7 @@ fun RecordFormScreen(
                                     vm.selectVolumeMode(if (estimated) RecordVolumeMode.ESTIMATED else RecordVolumeMode.MILLILITERS)
                                 }
                             )
-                            if (vm.useEstimatedMode) {
+                            QuantityModeContent(vm.useEstimatedMode, estimatedContent = { active ->
                                 Text(
                                     stringResource(R.string.form_estimated_amount, PredictionQuantitySettings.formatTicks(vm.estimatedTicks)),
                                     style = MiuixTheme.textStyles.title3,
@@ -281,12 +303,14 @@ fun RecordFormScreen(
                                 PredictionVolumeSlider(
                                     ticks = vm.estimatedTicks,
                                     maximumTicks = vm.predictionMaxTicks,
-                                    onValueChange = vm::updateEstimatedTicks
+                                    onValueChange = { if (active && vm.useEstimatedMode) vm.updateEstimatedTicks(it) },
+                                    enabled = active && !vm.isSaving
                                 )
-                            } else {
+                            }, manualContent = { active ->
                                 TextField(
                                     value = vm.volumeMl,
-                                    onValueChange = vm::updateManualVolume,
+                                    onValueChange = { if (active && !vm.useEstimatedMode) vm.updateManualVolume(it) },
+                                    enabled = active && !vm.isSaving,
                                     label = stringResource(R.string.form_volume_ml_label),
                                     leadingIcon = {
                                         Icon(
@@ -315,9 +339,10 @@ fun RecordFormScreen(
                                     values = listOf(1, 3, 5, 10),
                                     suffix = "ml",
                                     selected = vm.quickVolumeSelection,
-                                    onClick = vm::quickVolume
+                                    onClick = { if (active && !vm.useEstimatedMode) vm.quickVolume(it) },
+                                    enabled = active && !vm.isSaving
                                 )
-                            }
+                            })
                         }
                     }
 
@@ -377,7 +402,9 @@ fun RecordFormScreen(
                 },
                 onRemove = vm::removeVideo,
                 busy = vm.isSelectingVideo || vm.isLoading || vm.isSaving,
-                error = vm.videoError
+                error = vm.videoError,
+                busyText = stringResource(if (vm.isSelectingVideo || vm.isLoading) R.string.video_loading else R.string.video_saving_record),
+                titleContent = { FormSectionTitle(AppIcons.Video, stringResource(R.string.video_title)) }
             )
 
             RiseCard(modifier = Modifier.fillMaxWidth()) {
@@ -484,35 +511,13 @@ fun RecordFormScreen(
                 }
             }
 
-            if (vm.isQuantitySettingsLoading) {
-                Text(
-                    "正在读取射精量设置…",
-                    style = MiuixTheme.textStyles.body2,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                )
-            }
-            vm.quantitySettingsError?.let { error ->
-                Text(error, style = MiuixTheme.textStyles.body2, color = MiuixTheme.colorScheme.error)
-                TextButton(text = "重试读取设置", onClick = vm::retryQuantitySettings)
-            }
-            vm.errorMessage?.let { error ->
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(MiuixTheme.colorScheme.errorContainer)
-                        .padding(16.dp)
-                ) {
-                    Text(
-                        error,
-                        color = MiuixTheme.colorScheme.onErrorContainer,
-                        style = MiuixTheme.textStyles.body1
-                    )
-                }
+            AnimatedUiVisibility(vm.errorMessage != null) {
+                InlineStatusContent(listOfNotNull(vm.errorMessage ?: retainedFormError), Modifier.padding(8.dp))
             }
             Spacer(
                 modifier = Modifier.height(
-                    recordFormBottomSpacerDp(imeBottom > 0.dp).dp
+                    recordFormBottomSpacerDp(imeBottom > 0.dp).dp +
+                        if (imeBottom > 0.dp) 0.dp else maxOf(0.dp, saveButtonHeight - 56.dp)
                 )
             )
         }
@@ -649,6 +654,7 @@ fun RecordFormScreen(
     if (vm.showDiscard) {
         LiquidAlertDialog(
             onDismissRequest = vm::cancelDiscard,
+            modifier = Modifier.verticalScroll(rememberScrollState()),
             title = { Text("放弃填写？") },
             text = { Text("未保存的内容将被丢弃。") },
             confirmButton = {
@@ -657,7 +663,8 @@ fun RecordFormScreen(
             },
             dismissButton = {
                 TextButton("继续填写", vm::cancelDiscard, colors = liquidDialogCancelButtonColors())
-            }
+            },
+            adaptiveActions = true
         )
     }
     if (activeAchievement != null) {

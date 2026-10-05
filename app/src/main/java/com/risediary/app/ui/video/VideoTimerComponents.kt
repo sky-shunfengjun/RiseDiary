@@ -1,23 +1,18 @@
 package com.risediary.app.ui.video
 
 import androidx.compose.foundation.layout.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import com.kyant.backdrop.Backdrop
 import com.risediary.app.R
 import com.risediary.app.service.TimerSession
-import com.risediary.app.service.TimerStatus
 import com.risediary.app.ui.icons.AppIcons
+import com.risediary.app.ui.components.AnimatedUiVisibility
+import com.risediary.app.ui.components.InlineStatusContent
 import com.risediary.app.ui.theme.RiseCard
-import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
 internal fun VideoTimerSummary(
@@ -28,39 +23,62 @@ internal fun VideoTimerSummary(
     persistenceError: Boolean,
     backdrop: Backdrop,
     onRetry: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true
 ) {
     if (fullScreen) {
-        Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Column(modifier) {
             com.risediary.app.ui.timer.TimerInstrument(session, compact = true, fullScreen = true)
-            TimerProblems(notice, problem, persistenceError, true, backdrop, onRetry)
+            VideoTimerProblems(notice, problem, persistenceError, true, backdrop, onRetry, enabled)
         }
     } else {
         RiseCard(modifier.fillMaxWidth(), allowContentOverflow = true) {
-            Column(Modifier.fillMaxWidth().padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Column(Modifier.fillMaxWidth().padding(14.dp)) {
                 com.risediary.app.ui.timer.TimerInstrument(session, Modifier.fillMaxWidth(), dense = true)
-                TimerProblems(notice, problem, persistenceError, false, backdrop, onRetry)
+                VideoTimerProblems(notice, problem, persistenceError, false, backdrop, onRetry, enabled)
             }
         }
     }
 }
 
 @Composable
-private fun TimerProblems(
+internal fun VideoTimerProblems(
     notice: String?,
     problem: String?,
     persistenceError: Boolean,
     fullScreen: Boolean,
     backdrop: Backdrop,
-    onRetry: () -> Unit
+    onRetry: () -> Unit,
+    enabled: Boolean = true
 ) {
-    val colors = MiuixTheme.colorScheme
-    val infoColor = if (fullScreen) Color.White else colors.primary
-    notice?.let { Text(it, color = infoColor, fontSize = 12.sp) }
-    problem?.let { Text(it, color = if (fullScreen) Color.White else colors.error, fontSize = 12.sp) }
-    if (persistenceError) {
-        Text(stringResource(R.string.timer_error_save), color = if (fullScreen) Color.White else colors.error, fontSize = 12.sp)
-        VideoGlassButton(onRetry, backdrop, icon = AppIcons.Refresh,
-            label = stringResource(R.string.action_retry), fullScreen = fullScreen)
+    val problems = listOfNotNull(problem,
+        if (persistenceError) stringResource(R.string.timer_error_save) else null)
+    val presentation = TimerProblemPresentation(notice, problems, persistenceError)
+    val visible = !notice.isNullOrBlank() || problems.any { it.isNotBlank() }
+    var lastVisible by remember { mutableStateOf(presentation) }
+    SideEffect { if (visible) lastVisible = presentation }
+    val displayed = if (visible) presentation else lastVisible
+    AnimatedUiVisibility(visible = visible) { active ->
+        Column(Modifier.padding(top = if (fullScreen) 4.dp else 8.dp),
+            horizontalAlignment = if (fullScreen) Alignment.CenterHorizontally else Alignment.Start,
+            verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            displayed.notice?.let {
+                InlineStatusContent(listOf(it), backdrop = backdrop, fullScreen = fullScreen, error = false)
+            }
+            InlineStatusContent(displayed.problems, backdrop = backdrop,
+                onRetry = if (displayed.canRetry && !fullScreen) onRetry else null,
+                enabled = active && enabled, fullScreen = fullScreen)
+            if (displayed.canRetry && fullScreen) {
+                VideoGlassButton(onRetry, backdrop, icon = AppIcons.Refresh,
+                    description = stringResource(R.string.action_retry), fullScreen = true,
+                    enabled = active && enabled, dimWhenDisabled = false, modifier = Modifier.size(52.dp))
+            }
+        }
     }
 }
+
+private data class TimerProblemPresentation(
+    val notice: String?,
+    val problems: List<String>,
+    val canRetry: Boolean
+)

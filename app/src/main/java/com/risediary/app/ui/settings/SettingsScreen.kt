@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.mutableStateOf
@@ -35,6 +36,8 @@ import com.risediary.app.BuildConfig
 import com.risediary.app.R
 import com.risediary.app.data.UsernamePolicy
 import com.risediary.app.ui.components.mainPageBottomSpacing
+import com.risediary.app.ui.components.AnimatedUiVisibility
+import com.risediary.app.ui.components.InlineStatusContent
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.preference.ArrowPreference
@@ -100,11 +103,12 @@ fun SettingsScreen(
                             inputTransform = UsernamePolicy::limit
                         )
                         val predictionSettings by vm.predictionSettings.collectAsStateWithLifecycle()
-                        PredictionMaximumItem(value = predictionSettings.maxTicks, onValueChange = vm::setPredictionMaxTicks)
-                        predictionSettings.error?.let {
-                            Text(it, modifier = Modifier.padding(horizontal = 16.dp))
-                            top.yukonga.miuix.kmp.basic.TextButton(text = "重试读取设置", onClick = vm::retryPredictionSettings)
-                        }
+                        PredictionMaximumItem(
+                            value = predictionSettings.maxTicks,
+                            onValueChange = vm::setPredictionMaxTicks,
+                            error = predictionSettings.error,
+                            onRetry = vm::retryPredictionSettings
+                        )
                         ArrowPreference(
                             title = stringResource(R.string.settings_manage_tags),
                             summary = stringResource(R.string.settings_manage_tags_summary),
@@ -126,6 +130,10 @@ fun SettingsScreen(
                             onClick = { navigator.push(Route.ReminderSettings) }
                         )
                         val liveUpdates by vm.liveUpdatesSettings.collectAsStateWithLifecycle()
+                        var previousLiveUpdatesError by remember { mutableStateOf<String?>(null) }
+                        LaunchedEffect(liveUpdates.error) {
+                            liveUpdates.error?.let { previousLiveUpdatesError = it }
+                        }
                         val supported = TimerNotificationPolicy.supportsLiveUpdates(capabilities.sdkInt)
                         SettingsToggleItem(
                             icon = AppIcons.Schedule,
@@ -142,18 +150,24 @@ fun SettingsScreen(
                             onCheckedChange = vm::setLiveUpdatesEnabled,
                             enabled = liveUpdates.ready
                         )
-                        liveUpdates.error?.let {
-                            Text(it, modifier = Modifier.padding(horizontal = 16.dp))
-                            top.yukonga.miuix.kmp.basic.TextButton(
-                                text = stringResource(R.string.action_retry), onClick = vm::retryLiveUpdatesSettings)
+                        AnimatedUiVisibility(liveUpdates.error != null) { active ->
+                            InlineStatusContent(
+                                messages = listOfNotNull(liveUpdates.error ?: previousLiveUpdatesError),
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                                onRetry = vm::retryLiveUpdatesSettings,
+                                enabled = active
+                            )
                         }
-                        if (liveUpdates.ready && liveUpdates.enabled &&
-                            (!capabilities.notificationsAllowed || (supported && (!capabilities.promotionAllowed || capabilities.channelImportance < 2)))) {
+                        AnimatedUiVisibility(liveUpdates.ready && liveUpdates.enabled &&
+                            (!capabilities.notificationsAllowed || (supported && (!capabilities.promotionAllowed || capabilities.channelImportance < 2)))) { active ->
                             ArrowPreference(
                                 title = stringResource(R.string.settings_live_updates_system),
                                 summary = stringResource(R.string.settings_live_updates_system_summary),
                                 startAction = { SettingsIcon(AppIcons.NotificationsActive) },
-                                onClick = { TimerLiveUpdateSupport.openSettings(context, capabilities.notificationsAllowed && capabilities.channelImportance >= 2) }
+                                onClick = {
+                                    if (active) TimerLiveUpdateSupport.openSettings(context,
+                                        capabilities.notificationsAllowed && capabilities.channelImportance >= 2)
+                                }
                             )
                         }
                     }
@@ -163,15 +177,32 @@ fun SettingsScreen(
             item { SettingsGroupHeader(stringResource(R.string.settings_group_privacy)) }
             item {
                 Card(modifier = Modifier.fillMaxWidth()) {
-                    val lockEnabled by vm.appLockEnabled.collectAsStateWithLifecycle()
-                    ArrowPreference(
-                        title = stringResource(R.string.settings_app_lock),
-                        summary =
-                            if (lockEnabled) stringResource(R.string.settings_app_lock_on)
-                            else stringResource(R.string.settings_app_lock_off),
-                        startAction = { SettingsIcon(AppIcons.Lock) },
-                        onClick = { navigator.push(Route.AppLockSettings) }
-                    )
+                    Column {
+                        val lockEnabled by vm.appLockEnabled.collectAsStateWithLifecycle()
+                        ArrowPreference(
+                            title = stringResource(R.string.settings_app_lock),
+                            summary = if (lockEnabled) stringResource(R.string.settings_app_lock_on)
+                                else stringResource(R.string.settings_app_lock_off),
+                            startAction = { SettingsIcon(AppIcons.Lock) },
+                            onClick = { navigator.push(Route.AppLockSettings) }
+                        )
+                        val detailVideo by vm.detailVideoSettings.collectAsStateWithLifecycle()
+                        var retainedDetailVideoError by remember { mutableStateOf<String?>(null) }
+                        LaunchedEffect(detailVideo.error) { detailVideo.error?.let { retainedDetailVideoError = it } }
+                        SettingsToggleItem(
+                            icon = AppIcons.VisibilityOff,
+                            title = stringResource(R.string.settings_detail_video_hidden),
+                            subtitle = stringResource(R.string.settings_detail_video_hidden_summary),
+                            checked = detailVideo.hiddenByDefault,
+                            onCheckedChange = vm::setDetailVideoHiddenByDefault,
+                            enabled = detailVideo.ready && !detailVideo.saving
+                        )
+                        AnimatedUiVisibility(detailVideo.error != null) { active ->
+                            InlineStatusContent(listOfNotNull(detailVideo.error ?: retainedDetailVideoError),
+                                Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+                                onRetry = vm::retryDetailVideoSettings, enabled = active && !detailVideo.saving)
+                        }
+                    }
                 }
             }
 

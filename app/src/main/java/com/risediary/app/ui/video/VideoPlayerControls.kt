@@ -50,7 +50,8 @@ internal fun VideoGlassButton(
     accent: Boolean = false,
     enabled: Boolean = true,
     large: Boolean = false,
-    selected: Boolean = false
+    selected: Boolean = false,
+    dimWhenDisabled: Boolean = true
 ) {
     val colors = MiuixTheme.colorScheme
     val fontScale = LocalDensity.current.fontScale
@@ -65,8 +66,9 @@ internal fun VideoGlassButton(
         modifier = modifier
             .graphicsLayer {
                 // Fade individual draws without a button-sized offscreen buffer cutting the shadow.
-                alpha = if (enabled) 1f else 0.45f
+                alpha = if (enabled || !dimWhenDisabled) 1f else 0.45f
                 compositingStrategy = CompositingStrategy.ModulateAlpha
+                clip = false
             }
             .then(if (description != null) Modifier.semantics(mergeDescendants = true) {
                 contentDescription = description
@@ -110,9 +112,14 @@ internal fun VideoTransportControls(
     fullScreen: Boolean,
     onInteraction: () -> Unit,
     modifier: Modifier = Modifier,
-    onTouch: (Boolean) -> Unit = {}
+    onTouch: (Boolean) -> Unit = {},
+    enabled: Boolean = true
 ) {
     var scrubFraction by remember(snapshot?.video?.uriString, durationMillis) { mutableStateOf<Float?>(null) }
+    LaunchedEffect(enabled) {
+        // Disabling cancels slider input without committing a seek; discard its held preview too.
+        if (!enabled) scrubFraction = null
+    }
     val progress = scrubFraction ?: videoProgressFraction(snapshot?.positionMillis ?: 0L, durationMillis)
     val position = scrubFraction?.let { videoSeekPosition(it, durationMillis) } ?: snapshot?.positionMillis ?: 0L
     val foreground = if (fullScreen) Color.White else MiuixTheme.colorScheme.onSurface
@@ -127,12 +134,13 @@ internal fun VideoTransportControls(
     val progressDescription = stringResource(R.string.video_progress)
 
     fun interact(action: () -> Unit) {
+        if (!enabled) return
         onInteraction()
         action()
     }
 
     val currentTouch by rememberUpdatedState(onTouch)
-    Column(modifier.pointerInput(Unit) {
+    Column(modifier.then(if (enabled) Modifier.pointerInput(Unit) {
         // Observe without consuming slider/button gestures; a held control must not fade away.
         awaitEachGesture {
             try {
@@ -143,7 +151,7 @@ internal fun VideoTransportControls(
                 } while (event.changes.any { it.pressed })
             } finally { currentTouch(false) }
         }
-    }, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+    } else Modifier), verticalArrangement = Arrangement.spacedBy(2.dp)) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
             Text(formatVideoPosition(position), fontSize = 12.sp, color = secondary)
             Text(formatVideoPosition(durationMillis.takeIf { it > 0L }), fontSize = 12.sp, color = secondary)
@@ -151,18 +159,21 @@ internal fun VideoTransportControls(
         if (canSeek) {
             LiquidSlider(
                 value = { progress },
-                onValueChange = { scrubFraction = it; onInteraction() },
+                onValueChange = { if (enabled) { scrubFraction = it; onInteraction() } },
                 valueRange = 0f..1f,
                 steps = 0,
                 backdrop = backdrop,
                 modifier = Modifier.semantics { contentDescription = progressDescription },
                 onValueChangeFinished = {
-                    scrubFraction?.let { fraction ->
-                        videoSeekPosition(fraction, durationMillis)?.let(controller::seekTo)
+                    if (enabled) {
+                        scrubFraction?.let { fraction ->
+                            videoSeekPosition(fraction, durationMillis)?.let(controller::seekTo)
+                        }
+                        onInteraction()
                     }
                     scrubFraction = null
-                    onInteraction()
-                }
+                },
+                enabled = enabled
             )
         } else {
             // An unread duration must not expose a slider with an invalid range or seek action.
@@ -187,6 +198,7 @@ internal fun VideoTransportControls(
                     } },
                     backdrop = backdrop, fullScreen = fullScreen,
                     label = stringResource(R.string.video_speed_value, speedLabel),
+                    enabled = enabled, dimWhenDisabled = enabled,
                     description = speedDescription, modifier = Modifier.width(speedWidth).height(maxOf(buttonSize, (24f * fontScale + 20f).dp))
                 )
             }
@@ -198,7 +210,7 @@ internal fun VideoTransportControls(
                     } },
                     backdrop = backdrop, fullScreen = fullScreen, icon = AppIcons.FastRewind,
                     description = stringResource(R.string.video_seek_back, (controller.player.seekBackIncrement / 1_000L).toInt()),
-                    enabled = canSeek, modifier = Modifier.size(buttonSize)
+                    enabled = enabled && canSeek, dimWhenDisabled = enabled, modifier = Modifier.size(buttonSize)
                 )
             }
             val playButton: @Composable () -> Unit = {
@@ -212,6 +224,7 @@ internal fun VideoTransportControls(
                     } },
                     backdrop = backdrop, fullScreen = fullScreen, accent = true, large = true,
                     icon = if (wantsPlay && !ended) AppIcons.Pause else AppIcons.PlayArrow,
+                    enabled = enabled, dimWhenDisabled = enabled,
                     description = stringResource(if (wantsPlay && !ended) R.string.video_pause
                         else if (ended) R.string.video_replay else R.string.video_play),
                     modifier = Modifier.size(playSize)
@@ -225,7 +238,7 @@ internal fun VideoTransportControls(
                     } },
                     backdrop = backdrop, fullScreen = fullScreen, icon = AppIcons.FastForward,
                     description = stringResource(R.string.video_seek_forward, (controller.player.seekForwardIncrement / 1_000L).toInt()),
-                    enabled = canSeek, modifier = Modifier.size(buttonSize)
+                    enabled = enabled && canSeek, dimWhenDisabled = enabled, modifier = Modifier.size(buttonSize)
                 )
             }
             val loopButton: @Composable () -> Unit = {
@@ -234,6 +247,7 @@ internal fun VideoTransportControls(
                     backdrop = backdrop, fullScreen = fullScreen,
                     accent = snapshot?.loop == true, selected = snapshot?.loop == true, description = loopDescription,
                     icon = AppIcons.EventRepeat,
+                    enabled = enabled, dimWhenDisabled = enabled,
                     modifier = Modifier.size(buttonSize).semantics {
                         stateDescription = loopState
                         selected = snapshot?.loop == true

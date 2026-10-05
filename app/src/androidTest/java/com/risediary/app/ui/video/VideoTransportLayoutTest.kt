@@ -8,12 +8,15 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createComposeRule
 import androidx.compose.ui.unit.dp
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.risediary.app.media.*
+import com.risediary.app.R
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -22,6 +25,48 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 class VideoTransportLayoutTest {
     @get:Rule val compose = createComposeRule()
+
+    @Test fun disablingControlsCancelsTemporaryScrubBeforeTheyAreShownAgain() {
+        lateinit var controller: Media3VideoPlayerController
+        lateinit var progressDescription: String
+        val enabled = mutableStateOf(true)
+        compose.setContent {
+            val context = LocalContext.current
+            progressDescription = stringResource(R.string.video_progress)
+            controller = remember { Media3VideoPlayerController(context) }
+            DisposableEffect(controller) { onDispose { controller.release() } }
+            MiuixTheme {
+                val backdrop = rememberLayerBackdrop { drawContent() }
+                Box(Modifier.fillMaxSize()) {
+                    Box(Modifier.fillMaxSize().layerBackdrop(backdrop))
+                    VideoTransportControls(controller,
+                        VideoPlaybackSnapshot(LocalVideoRef("content://test/video", "test.mp4", "video/mp4")),
+                        60_000L, false, false, backdrop, false, {},
+                        Modifier.width(320.dp), enabled = enabled.value)
+                }
+            }
+        }
+        compose.waitForIdle()
+        compose.mainClock.autoAdvance = false
+        compose.onNodeWithContentDescription(progressDescription).performTouchInput {
+            down(center.copy(x = width * 0.1f))
+            moveTo(center.copy(x = width * 0.8f))
+        }
+        compose.mainClock.advanceTimeByFrame()
+        assertTrue("The held gesture must have a temporary seek preview",
+            compose.onNodeWithContentDescription(progressDescription).fetchSemanticsNode()
+                .config[SemanticsProperties.ProgressBarRangeInfo].current > 0.25f)
+
+        compose.runOnIdle { enabled.value = false }
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithContentDescription(progressDescription).performTouchInput { up() }
+        compose.runOnIdle { enabled.value = true }
+        compose.mainClock.advanceTimeByFrame()
+
+        assertEquals("Cancelled scrubbing must show the real playback position on return", 0f,
+            compose.onNodeWithContentDescription(progressDescription).fetchSemanticsNode()
+                .config[SemanticsProperties.ProgressBarRangeInfo].current, 0.001f)
+    }
 
     @Test fun controlsUseAvailableWidthAndKeepIconLoopOnPlaybackRow() {
         lateinit var controller: Media3VideoPlayerController

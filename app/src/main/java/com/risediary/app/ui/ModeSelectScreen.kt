@@ -3,6 +3,8 @@ package com.risediary.app.ui
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
@@ -29,11 +31,11 @@ fun ModeSelectScreen(vm: ModeSelectViewModel = hiltViewModel()) {
                 Triple(FlightEntry.MANUAL, stringResource(R.string.mode_select_manual), stringResource(R.string.mode_select_manual_summary))
             )
             choices.forEach { (entry, title, summary) ->
-                RiseCard(modifier = Modifier.fillMaxWidth(), onClick = { if (!vm.busy) vm.open(entry) }) {
+                RiseCard(modifier = Modifier.fillMaxWidth().semantics { if (vm.busy) disabled() }, enabled = !vm.busy, onClick = { if (!vm.busy) vm.open(entry) }) {
                     Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(when (entry) {
                             FlightEntry.NORMAL -> AppIcons.Schedule
-                            FlightEntry.VIDEO -> AppIcons.PlayArrow
+                            FlightEntry.VIDEO -> AppIcons.Video
                             FlightEntry.MANUAL -> AppIcons.Edit
                         }, null, Modifier.size(40.dp), tint = MiuixTheme.colorScheme.primary)
                         Spacer(Modifier.width(16.dp))
@@ -51,12 +53,12 @@ fun ModeSelectScreen(vm: ModeSelectViewModel = hiltViewModel()) {
     }
     if (vm.currentTimer != null) {
         LiquidAlertDialog(onDismissRequest = vm::dismissCurrent,
-            title = { Text("请先处理当前计时") },
-            confirmButton = { TextButton("返回计时", vm::returnToTimer, colors = liquidDialogConfirmButtonColors()) },
-            dismissButton = { TextButton("取消", vm::dismissCurrent, colors = liquidDialogCancelButtonColors()) })
+            adaptiveActions = true, title = { Text(stringResource(R.string.mode_current_timer)) },
+            confirmButton = { TextButton(stringResource(R.string.mode_return_timer), vm::returnToTimer, colors = liquidDialogConfirmButtonColors()) },
+            dismissButton = { TextButton(stringResource(R.string.action_cancel), vm::dismissCurrent, colors = liquidDialogCancelButtonColors()) })
     }
     vm.error?.let { message ->
-        LiquidAlertDialog(onDismissRequest = vm::dismissError, title = { Text(message) },
-            confirmButton = { TextButton("知道了", vm::dismissError, colors = liquidDialogConfirmButtonColors()) })
+        LiquidAlertDialog(onDismissRequest = vm::dismissError, adaptiveActions = true, title = { Text(message) },
+            confirmButton = { TextButton(stringResource(R.string.action_got_it), vm::dismissError, colors = liquidDialogConfirmButtonColors()) })
     }
 }

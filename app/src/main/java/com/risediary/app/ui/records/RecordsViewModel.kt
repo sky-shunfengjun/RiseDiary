@@ -47,7 +47,7 @@ class RecordsViewModel @Inject constructor(
     internal val pendingDeletions: StateFlow<List<PendingDeletion>> = _pendingDeletions.asStateFlow()
     private val deletionOperations = PendingDeletionOperations()
     private val deletionOwner = "deletion:" + UUID.randomUUID()
-    private fun videoOwner(flightId: Long) = "$deletionOwner:$flightId"
+    private fun videoOwner(entry: PendingDeletion) = "$deletionOwner:${entry.token}"
 
     // Main.immediate may emit the current maintenance state during construction.
     // Initialize pending entries before the collector is allowed to clear them.
@@ -74,13 +74,16 @@ class RecordsViewModel @Inject constructor(
      */
     fun delete(flight: Flight): Boolean {
         if (maintenanceGate.state.value != DataMaintenanceGate.State.IDLE) return false
-        _pendingDeletions.update { enqueuePendingDeletion(it, flight) }
+        discardExpiredDeletions()
+        if (_pendingDeletions.value.any { it.flight.id == flight.id }) return false
+        val generation = maintenanceGate.snapshotGeneration()
+        _pendingDeletions.update { enqueuePendingDeletion(it, flight, generation) }
         maintenanceGate.launchWrite(viewModelScope) {
             deletionOperations.run {
                 val entry = _pendingDeletions.value.firstOrNull { it.flight.id == flight.id }
                     ?: return@run
                 if (!entry.cancelled && !entry.completed) {
-                    videoGrants.retain(videoOwner(flight.id), setOfNotNull(flight.videoUri))
+                    videoGrants.retain(videoOwner(entry), setOfNotNull(flight.videoUri))
                     flightRepo.delete(flight)
                     entry.completed = true
                 }
@@ -98,6 +101,7 @@ class RecordsViewModel @Inject constructor(
     fun undoDelete(flight: Flight) {
         maintenanceGate.launchWrite(viewModelScope) {
             deletionOperations.run {
+                discardExpiredDeletions()
                 val entry = _pendingDeletions.value.firstOrNull { it.flight.id == flight.id }
                     ?: return@run
                 if (entry.finalized) return@run
@@ -109,6 +113,29 @@ class RecordsViewModel @Inject constructor(
                 removePendingDeletion(flight.id)
             }
             runCatching { reminderScheduler.onFlightDataChanged() }
+        }
+    }
+
+    /** The detail page waits for this write before leaving; the app owns the undo window. */
+    suspend fun deleteForUndo(flight: Flight, expectedGeneration: Long) {
+        maintenanceGate.write {
+            maintenanceGate.requireGeneration(expectedGeneration)
+            deletionOperations.run {
+                discardExpiredDeletions()
+                maintenanceGate.requireCurrent(flight, flightRepo.getById(flight.id))
+                check(_pendingDeletions.value.none { it.flight.id == flight.id })
+                _pendingDeletions.update { enqueuePendingDeletion(it, flight, expectedGeneration) }
+                val entry = _pendingDeletions.value.first { it.flight.id == flight.id }
+                try {
+                    videoGrants.retain(videoOwner(entry), setOfNotNull(flight.videoUri))
+                    flightRepo.delete(flight)
+                    entry.completed = true
+                    if (_pendingDeletions.value.none { it === entry }) videoGrants.forget(videoOwner(entry))
+                } catch (failure: Exception) {
+                    removePendingDeletion(flight.id)
+                    throw failure
+                }
+            }
         }
     }
 
@@ -126,13 +153,19 @@ class RecordsViewModel @Inject constructor(
     }
 
     fun clearPendingDeletions() {
-        _pendingDeletions.value.forEach { videoGrants.forget(videoOwner(it.flight.id)) }
+        _pendingDeletions.value.forEach { videoGrants.forget(videoOwner(it)) }
         _pendingDeletions.value = emptyList()
     }
 
     private fun removePendingDeletion(flightId: Long) {
+        val removed = _pendingDeletions.value.filter { it.flight.id == flightId }
         _pendingDeletions.update { removePendingDeletion(it, flightId) }
-        videoGrants.forget(videoOwner(flightId))
+        removed.forEach { videoGrants.forget(videoOwner(it)) }
+    }
+
+    private fun discardExpiredDeletions() {
+        val generation = maintenanceGate.snapshotGeneration()
+        _pendingDeletions.value.filter { it.generation != generation }.forEach { removePendingDeletion(it.flight.id) }
     }
 
     override fun onCleared() { clearPendingDeletions() }
@@ -154,7 +187,8 @@ class RecordsViewModel @Inject constructor(
  * (undo then re-inserts), [finalized] once the Snackbar expired (undo becomes
  * a no-op). All three flags are only mutated under [PendingDeletionOperations].
  */
-internal class PendingDeletion(val flight: Flight) {
+internal class PendingDeletion(val flight: Flight, val generation: Long = 0L) {
+    val token = UUID.randomUUID().toString()
     var cancelled = false
     var completed = false
     var finalized = false
@@ -162,9 +196,10 @@ internal class PendingDeletion(val flight: Flight) {
 
 internal fun enqueuePendingDeletion(
     current: List<PendingDeletion>,
-    flight: Flight
+    flight: Flight,
+    generation: Long = 0L
 ): List<PendingDeletion> =
-    current.filterNot { it.flight.id == flight.id } + PendingDeletion(flight)
+    current.filterNot { it.flight.id == flight.id } + PendingDeletion(flight, generation)
 
 internal fun removePendingDeletion(
     current: List<PendingDeletion>,

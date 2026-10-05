@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -32,6 +33,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
@@ -65,6 +68,8 @@ fun SecondaryPageScaffold(
     reserveBottomActionSpace: Boolean = true,
     titleAlpha: (() -> Float)? = null,
     topBlurProgress: () -> Float = { 0f },
+    adaptiveBottomActionSpace: Boolean = false,
+    topBarActionsWidth: Dp = 0.dp,
     content: @Composable (PaddingValues) -> Unit
 ) {
     val statusBarTopDp = WindowInsets.statusBars
@@ -73,6 +78,8 @@ fun SecondaryPageScaffold(
     val navigationBarBottomDp = WindowInsets.navigationBars
         .asPaddingValues()
         .calculateBottomPadding()
+    val density = LocalDensity.current
+    var bottomActionHeightDp by remember { mutableFloatStateOf(0f) }
     val pageBackground = backgroundBrush()
     val currentBackground by rememberUpdatedState(pageBackground)
     val backdrop = rememberLayerBackdrop {
@@ -108,7 +115,8 @@ fun SecondaryPageScaffold(
                     onBack = guardedBack,
                     backdrop = backdrop,
                     actions = actions,
-                    titleAlpha = titleAlpha
+                    titleAlpha = titleAlpha,
+                    actionsWidth = topBarActionsWidth
                 )
 
                 if (floatingActionButton != null) {
@@ -130,7 +138,9 @@ fun SecondaryPageScaffold(
                             .imePadding()
                             .padding(horizontal = 20.dp, vertical = 12.dp)
                     ) {
-                        bottomAction(backdrop)
+                        Box(Modifier.onSizeChanged {
+                            if (adaptiveBottomActionSpace) bottomActionHeightDp = with(density) { it.height.toDp().value }
+                        }) { bottomAction(backdrop) }
                     }
                 }
             }
@@ -146,10 +156,12 @@ fun SecondaryPageScaffold(
                         top = statusBarTopDp + 76.dp,
                         end = 20.dp,
                         bottom = navigationBarBottomDp +
-                            if (
+                            when {
+                                bottomAction != null && reserveBottomActionSpace && adaptiveBottomActionSpace -> bottomActionPaddingDp(bottomActionHeightDp).dp
                                 (floatingActionButton != null && reserveFloatingActionButtonSpace) ||
-                                (bottomAction != null && reserveBottomActionSpace)
-                            ) 104.dp else 20.dp
+                                    (bottomAction != null && reserveBottomActionSpace) -> 104.dp
+                                else -> 20.dp
+                            }
                     )
                 )
             }
@@ -168,7 +180,8 @@ fun PageTopBar(
     modifier: Modifier = Modifier,
     actions: @Composable RowScope.() -> Unit = {},
     titleAlpha: (() -> Float)? = null,
-    endPadding: Dp = 12.dp
+    endPadding: Dp = 12.dp,
+    actionsWidth: Dp = 0.dp
 ) {
     val baseAlpha = titleAlpha?.invoke() ?: 1f
     Box(
@@ -187,12 +200,13 @@ fun PageTopBar(
             text = title,
             modifier = Modifier
                 .align(Alignment.CenterStart)
-                .padding(start = 62.dp)
+                .padding(start = 62.dp, end = actionsWidth)
                 .graphicsLayer { alpha = baseAlpha },
             fontSize = 30.sp,
             fontWeight = FontWeight.SemiBold,
             color = MiuixTheme.colorScheme.onSurface,
-            maxLines = 1
+            maxLines = 1,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
         )
         Row(
             modifier = Modifier.align(Alignment.CenterEnd),

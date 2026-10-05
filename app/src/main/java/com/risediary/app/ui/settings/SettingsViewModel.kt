@@ -48,8 +48,15 @@ class SettingsViewModel @Inject constructor(
     val liveUpdatesSettings = mutableLiveUpdatesSettings.asStateFlow()
     private var liveUpdatesSettingsJob: Job? = null
 
+    private val detailVideoEditor = DetailVideoSettingsEditor(viewModelScope, prefs.detailVideoHiddenByDefault,
+        prefs::setDetailVideoHiddenByDefault, context.getString(R.string.settings_detail_video_read_failed),
+        context.getString(R.string.settings_detail_video_save_failed))
+    internal val detailVideoSettings = detailVideoEditor.state
+
     init { retryPredictionSettings(); retryLiveUpdatesSettings() }
 
+    fun retryDetailVideoSettings() = detailVideoEditor.retry()
+    fun setDetailVideoHiddenByDefault(hidden: Boolean) = detailVideoEditor.setHidden(hidden)
     fun retryLiveUpdatesSettings() {
         liveUpdatesSettingsJob?.cancel()
         mutableLiveUpdatesSettings.value = mutableLiveUpdatesSettings.value.copy(ready = false, error = null)

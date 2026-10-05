@@ -45,6 +45,8 @@ class RecordDetailViewModel @Inject constructor(
     val loading = _loading.asStateFlow()
     private val _deleted = MutableStateFlow(false)
     val deleted = _deleted.asStateFlow()
+    private val _deleting = MutableStateFlow(false)
+    val deleting = _deleting.asStateFlow()
     private val _videoAccess = MutableStateFlow<VideoAccessState?>(null)
     val videoAccess = _videoAccess.asStateFlow()
     private val _videoBusy = MutableStateFlow(false)
@@ -74,7 +76,9 @@ class RecordDetailViewModel @Inject constructor(
                 loadedGeneration = generation
                 _videoAccess.value = null
                 current?.localVideoRef()?.let { video ->
-                    val state = videoFiles.check(video)
+                    val state = try { videoFiles.check(video) }
+                    catch (cancelled: CancellationException) { throw cancelled }
+                    catch (_: Exception) { VideoAccessState.INVALID }
                     if (epoch == refreshEpoch && generation == maintenanceGate.snapshotGeneration()) {
                         _videoAccess.value = state
                     }
@@ -129,15 +133,17 @@ class RecordDetailViewModel @Inject constructor(
         }
     }
 
-    fun delete() {
+    fun delete(deleteForUndo: suspend (Flight, Long) -> Unit) {
         val current = _flight.value ?: return
         if (_loading.value || _videoBusy.value) return
         _videoBusy.value = true
+        _deleting.value = true
+        _error.value = null
         viewModelScope.launch {
             try {
                 maintenanceGate.write {
                     maintenanceGate.requireGeneration(loadedGeneration)
-                    repository.delete(current)
+                    deleteForUndo(current, loadedGeneration)
                     _deleted.value = true
                     videoGrants.requestCleanup()
                     runCatching { reminderScheduler.onFlightDataChanged() }
@@ -150,7 +156,7 @@ class RecordDetailViewModel @Inject constructor(
                 throw cancelled
             } catch (_: Exception) {
                 _error.value = "删除失败，请重试"
-            } finally { _videoBusy.value = false }
+            } finally { _videoBusy.value = false; _deleting.value = false }
         }
     }
 

@@ -78,7 +78,8 @@ data class SettingsSnapshot(
     val homeCardVisibility: String,
     val onboardingCompleted: Boolean,
     val predictionMaxTicks: Int = 80,
-    val liveUpdatesEnabled: Boolean = true
+    val liveUpdatesEnabled: Boolean = true,
+    val detailVideoHiddenByDefault: Boolean = false
 )
 
 @Singleton

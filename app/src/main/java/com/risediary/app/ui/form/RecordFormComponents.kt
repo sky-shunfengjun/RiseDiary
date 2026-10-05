@@ -5,26 +5,50 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.EnterExitState
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.togetherWith
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.kyant.backdrop.backdrops.layerBackdrop
@@ -165,30 +189,74 @@ internal fun VolumeModeSelector(
     onSelectEstimatedMode: (Boolean) -> Unit
 ) {
     val backdrop = rememberLayerBackdrop()
-    Box(modifier = Modifier.fillMaxWidth().height(56.dp)) {
-        Box(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .fillMaxWidth()
-                .height(40.dp)
-                .clip(ContinuousCapsule)
-                .background(MiuixTheme.colorScheme.onSurface.copy(alpha = 0.035f))
-                .layerBackdrop(backdrop)
-        )
-        LiquidSegmentedControl(
-            options = listOf(
-                LiquidSegmentOption(stringResource(R.string.form_volume_mode_estimated), AppIcons.WaterDrop),
-                LiquidSegmentOption(stringResource(R.string.form_volume_mode_ml), AppIcons.Numbers)
-            ),
-            selectedIndex = if (useEstimatedMode) 0 else 1,
-            onSelected = { onSelectEstimatedMode(it == 0) },
-            backdrop = backdrop,
-            modifier = Modifier.align(Alignment.Center).fillMaxWidth(),
-            containerHeight = 40.dp,
-            contentPadding = 3.dp,
-            showIcons = false,
-            labelFontSize = 13.sp
-        )
+    val density = LocalDensity.current
+    val measurer = rememberTextMeasurer()
+    val labels = listOf(stringResource(R.string.form_volume_mode_estimated), stringResource(R.string.form_volume_mode_ml))
+    BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+        val textWidth = (constraints.maxWidth / 2 - with(density) { 44.dp.roundToPx() }).coerceAtLeast(1)
+        val textHeight = labels.maxOf { label ->
+            measurer.measure(label, style = TextStyle(fontSize = 13.sp, fontWeight = FontWeight.SemiBold),
+                constraints = Constraints(maxWidth = textWidth)).size.height
+        }
+        val controlHeight = maxOf(48.dp, with(density) { textHeight.toDp() } + 12.dp)
+        Box(modifier = Modifier.fillMaxWidth().height(controlHeight + 16.dp)) {
+            Box(modifier = Modifier.matchParentSize().layerBackdrop(backdrop)) {
+                Box(Modifier.align(Alignment.Center).fillMaxWidth().padding(horizontal = 4.dp)
+                    .height(controlHeight).clip(ContinuousCapsule)
+                    .background(MiuixTheme.colorScheme.onSurface.copy(alpha = 0.035f)))
+            }
+            LiquidSegmentedControl(
+                options = listOf(
+                    LiquidSegmentOption(labels[0], AppIcons.WaterDrop),
+                    LiquidSegmentOption(labels[1], AppIcons.Numbers)
+                ),
+                selectedIndex = if (useEstimatedMode) 0 else 1,
+                onSelected = { onSelectEstimatedMode(it == 0) },
+                backdrop = backdrop,
+                modifier = Modifier.align(Alignment.Center).fillMaxWidth().padding(horizontal = 4.dp),
+                containerHeight = controlHeight,
+                contentPadding = 3.dp,
+                showIcons = true,
+                labelFontSize = 13.sp,
+                inlineIcon = true
+            )
+        }
+    }
+}
+
+/** Only the selected branch remains interactive while the previous content fades out. */
+@Composable
+internal fun QuantityModeContent(
+    useEstimatedMode: Boolean,
+    estimatedContent: @Composable (active: Boolean) -> Unit,
+    manualContent: @Composable (active: Boolean) -> Unit
+) {
+    val focusManager = LocalFocusManager.current
+    var previousMode by remember { mutableStateOf(useEstimatedMode) }
+    LaunchedEffect(useEstimatedMode) {
+        if (previousMode != useEstimatedMode) {
+            focusManager.clearFocus()
+            previousMode = useEstimatedMode
+        }
+    }
+    AnimatedContent(targetState = useEstimatedMode,
+        transitionSpec = {
+            (EnterTransition.None togetherWith ExitTransition.None)
+                .using(SizeTransform(clip = false, sizeAnimationSpec = { _, _ -> tween(190) }))
+        }, label = "quantity_mode_content") { estimated ->
+        val active = estimated == useEstimatedMode
+        val alpha by transition.animateFloat(
+            transitionSpec = { tween(if (targetState == EnterExitState.Visible) 170 else 120) },
+            label = "quantity_branch_alpha"
+        ) { state -> if (state == EnterExitState.Visible) 1f else 0f }
+        Column(Modifier.fillMaxWidth().graphicsLayer {
+            this.alpha = alpha
+            compositingStrategy = CompositingStrategy.ModulateAlpha
+            clip = false
+        }.then(if (!active) Modifier.clearAndSetSemantics { } else Modifier),
+            verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (estimated) estimatedContent(active) else manualContent(active)
+        }
     }
 }
 
@@ -196,7 +264,8 @@ internal fun VolumeModeSelector(
 internal fun PredictionVolumeSlider(
     ticks: Int,
     maximumTicks: Int,
-    onValueChange: (Int) -> Unit
+    onValueChange: (Int) -> Unit,
+    enabled: Boolean = true
 ) {
     val surface by rememberUpdatedState(
         if (LocalRiseDarkTheme.current) Color(0xFF20242B) else Color(0xF7FFFFFF)
@@ -223,11 +292,12 @@ internal fun PredictionVolumeSlider(
         key(maximumTicks) {
             LiquidSlider(
                 value = { ticks / 10f },
-                onValueChange = { onValueChange((it * 10).roundToInt().coerceIn(0, maximumTicks)) },
+                onValueChange = { if (enabled) onValueChange((it * 10).roundToInt().coerceIn(0, maximumTicks)) },
                 valueRange = 0f..maximumTicks / 10f,
                 steps = maximumTicks - 1,
                 backdrop = backdrop,
-                modifier = Modifier.align(Alignment.TopCenter).padding(horizontal = 8.dp)
+                modifier = Modifier.align(Alignment.TopCenter).padding(horizontal = 8.dp),
+                enabled = enabled
             )
         }
     }
@@ -238,20 +308,22 @@ internal fun QuickChoices(
     values: List<Int>,
     suffix: String,
     selected: Int?,
-    onClick: (Int) -> Unit
+    onClick: (Int) -> Unit,
+    enabled: Boolean = true
 ) {
     val selectedIndex = values.indexOfFirst { it == selected }
-    Row(
+    FlowRow(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(6.dp)
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         values.forEachIndexed { index, value ->
             val isSelected = index == selectedIndex
             val accent = MiuixTheme.colorScheme.primary
             Box(
                 modifier = Modifier
-                    .width(50.dp)
-                    .height(36.dp)
+                    .widthIn(min = 56.dp)
+                    .heightIn(min = 48.dp)
                     .clip(RoundedCornerShape(11.dp))
                     .background(if (isSelected) accent else Color.Transparent)
                     .border(
@@ -259,7 +331,8 @@ internal fun QuickChoices(
                         if (isSelected) accent else MiuixTheme.colorScheme.outline,
                         RoundedCornerShape(11.dp)
                     )
-                    .clickable { onClick(value) },
+                    .clickable(enabled = enabled) { onClick(value) }
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(

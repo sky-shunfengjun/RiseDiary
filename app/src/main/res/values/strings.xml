@@ -638,4 +638,24 @@
     <string name="notification_timer_preparing_title">正在准备计时</string>
     <string name="notification_timer_return">点按返回计时</string>
     <string name="notification_timer_expired">这次计时已结束</string>
+    <!-- Dev28 UI presentation -->
+    <string name="video_add">添加视频</string>
+    <string name="video_replace">更换</string>
+    <string name="video_remove">移除</string>
+    <string name="video_play_short">播放</string>
+    <string name="video_processing">处理中</string>
+    <string name="video_saving_record">正在保存记录</string>
+    <string name="mode_current_timer">请先处理当前计时</string>
+    <string name="mode_return_timer">返回计时</string>
+    <string name="action_got_it">知道了</string>
+    <!-- Dev30: inline record playback and clear concealment wording -->
+    <string name="settings_detail_video_hidden">详情页视频默认隐藏</string>
+    <string name="settings_detail_video_hidden_summary">用遮罩隐藏画面，保留视频区域和文件名；点击显示后手动播放</string>
+    <string name="settings_detail_video_read_failed">读取失败，请重试</string>
+    <string name="settings_detail_video_save_failed">设置未保存，请重试</string>
+    <string name="detail_video_hidden">视频已隐藏</string>
+    <string name="detail_video_show">显示视频</string>
+    <string name="detail_video_hide">隐藏视频</string>
+    <string name="detail_video_unavailable">视频无法访问，请重试或重新关联</string>
+    <string name="record_detail_time_details">时间细节</string>
 </resources>

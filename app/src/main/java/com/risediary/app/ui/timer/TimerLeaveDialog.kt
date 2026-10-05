@@ -38,7 +38,7 @@ internal fun TimerLeaveDialog(
     LiquidAlertDialog(
         onDismissRequest = ::dismiss,
         modifier = Modifier.verticalScroll(rememberScrollState()),
-        title = { Text(stringResource(R.string.timer_leave_dialog_title)) },
+        title = { Text(stringResource(R.string.timer_leave_dialog_title), style = MiuixTheme.textStyles.title3) },
         text = {
             Column {
                 Text(stringResource(when {
@@ -78,6 +78,7 @@ internal fun TimerLeaveDialog(
         dismissButton = {
             TextButton(stringResource(R.string.timer_leave_cancel), ::dismiss,
                 enabled = !blocked && !vm.discarding, colors = liquidDialogCancelButtonColors())
-        }
+        },
+        adaptiveActions = true
     )
 }

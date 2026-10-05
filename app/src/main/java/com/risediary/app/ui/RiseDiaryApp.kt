@@ -61,6 +61,10 @@ import com.risediary.app.ui.onboarding.OnboardingScreen
 import com.risediary.app.ui.onboarding.OnboardingMode
 import com.risediary.app.ui.records.RecordsScreen
 import com.risediary.app.ui.records.RecordDetailScreen
+import com.risediary.app.ui.records.RecordsViewModel
+import com.risediary.app.ui.components.showLiquidSnackbar
+import com.risediary.app.ui.components.LiquidSnackbarTone
+import androidx.compose.material3.SnackbarResult
 import com.risediary.app.ui.settings.CardOrderScreen
 import com.risediary.app.ui.settings.AppLockSettingsScreen
 import com.risediary.app.ui.settings.SettingsScreen
@@ -283,6 +287,17 @@ private fun MainAppContent(
     val snackbarHostState = remember { androidx.compose.material3.SnackbarHostState() }
     val pagerState = rememberPagerState(pageCount = { 3 })
     val pagerCoroutineScope = rememberCoroutineScope()
+    val recordsViewModel: RecordsViewModel = hiltViewModel()
+    val deletedMessage = stringResource(R.string.records_deleted)
+    val undoAction = stringResource(R.string.action_undo)
+    fun showDetailDeletionUndo(target: com.risediary.app.data.entity.Flight) {
+        if (recordsViewModel.pendingDeletions.value.none { it.flight == target }) return
+        pagerCoroutineScope.launch {
+            val result = snackbarHostState.showLiquidSnackbar(deletedMessage, undoAction, LiquidSnackbarTone.UNDO)
+            if (result == SnackbarResult.ActionPerformed) recordsViewModel.undoDelete(target)
+            else recordsViewModel.finalizeDeletion(target.id)
+        }
+    }
     val mainPagerState = remember(pagerState) {
         MainPagerState(pagerState, pagerCoroutineScope)
     }
@@ -411,7 +426,8 @@ private fun MainAppContent(
                                                 mainPagerState = mainPagerState,
                                                 sceneBackdrop = mainSceneBackdrop,
                                                 snackbarHostState = snackbarHostState,
-                                                snackbarScope = pagerCoroutineScope
+                                                snackbarScope = pagerCoroutineScope,
+                                                recordsViewModel = recordsViewModel
                                             )
                                         }
                                         pageEntry<Route.ModeSelect>(navigationMotion) { ModeSelectScreen() }
@@ -435,7 +451,9 @@ private fun MainAppContent(
                                             com.risediary.app.ui.video.VideoPlayerScreen(route)
                                         }
                                         pageEntry<Route.RecordDetail>(navigationMotion) { route ->
-                                            RecordDetailScreen(flightId = route.flightId)
+                                            RecordDetailScreen(flightId = route.flightId,
+                                                deleteForUndo = recordsViewModel::deleteForUndo,
+                                                onRecordDeleted = ::showDetailDeletionUndo)
                                         }
                                         pageEntry<Route.RecordEdit>(navigationMotion) { route ->
                                             RecordFormScreen(
@@ -530,7 +548,8 @@ private fun MainScene(
     mainPagerState: MainPagerState,
     sceneBackdrop: LayerBackdrop,
     snackbarHostState: androidx.compose.material3.SnackbarHostState,
-    snackbarScope: CoroutineScope
+    snackbarScope: CoroutineScope,
+    recordsViewModel: RecordsViewModel
 ) {
     val navigator = LocalNavigator.current
     val currentPage = pagerState.currentPage
@@ -557,6 +576,7 @@ private fun MainScene(
                         when (page) {
                             0 -> HomeScreen()
                             1 -> RecordsScreen(
+                                viewModel = recordsViewModel,
                                 snackbarHostState = snackbarHostState,
                                 snackbarScope = snackbarScope
                             )

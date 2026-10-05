@@ -80,6 +80,7 @@ internal object BackupJsonCodec {
     fun settingsToJson(value: SettingsSnapshot) = JSONObject().apply {
         put("username", value.username)
         put("live_updates_enabled", value.liveUpdatesEnabled)
+        put("detail_video_hidden_by_default", value.detailVideoHiddenByDefault)
         put("prediction_max_ticks", value.predictionMaxTicks)
         put("ml_per_spurt", value.mlPerSpurt)
         put("default_volume_mode", value.defaultVolumeMode.storedValue)
@@ -210,6 +211,11 @@ internal object BackupJsonCodec {
             predictionMaxTicks = if (has("prediction_max_ticks")) strictTicks("prediction_max_ticks") else 80,
             username = getString("username"),
             liveUpdatesEnabled = if (has("live_updates_enabled")) getBoolean("live_updates_enabled") else true,
+            detailVideoHiddenByDefault = if (has("detail_video_hidden_by_default")) {
+                val hidden = get("detail_video_hidden_by_default")
+                require(hidden is Boolean) { "视频隐藏设置格式无效" }
+                hidden
+            } else false,
             mlPerSpurt = getDouble("ml_per_spurt").toFloat(),
             defaultVolumeMode = parseBackupDefaultVolumeMode(
                 optString("default_volume_mode", DefaultVolumeMode.MILLILITERS.storedValue)

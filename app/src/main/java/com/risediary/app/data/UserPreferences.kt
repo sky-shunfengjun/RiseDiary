@@ -104,6 +104,7 @@ class UserPreferences internal constructor(
         com.risediary.app.data.backup.SettingsSnapshot(
             username = UsernamePolicy.normalize(prefs[KEY_USERNAME].orEmpty()),
             liveUpdatesEnabled = prefs[KEY_LIVE_UPDATES_ENABLED] ?: true,
+            detailVideoHiddenByDefault = prefs[KEY_DETAIL_VIDEO_HIDDEN] ?: false,
             predictionMaxTicks = com.risediary.app.util.PredictionQuantitySettings.normalizeStoredMaximum(prefs[KEY_PREDICTION_MAX_TICKS] ?: 80),
             mlPerSpurt = prefs[KEY_ML_PER_SPURT] ?: 2f,
             defaultVolumeMode = DefaultVolumeMode.fromStoredValue(prefs[KEY_DEFAULT_VOLUME_MODE]),
@@ -148,6 +149,10 @@ class UserPreferences internal constructor(
     val defaultVolumeMode: Flow<DefaultVolumeMode> = safeData.map { prefs ->
         DefaultVolumeMode.fromStoredValue(prefs[KEY_DEFAULT_VOLUME_MODE])
     }
+
+    // Privacy-sensitive reads must never substitute a visible default after IO failure.
+    val detailVideoHiddenByDefault: Flow<Boolean> = dataStore.data.map { it[KEY_DETAIL_VIDEO_HIDDEN] ?: false }
+    suspend fun setDetailVideoHiddenByDefault(hidden: Boolean) { edit { it[KEY_DETAIL_VIDEO_HIDDEN] = hidden } }
 
     // A failed read must not re-enable a setting the user disabled.
     val liveUpdatesEnabled: Flow<Boolean> = dataStore.data.map { it[KEY_LIVE_UPDATES_ENABLED] ?: true }
@@ -519,6 +524,7 @@ class UserPreferences internal constructor(
         dataStore.edit { prefs ->
             prefs[KEY_USERNAME] = UsernamePolicy.normalize(settings.username)
             prefs[KEY_LIVE_UPDATES_ENABLED] = settings.liveUpdatesEnabled
+            prefs[KEY_DETAIL_VIDEO_HIDDEN] = settings.detailVideoHiddenByDefault
             prefs[KEY_PREDICTION_MAX_TICKS] = com.risediary.app.util.PredictionQuantitySettings.normalizeStoredMaximum(settings.predictionMaxTicks)
             prefs[KEY_ML_PER_SPURT] = settings.mlPerSpurt
             prefs[KEY_DEFAULT_VOLUME_MODE] = settings.defaultVolumeMode.storedValue
@@ -626,6 +632,7 @@ class UserPreferences internal constructor(
     companion object {
         private val KEY_USERNAME = stringPreferencesKey("username")
         private val KEY_LIVE_UPDATES_ENABLED = booleanPreferencesKey("live_updates_enabled")
+        private val KEY_DETAIL_VIDEO_HIDDEN = booleanPreferencesKey("detail_video_hidden_by_default")
         private val KEY_PREDICTION_MAX_TICKS = intPreferencesKey("prediction_max_ticks")
         private val KEY_ML_PER_SPURT = floatPreferencesKey("ml_per_spurt")
         private val KEY_DEFAULT_VOLUME_MODE = stringPreferencesKey("default_volume_mode")

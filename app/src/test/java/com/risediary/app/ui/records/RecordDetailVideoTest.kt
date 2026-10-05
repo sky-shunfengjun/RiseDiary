@@ -116,7 +116,8 @@ class RecordDetailVideoTest {
             f.vm.refresh()
             runCurrent()
             assertEquals(original, f.vm.flight.value)
-            assertNotNull(f.vm.error.value)
+            assertNull("A video provider failure must be shown in the video region", f.vm.error.value)
+            assertEquals(VideoAccessState.INVALID, f.vm.videoAccess.value)
             assertFalse(f.vm.videoBusy.value)
             f.failCheck = false
             f.vm.refresh()
