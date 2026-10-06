@@ -93,14 +93,17 @@ internal fun InlineStatusContent(
     onRetry: (() -> Unit)? = null,
     enabled: Boolean = true,
     fullScreen: Boolean = false,
-    error: Boolean = true
+    error: Boolean = true,
+    backgroundColor: Color = Color.Unspecified
 ) {
     val visibleMessages = messages.filter { it.isNotBlank() }.distinct()
     if (visibleMessages.isEmpty()) return
     val colors = MiuixTheme.colorScheme
-    val ownBackdrop = rememberLayerBackdrop { drawRect(colors.surface); drawContent() }
-    // A status region can live inside the page's capture layer: never sample its own glass.
-    val sharedBackdrop = backdrop
+    val captureColor = if (backgroundColor == Color.Unspecified) colors.surface else backgroundColor
+    val ownBackdrop = rememberLayerBackdrop { drawRect(captureColor); drawContent() }
+    // Page content may itself be recorded into backdrop. Its retry must use a sibling leaf.
+    // Fullscreen supplies the separate video/background layer and can safely keep sampling it.
+    val sharedBackdrop = backdrop.takeIf { fullScreen || onRetry == null }
     val foreground = if (fullScreen) Color.White else if (error) colors.error else colors.onSurfaceVariantSummary
     Box(modifier) {
         if (sharedBackdrop == null) Box(Modifier.matchParentSize().layerBackdrop(ownBackdrop))

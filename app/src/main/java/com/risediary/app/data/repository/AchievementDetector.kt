@@ -44,8 +44,8 @@ class AchievementDetector @Inject constructor(
             candidates += "record_volume_high"
         }
 
-        val distinctTags = flightRepository.getRecent(1000)
-            .flatMap { TagJson.decode(it.methodTags) }
+        val distinctTags = flightRepository.getAllMethodTags()
+            .flatMap(TagJson::decode)
             .distinct()
         if (distinctTags.size >= 5) candidates += "tag_5_types"
 

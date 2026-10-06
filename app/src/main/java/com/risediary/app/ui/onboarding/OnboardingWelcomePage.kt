@@ -1,151 +1,53 @@
+/* Copyright (C) 2026 sky-shunfengjun. SPDX-License-Identifier: GPL-3.0-only */
 package com.risediary.app.ui.onboarding
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.risediary.app.R
-import com.risediary.app.ui.theme.LocalRiseDarkTheme
-import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.Surface
+import com.risediary.app.ui.onboarding.original.originalOnboardingSummary
+import com.risediary.app.ui.onboarding.original.originalOnboardingText
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.theme.MiuixTheme
-import com.risediary.app.ui.icons.AppIcons
 
+/** Welcome is native. Completion uses the host transition, with no second animation clock. */
+@Suppress("UNUSED_PARAMETER")
 @Composable
-internal fun WelcomeOnboardingPage() {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(LocalOnboardingScrollState.current)
-            .padding(top = LocalOnboardingContentTop.current)
-            .padding(horizontal = 4.dp, vertical = 12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center
-    ) {
-        InstrumentHero()
-        Spacer(modifier = Modifier.height(30.dp))
-        Text(
-            text = stringResource(R.string.onboarding_welcome_title),
-            fontSize = MiuixTheme.textStyles.title1.fontSize,
-            fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center,
-            color = MiuixTheme.colorScheme.onSurface
-        )
-        Spacer(modifier = Modifier.height(12.dp))
-        Text(
-            text = stringResource(R.string.onboarding_welcome_subtitle),
-            fontSize = MiuixTheme.textStyles.headline1.fontSize,
-            textAlign = TextAlign.Center,
-            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-            modifier = Modifier.padding(horizontal = 20.dp)
-        )
-        Surface(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp),
-            shape = RoundedCornerShape(14.dp),
-            color = MiuixTheme.colorScheme.primary.copy(alpha = 0.08f)
-        ) {
-            Row(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                Icon(
-                    AppIcons.Info,
-                    contentDescription = stringResource(R.string.onboarding_usage_disclaimer_title),
-                    tint = MiuixTheme.colorScheme.primary,
-                    modifier = Modifier.size(18.dp)
-                )
-                Text(
-                    text = stringResource(R.string.usage_disclaimer),
-                    fontSize = MiuixTheme.textStyles.body2.fontSize,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                )
-            }
-        }
-        Spacer(modifier = Modifier.height(28.dp))
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            WelcomeStatus(AppIcons.Storage, stringResource(R.string.onboarding_status_local), Modifier.weight(1f))
-            WelcomeStatus(AppIcons.CloudOff, stringResource(R.string.onboarding_status_no_account), Modifier.weight(1f))
-            WelcomeStatus(AppIcons.Tune, stringResource(R.string.onboarding_status_editable), Modifier.weight(1f))
-        }
-    }
-}
-
-@Composable
-private fun InstrumentHero() {
-    val dark = LocalRiseDarkTheme.current
-    val accent = if (dark) Color(0xFF59C3FF) else Color(0xFF087FCC)
-    Box(modifier = Modifier.size(176.dp), contentAlignment = Alignment.Center) {
-        Canvas(modifier = Modifier.fillMaxSize()) {
-            drawCircle(accent.copy(alpha = 0.08f))
-            drawCircle(accent.copy(alpha = 0.28f), size.minDimension * 0.42f, style = Stroke(2.dp.toPx()))
-            drawCircle(accent.copy(alpha = 0.16f), size.minDimension * 0.29f, style = Stroke(1.dp.toPx()))
-            repeat(12) { index ->
-                val angle = Math.toRadians(index * 30.0)
-                val outer = size.minDimension * 0.48f
-                val inner = size.minDimension * 0.44f
-                val center = Offset(size.width / 2f, size.height / 2f)
-                drawLine(
-                    accent.copy(alpha = 0.28f),
-                    Offset(center.x + kotlin.math.cos(angle).toFloat() * inner, center.y + kotlin.math.sin(angle).toFloat() * inner),
-                    Offset(center.x + kotlin.math.cos(angle).toFloat() * outer, center.y + kotlin.math.sin(angle).toFloat() * outer),
-                    1.dp.toPx()
-                )
-            }
-        }
-        Image(
-            painterResource(R.drawable.app_icon),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier.size(92.dp).clip(RoundedCornerShape(28.dp))
-        )
-    }
-}
-
-@Composable
-private fun WelcomeStatus(icon: ImageVector, text: String, modifier: Modifier = Modifier) {
-    Surface(modifier, RoundedCornerShape(16.dp), color = MiuixTheme.colorScheme.surface.copy(alpha = 0.72f)) {
+internal fun OnboardingHero(complete: Boolean, scrollState: ScrollState, animate: Boolean) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
         Column(
-            Modifier.padding(horizontal = 6.dp, vertical = 12.dp),
+            Modifier.fillMaxWidth().verticalScroll(scrollState).heightIn(min = maxHeight)
+                .padding(horizontal = 24.dp, vertical = 28.dp),
+            verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Icon(icon, null, tint = MiuixTheme.colorScheme.primary)
+            Image(
+                painterResource(R.drawable.app_icon), null,
+                Modifier.size(90.dp).testTag("oobe_hero_icon"),
+            )
+            Spacer(Modifier.height(30.dp))
             Text(
-                text,
-                fontSize = MiuixTheme.textStyles.footnote1.fontSize,
-                textAlign = TextAlign.Center,
-                color = MiuixTheme.colorScheme.onSurface
+                stringResource(if (complete) R.string.oobe_complete_title else R.string.app_name),
+                Modifier.fillMaxWidth(), fontSize = if (complete) 24.sp else 32.sp,
+                fontWeight = FontWeight.Medium, textAlign = TextAlign.Center,
+                color = if (complete) Color.White else originalOnboardingText(),
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                stringResource(if (complete) R.string.oobe_complete_subtitle else R.string.oobe_welcome_subtitle),
+                Modifier.fillMaxWidth(), fontSize = 14.sp, textAlign = TextAlign.Center,
+                color = if (complete) Color.White.copy(alpha = 0.7f) else originalOnboardingSummary(),
             )
         }
     }

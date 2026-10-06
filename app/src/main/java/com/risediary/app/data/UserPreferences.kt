@@ -96,6 +96,40 @@ class UserPreferences internal constructor(
     }
 
     internal suspend fun rawSnapshot(): Preferences = dataStore.data.first().toPreferences()
+    // Never substitute defaults after an IO error: the guide can save what it displays.
+    val onboardingSettings: Flow<OnboardingSettingsSnapshot> = dataStore.data.map { prefs ->
+        val settings = settingsSnapshot(prefs)
+        OnboardingSettingsSnapshot(
+            username = settings.username,
+            themeMode = settings.themeMode,
+            predictionMaxTicks = settings.predictionMaxTicks,
+            detailVideoHiddenByDefault = settings.detailVideoHiddenByDefault,
+            dailyReminderEnabled = settings.dailyReminderEnabled,
+            inactiveReminderEnabled = settings.inactiveReminderEnabled,
+            inactiveReminderDays = settings.inactiveReminderDays,
+            inactiveReminderTime = settings.inactiveReminderTime,
+            reminderTime = if (!settings.dailyReminderEnabled && settings.inactiveReminderEnabled) settings.inactiveReminderTime else settings.dailyReminderTime,
+            appLockEnabled = prefs[KEY_APP_LOCK_ENABLED] ?: false,
+            biometricEnabled = prefs[KEY_BIOMETRIC_UNLOCK_ENABLED] ?: false,
+            liveUpdatesEnabled = settings.liveUpdatesEnabled,
+        )
+    }
+
+    /** Only explicit changes in the guide update the paired recommendation. */
+    suspend fun setOnboardingReminders(enabledChanged: Boolean, enabled: Boolean, timeChanged: Boolean, time: String) {
+        val normalizedTime = normalizeReminderTime(time)
+        edit { prefs ->
+            if (enabledChanged) {
+                prefs[KEY_DAILY_REMINDER_ENABLED] = enabled
+                prefs[KEY_INACTIVE_REMINDER_ENABLED] = enabled
+                if (enabled) prefs[KEY_INACTIVE_REMINDER_DAYS] = 7
+            }
+            if (timeChanged || (enabledChanged && enabled)) {
+                prefs[KEY_DAILY_REMINDER_TIME] = normalizedTime
+                prefs[KEY_INACTIVE_REMINDER_TIME] = normalizedTime
+            }
+        }
+    }
     internal suspend fun restoreRaw(snapshot: Preferences) {
         dataStore.updateData { snapshot }
     }
@@ -257,6 +291,13 @@ class UserPreferences internal constructor(
 
     val reminderConfiguration: Flow<ReminderConfiguration> =
         safeData.map(::toReminderConfiguration)
+
+    // Scheduling must not treat an IO fallback as a user disabling reminders.
+    internal val strictReminderConfiguration: Flow<ReminderConfiguration> =
+        dataStore.data.map(::toReminderConfiguration)
+
+    internal suspend fun getReminderConfiguration(): ReminderConfiguration =
+        toReminderConfiguration(dataStore.data.first())
 
     // --- Setters ---
 

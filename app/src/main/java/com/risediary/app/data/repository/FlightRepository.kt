@@ -37,6 +37,7 @@ interface FlightRepository {
     suspend fun totalDistinctDays(): Int
     suspend fun getDistinctFlightDates(): List<String>
     suspend fun getRecent(limit: Int = 100): List<Flight>
+    suspend fun getAllMethodTags(): List<String> = getAll().map(Flight::methodTags)
     suspend fun getByTag(tag: String): List<Flight>
     suspend fun countByTag(tag: String): Int
     suspend fun getDayCountsSince(since: Long): Map<String, Int>
@@ -62,6 +63,7 @@ class RoomFlightRepository @Inject constructor(
     }
     override suspend fun getById(id: Long): Flight? = dao.getById(id)
     override suspend fun getAll(): List<Flight> = dao.getAll()
+    override suspend fun getAllMethodTags(): List<String> = dao.getAllMethodTags()
     override suspend fun getAllStartTimes(): List<Long> = dao.getAllStartTimes()
 
     override suspend fun countToday(): Int {

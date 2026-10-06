@@ -214,7 +214,7 @@ class TimerViewModel @Inject constructor(
         finishing = false
         session.value.sessionId?.let { id ->
             awaitCommand({ controller.cancelFinish(id) },
-                { it.sessionId == id && it.status == TimerStatus.PAUSED && it.finishCandidate == null },
+                { it.sessionId == id && it.isActive && it.finishCandidate == null },
                 "未能取消，请重试")
         }
     }

@@ -1,97 +1,50 @@
+/* Copyright (C) 2026 sky-shunfengjun. SPDX-License-Identifier: GPL-3.0-only */
 package com.risediary.app.ui.onboarding
 
-import com.risediary.app.ui.components.PageTopBlurLayout
-import com.risediary.app.ui.components.rememberTopBlurProgress
-import com.risediary.app.ui.components.LocalPageEffectsActive
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.layout.onSizeChanged
 import android.Manifest
 import android.content.pm.PackageManager
+import android.content.Context
+import android.content.Intent
 import android.os.Build
-import com.risediary.app.ui.components.PageBackHandler as BackHandler
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.asPaddingValues
-import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.MotionDurationScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.net.toUri
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.risediary.app.R
-import com.risediary.app.reminder.ReminderType
-import com.risediary.app.ui.components.LiquidAlertDialog
-import com.risediary.app.ui.components.LiquidDialogHost
-import com.risediary.app.ui.components.ProvideLiquidDialogHost
-import com.risediary.app.ui.components.WheelColumn
-import com.risediary.app.ui.components.liquidDialogCancelButtonColors
-import com.risediary.app.ui.components.liquidDialogConfirmButtonColors
-import com.risediary.app.ui.components.rememberLiquidDialogHostState
+import com.risediary.app.ui.components.*
+import com.risediary.app.ui.onboarding.original.originalOnboardingText
+import com.risediary.app.ui.icons.AppIcons
 import com.risediary.app.ui.lock.AppLockScreen
 import com.risediary.app.ui.lock.LockMode
+import com.risediary.app.ui.policy.PolicySheet
 import com.risediary.app.ui.settings.SettingsViewModel
-import com.risediary.app.ui.settings.openExactAlarmSettings
-import com.risediary.app.ui.settings.openReminderNotificationSettings
-import com.risediary.app.ui.settings.reminderNotificationsAvailable
 import com.risediary.app.ui.theme.RiseDiaryTheme
-import java.time.LocalTime
-import java.util.Locale
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.CancellationException
-import com.risediary.app.data.DataMaintenanceBusyException
+import com.risediary.app.ui.theme.SystemBarIconOverride
+import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
-enum class OnboardingMode {
-    FIRST_RUN,
-    REVIEW
-}
-
-private const val WELCOME_PAGE = 0
-private const val PROFILE_PAGE = 1
-private const val THEME_PAGE = 2
-private const val RECORDING_PAGE = 3
-private const val PRIVACY_PAGE = 4
+enum class OnboardingMode { FIRST_RUN, REVIEW }
 
 @Composable
 fun OnboardingScreen(
@@ -100,462 +53,178 @@ fun OnboardingScreen(
     onSecurityVerified: ((String?) -> Unit)? = null,
     onManageAppLock: (() -> Unit)? = null,
     viewModel: OnboardingViewModel = hiltViewModel(),
-    settingsViewModel: SettingsViewModel = hiltViewModel()
+    settingsViewModel: SettingsViewModel = hiltViewModel(),
 ) {
+    val ui by viewModel.ui.collectAsStateWithLifecycle()
+    val motion = viewModel.motion
+    val durationScale = rememberCoroutineScope().coroutineContext[MotionDurationScale]?.scaleFactor ?: 1f
+    val persistedTheme by settingsViewModel.themeMode.collectAsStateWithLifecycle()
     val context = LocalContext.current
     val activity = remember(context) { context.findFragmentActivity() }
-    val systemDark = isSystemInDarkTheme()
-    val saveError by viewModel.errorMessage.collectAsStateWithLifecycle()
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val pageActive = LocalPageEffectsActive.current
+    val focus = LocalFocusManager.current
+    val keyboard = LocalSoftwareKeyboardController.current
+    val updatedUi by rememberUpdatedState(ui)
+    var resumed by remember(lifecycle) { mutableStateOf(lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) }
+    var notificationsAllowed by remember(context) { mutableStateOf(onboardingNotificationsAllowed(context)) }
+    var permissionRequested by remember { mutableStateOf(false) }
 
-    val persistedUsername by settingsViewModel.username.collectAsStateWithLifecycle()
-    val persistedTheme by settingsViewModel.themeMode.collectAsStateWithLifecycle()
-    val persistedPredictionSettings by settingsViewModel.predictionSettings.collectAsStateWithLifecycle()
-    val appLockEnabled by settingsViewModel.appLockEnabled.collectAsStateWithLifecycle()
-    val biometricEnabled by
-        settingsViewModel.biometricUnlockEnabled.collectAsStateWithLifecycle()
-    val dailyReminderEnabled by
-        settingsViewModel.dailyReminderEnabled.collectAsStateWithLifecycle()
-    val inactiveReminderEnabled by
-        settingsViewModel.inactiveReminderEnabled.collectAsStateWithLifecycle()
-    val dailyReminderTime by
-        settingsViewModel.dailyReminderTime.collectAsStateWithLifecycle()
-
-    val pageScrollStates = listOf(
-        rememberScrollState(), rememberScrollState(), rememberScrollState(),
-        rememberScrollState(), rememberScrollState()
-    )
-    var page by rememberSaveable { mutableIntStateOf(WELCOME_PAGE) }
-    var usernameDraft by rememberSaveable { mutableStateOf(persistedUsername) }
-    var usernameDirty by rememberSaveable { mutableStateOf(false) }
-    var themeDraft by rememberSaveable { mutableStateOf(persistedTheme) }
-    var themeDirty by rememberSaveable { mutableStateOf(false) }
-    var predictionMaxDraft by rememberSaveable { mutableIntStateOf(persistedPredictionSettings.maxTicks ?: 80) }
-    var recordingDirty by rememberSaveable { mutableStateOf(false) }
-    var reminderTimeDraft by rememberSaveable { mutableStateOf(dailyReminderTime) }
-    var reminderTimeDirty by rememberSaveable { mutableStateOf(false) }
-
-    var onboardingCredential by remember { mutableStateOf<String?>(null) }
-    var showLockSetup by rememberSaveable { mutableStateOf(false) }
-    var showTimePicker by rememberSaveable { mutableStateOf(false) }
-    var showNotificationBlockedDialog by rememberSaveable { mutableStateOf(false) }
-    var showExactAlarmDialog by rememberSaveable { mutableStateOf(false) }
-    var finishing by rememberSaveable { mutableStateOf(false) }
-    val onboardingScope = rememberCoroutineScope()
-
-    LaunchedEffect(persistedUsername) {
-        if (!usernameDirty) usernameDraft = persistedUsername
-    }
-    LaunchedEffect(persistedTheme) {
-        if (!themeDirty) themeDraft = persistedTheme
-    }
-    LaunchedEffect(persistedPredictionSettings.maxTicks) {
-        persistedPredictionSettings.maxTicks?.let { if (!recordingDirty) predictionMaxDraft = it }
-    }
-    LaunchedEffect(dailyReminderTime) {
-        if (!reminderTimeDirty) reminderTimeDraft = dailyReminderTime
-    }
-
-    val enableRecommendedReminders = {
-        settingsViewModel.applyRecommendedReminders(true, reminderTimeDraft)
-        if (!settingsViewModel.exactAlarmsAllowed()) showExactAlarmDialog = true
-    }
-    val notificationPermissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        if (granted && reminderNotificationsAvailable(context)) {
-            enableRecommendedReminders()
-        } else {
-            showNotificationBlockedDialog = true
+    LaunchedEffect(viewModel) { viewModel.start() }
+    DisposableEffect(viewModel, activity) {
+        onDispose {
+            // Activity recreation keeps the memory session; leaving this guide releases it.
+            if (activity?.isChangingConfigurations != true) viewModel.endSession()
         }
     }
-
-    fun requestRecommendedReminders(enabled: Boolean) {
-        if (!enabled) {
-            settingsViewModel.applyRecommendedReminders(false, reminderTimeDraft)
-            return
-        }
-        val runtimePermissionMissing =
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                ContextCompat.checkSelfPermission(
-                    context,
-                    Manifest.permission.POST_NOTIFICATIONS
-                ) != PackageManager.PERMISSION_GRANTED
-        when {
-            runtimePermissionMissing ->
-                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-            reminderNotificationsAvailable(context) -> enableRecommendedReminders()
-            else -> showNotificationBlockedDialog = true
-        }
-    }
-
-    fun finish(saveReminderTime: Boolean) {
-        if (finishing) return
-        finishing = true
-        onboardingScope.launch {
-            try {
-                settingsViewModel.awaitOnboardingWrites()
-                val completed = viewModel.finish(
-                    firstRun = mode == OnboardingMode.FIRST_RUN,
-                    reminderTime = reminderTimeDraft.takeIf { saveReminderTime }
-                )
-                if (completed) {
-                    onSecurityVerified?.invoke(onboardingCredential)
-                    onDone()
-                }
-            } catch (error: DataMaintenanceBusyException) {
-                viewModel.reportSaveFailure(error)
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (error: Exception) {
-                viewModel.reportSaveFailure(error)
-            } finally {
-                finishing = false
+    DisposableEffect(lifecycle, context) {
+        val observer = LifecycleEventObserver { _, _ ->
+            resumed = lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
+            if (resumed) {
+                notificationsAllowed = onboardingNotificationsAllowed(context)
             }
         }
+        lifecycle.addObserver(observer)
+        onDispose { lifecycle.removeObserver(observer) }
     }
-
-    BackHandler(enabled = page > WELCOME_PAGE || mode == OnboardingMode.REVIEW) {
-        if (page > WELCOME_PAGE) page-- else onDone()
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        notificationsAllowed = onboardingNotificationsAllowed(context)
+        settingsViewModel.refreshReminderSchedules()
     }
+    fun requestNotifications() {
+        if (!pageActive || !updatedUi.ready || updatedUi.step != OnboardingStep.NOTIFICATIONS || updatedUi.transitioning || updatedUi.saving) return
+        runCatching {
+            if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                val canRequest = !permissionRequested || activity?.let { ActivityCompat.shouldShowRequestPermissionRationale(it, Manifest.permission.POST_NOTIFICATIONS) } == true
+                if (canRequest) {
+                    permissionRequested = true
+                    permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                } else openOnboardingSystemPage(context, Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName))
+            } else openOnboardingSystemPage(context, Intent(Settings.ACTION_APP_NOTIFICATION_SETTINGS).putExtra(Settings.EXTRA_APP_PACKAGE, context.packageName))
+        }.onSuccess { viewModel.clearActionFailure() }.onFailure { viewModel.reportActionFailure(OnboardingPermissionAction.NOTIFICATIONS) }
+    }
+    fun goBack() {
+        if (!pageActive) return
+        focus.clearFocus()
+        keyboard?.hide()
+        if (!viewModel.back()) {
+            if (mode == OnboardingMode.REVIEW) onDone() else activity?.finish()
+        }
+    }
+    // Welcome in review mode belongs to the normal navigator, retaining its predictive return.
+    PageBackHandler(enabled = ui.document == null && (ui.step != OnboardingStep.WELCOME || ui.modalOpen || ui.saving || ui.transitioning)) { goBack() }
 
-    // The draft is the source of truth while the flow is open. Persisted settings may
-    // still be catching up after saving the theme, which previously caused a brief light
-    // flash on the following pages.
-    val previewTheme = resolveOnboardingPreviewTheme(themeDraft, persistedTheme)
-
-    if (showLockSetup) {
-        RiseDiaryTheme(themeMode = previewTheme) {
+    val previewTheme = resolveOnboardingPreviewTheme(ui.themeMode, persistedTheme)
+    // Outside the draft theme: leaving an unsaved preview restores the parent's bars.
+    SystemBarIconOverride(forceLightIcons = ui.step == OnboardingStep.WELCOME || ui.step == OnboardingStep.COMPLETE)
+    RiseDiaryTheme(themeMode = previewTheme) {
+        if (ui.lockSetup) {
             AppLockScreen(
                 mode = LockMode.CREATE,
                 onDone = {
                     settingsViewModel.applyOnboardingLockDefaults()
-                    showLockSetup = false
-                    if (settingsViewModel.biometricAvailable) {
-                        settingsViewModel.requestBiometricUnlock(true, activity)
-                    }
+                    viewModel.closeLockSetup()
                 },
-                onCancel = { showLockSetup = false },
-                onCredentialVerified = { onboardingCredential = it }
+                onCancel = viewModel::closeLockSetup,
+                onCredentialVerified = viewModel::recordCredential,
             )
-        }
-        return
-    }
-
-    RiseDiaryTheme(themeMode = previewTheme) {
-        val backdrop = rememberLayerBackdrop()
-        val dialogHostState = rememberLiquidDialogHostState()
-        val density = LocalDensity.current
-        val cockpitTopInsetPx = with(density) {
-            if (mode == OnboardingMode.FIRST_RUN) {
-                0f
-            } else {
-                WindowInsets.statusBars
-                    .asPaddingValues()
-                    .calculateTopPadding()
-                    .toPx()
+        } else {
+            val backdrop = rememberLayerBackdrop()
+            val scrollStates = List(OnboardingStep.entries.size) { rememberScrollState() }
+            val dialogHost = rememberLiquidDialogHostState()
+            LaunchedEffect(motion, durationScale) {
+                if (durationScale <= 0f) motion.advanceBy(0f, durationScale = 0f)
             }
-        }
-        val cockpitWindowHeightPx = LocalView.current.height.toFloat()
-        var headerHeight by remember(density) { mutableStateOf(64.dp) }
-        ProvideLiquidDialogHost(dialogHostState) {
-            PageTopBlurLayout(
-                progress = rememberTopBlurProgress(pageScrollStates[page]),
-                topBarHeight = if (page > WELCOME_PAGE) headerHeight else 48.dp,
-                fadeHeight = if (page > WELCOME_PAGE) 24.dp else 0.dp,
-                overlay = {
-                    if (page > WELCOME_PAGE) {
-                        Box(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 20.dp)) {
-                            Box(Modifier.onSizeChanged { headerHeight = with(density) { it.height.toDp() } }) {
-                                SetupProgressHeader(step = page, backdrop = backdrop, onBack = { page-- })
-                            }
-                        }
+            OnboardingMotionClock(motion, resumed && pageActive, durationScale)
+            fun next() {
+                if (!pageActive || !motion.canContinue) return
+                focus.clearFocus()
+                keyboard?.hide()
+                viewModel.next(mode == OnboardingMode.FIRST_RUN,
+                    beforeSave = settingsViewModel::awaitOnboardingWrites,
+                    onFinished = { onSecurityVerified?.invoke(viewModel.verifiedCredential()); onDone() })
+            }
+            fun retry() {
+                if (!pageActive || ui.saving || ui.transitioning || motion.isTransitioning) return
+                if (ui.readError != null) viewModel.retryRead()
+                else if (ui.saveError == null && ui.actionError != null) {
+                    when (ui.actionError) {
+                        OnboardingPermissionAction.NOTIFICATIONS -> requestNotifications()
+                        null -> Unit
                     }
-                }
-            ) {
-                CockpitBackdrop(
-                    topInsetPx = cockpitTopInsetPx,
-                    windowHeightPx = cockpitWindowHeightPx,
-                    modifier = Modifier.layerBackdrop(backdrop)
-                )
-
-            Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    // Both modes keep content inside the system bars; the cockpit
-                    // backdrop still draws edge-to-edge behind them (immersive).
-                    .statusBarsPadding()
-                    .navigationBarsPadding()
-                    .imePadding()
-                    .padding(horizontal = 20.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                AnimatedContent(
-                    targetState = page,
-                    transitionSpec = {
-                        if (targetState > initialState) {
-                            (slideInHorizontally { it / 4 } + fadeIn()) togetherWith
-                                (slideOutHorizontally { -it / 4 } + fadeOut())
-                        } else {
-                            (slideInHorizontally { -it / 4 } + fadeIn()) togetherWith
-                                (slideOutHorizontally { it / 4 } + fadeOut())
-                        }
-                    },
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxWidth(),
-                    label = "onboarding_page"
-                ) { currentPage ->
-                    val effectsActive = LocalPageEffectsActive.current && currentPage == page
-                    CompositionLocalProvider(
-                        LocalOnboardingScrollState provides pageScrollStates[currentPage],
-                        LocalOnboardingContentTop provides if (currentPage > WELCOME_PAGE) headerHeight + 16.dp else 12.dp,
-                        LocalPageEffectsActive provides effectsActive
-                    ) {
-                        when (currentPage) {
-                            WELCOME_PAGE -> WelcomeOnboardingPage()
-                            PROFILE_PAGE -> ProfileOnboardingPage(
-                                username = usernameDraft,
-                                onUsernameChange = {
-                                    usernameDirty = true
-                                    usernameDraft = it.take(40)
+                } else next()
+            }
+            ProvideLiquidDialogHost(dialogHost) {
+                Box(Modifier.fillMaxSize()) {
+                    // Sample a background sibling; glass dialogs cannot sample their own tree.
+                    Box(Modifier.matchParentSize().layerBackdrop(backdrop).background(
+                        com.risediary.app.ui.onboarding.original.originalOnboardingBackground()
+                    ))
+                    NativeOnboardingHost(
+                        ui = ui,
+                        frame = motion.visualFrame,
+                        active = resumed && pageActive,
+                        onNext = ::next,
+                        onBack = ::goBack,
+                        onTransitionSettled = viewModel::transitionSettled,
+                        primaryEnabled = motion.canContinue,
+                        introCenter = motion.introCenter,
+                        onGeometry = { center, button, viewport ->
+                            motion.placeViewport(viewport)
+                            motion.placeWelcomeButton(button)
+                            motion.startIntro(center, animationsEnabled = durationScale > 0f)
+                        },
+                        content = { step, interactive ->
+                            val controlsEnabled = interactive && (step.ordinal < OnboardingStep.PROFILE.ordinal || ui.ready)
+                            Column(Modifier.fillMaxSize()) {
+                                Box(Modifier.weight(1f).fillMaxWidth()) {
+                                    when (step) {
+                                        OnboardingStep.WELCOME -> Unit
+                                        OnboardingStep.STATEMENT -> StatementOnboardingPage(ui.acceptedStatement, interactive, scrollStates[step.ordinal], backdrop, viewModel::setAccepted, viewModel::openDocument)
+                                        OnboardingStep.PROFILE -> ProfileOnboardingPage(ui.username, controlsEnabled, scrollStates[step.ordinal], viewModel::setUsername)
+                                        OnboardingStep.THEME -> ThemeOnboardingPage(ui.themeMode, scrollStates[step.ordinal], viewModel::setTheme, enabled = controlsEnabled)
+                                        OnboardingStep.PREDICTION -> RecordingOnboardingPage(ui.predictionMaxTicks.takeIf { ui.ready }, scrollStates[step.ordinal], viewModel::setPrediction, enabled = controlsEnabled)
+                                        OnboardingStep.PRIVACY -> PrivacyOnboardingPage(
+                                            ui, scrollStates[step.ordinal], backdrop, controlsEnabled,
+                                            settingsViewModel.biometricAvailable, viewModel::openLockSetup,
+                                            onManageAppLock?.let { manage -> { if (controlsEnabled) manage() } },
+                                            { checked -> if (controlsEnabled) settingsViewModel.requestBiometricUnlock(checked, activity) }, viewModel::setVideoHidden,
+                                        )
+                                        OnboardingStep.NOTIFICATIONS -> NotificationsOnboardingPage(
+                                            ui, scrollStates[step.ordinal], backdrop, controlsEnabled, notificationsAllowed,
+                                            ::requestNotifications, viewModel::setLiveUpdates,
+                                        )
+                                        OnboardingStep.COMPLETE -> OnboardingHero(true, scrollStates[step.ordinal], resumed && pageActive)
+                                    }
                                 }
-                            )
-                            THEME_PAGE -> ThemeOnboardingPage(
-                                themeMode = themeDraft,
-                                backdrop = backdrop,
-                                onThemeSelected = {
-                                    themeDirty = true
-                                    themeDraft = it
+                                if (step == ui.step && step.ordinal >= OnboardingStep.PROFILE.ordinal) {
+                                    val messages = listOfNotNull(ui.readError, ui.saveError,
+                                        ui.actionError?.let { stringResource(R.string.oobe_system_action_error) })
+                                    if (messages.isNotEmpty()) Column(Modifier.fillMaxWidth().padding(horizontal = 30.dp, vertical = 8.dp)) {
+                                        messages.forEach { Text(it, style = MiuixTheme.textStyles.body2,
+                                            color = originalOnboardingText()) }
+                                        OnboardingAction(stringResource(R.string.action_retry), AppIcons.Refresh, backdrop, ::retry,
+                                            enabled = interactive, modifier = Modifier.padding(top = 8.dp))
+                                    } else if (ui.loading) Text(stringResource(R.string.oobe_loading), style = MiuixTheme.textStyles.body2,
+                                        modifier = Modifier.padding(horizontal = 30.dp, vertical = 8.dp), color = originalOnboardingText())
                                 }
-                            )
-                            RECORDING_PAGE -> RecordingOnboardingPage(
-                                predictionMaxTicks = if (recordingDirty) predictionMaxDraft else persistedPredictionSettings.maxTicks,
-                                backdrop = backdrop,
-                                onPredictionMaximumChange = { recordingDirty = true; predictionMaxDraft = it }
-                            )
-                            else -> PrivacyOnboardingPage(
-                                appLockEnabled = appLockEnabled,
-                                biometricAvailable = settingsViewModel.biometricAvailable,
-                                biometricEnabled = biometricEnabled,
-                                recommendedRemindersEnabled =
-                                    dailyReminderEnabled && inactiveReminderEnabled,
-                                reminderTime = reminderTimeDraft,
-                                backdrop = backdrop,
-                                onCreateAppLock = { showLockSetup = true },
-                                onManageAppLock = onManageAppLock,
-                                onEnableBiometric = {
-                                    settingsViewModel.requestBiometricUnlock(true, activity)
-                                },
-                                onRecommendedRemindersChange = ::requestRecommendedReminders,
-                                onEditReminderTime = { showTimePicker = true }
-                            )
-                        }
-                    }
-                }
-
-                saveError?.let { message ->
-                    Text(
-                        message,
-                        color = MiuixTheme.colorScheme.error,
-                        style = MiuixTheme.textStyles.body2,
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
-                    )
-                }
-                when (page) {
-                    WELCOME_PAGE -> WelcomeAction(
-                        backdrop = backdrop,
-                        onClick = { page = PROFILE_PAGE }
-                    )
-                    PROFILE_PAGE -> SetupBottomActions(
-                        backdrop = backdrop,
-                        onLater = {
-                            usernameDraft = persistedUsername
-                            usernameDirty = false
-                            page = THEME_PAGE
-                        },
-                        onContinue = {
-                            viewModel.saveProfile(usernameDraft) {
-                                usernameDirty = false
-                                page = THEME_PAGE
                             }
-                        }
-                    )
-                    THEME_PAGE -> SetupBottomActions(
-                        backdrop = backdrop,
-                        onLater = {
-                            themeDraft = persistedTheme
-                            themeDirty = false
-                            page = RECORDING_PAGE
                         },
-                        onContinue = {
-                            viewModel.saveTheme(themeDraft) {
-                                themeDirty = false
-                                page = RECORDING_PAGE
-                            }
-                        }
                     )
-                    RECORDING_PAGE -> SetupBottomActions(
-                        backdrop = backdrop,
-                        continueEnabled = recordingDirty || persistedPredictionSettings.maxTicks != null,
-                        onLater = {
-                            predictionMaxDraft = persistedPredictionSettings.maxTicks ?: 80
-                            recordingDirty = false
-                            page = PRIVACY_PAGE
-                        },
-                        onContinue = {
-                            val ticks = if (recordingDirty) predictionMaxDraft else persistedPredictionSettings.maxTicks
-                            if (ticks != null) viewModel.saveRecordingPreferences(predictionMaxTicks = ticks) {
-                                recordingDirty = false
-                                page = PRIVACY_PAGE
-                            }
-                        }
-                    )
-                    else -> SetupBottomActions(
-                        backdrop = backdrop,
-                        laterLabel = stringResource(R.string.onboarding_finish_later),
-                        continueLabel = stringResource(
-                            if (mode == OnboardingMode.FIRST_RUN) {
-                                R.string.onboarding_save_and_start
-                            } else {
-                                R.string.onboarding_done
-                            }
-                        ),
-                        onLater = { finish(saveReminderTime = false) },
-                        onContinue = { finish(saveReminderTime = true) }
-                    )
+                    LiquidDialogHost(state = dialogHost, backdrop = backdrop)
+                    PolicySheet(ui.document, viewModel::closeDocument)
                 }
-                Spacer(modifier = Modifier.height(20.dp))
-            }
-                if (showTimePicker) {
-            val parsed = remember(reminderTimeDraft) {
-                runCatching { LocalTime.parse(reminderTimeDraft) }
-                    .getOrDefault(LocalTime.of(22, 0))
-            }
-            var pickedHour by remember(reminderTimeDraft) {
-                mutableIntStateOf(parsed.hour)
-            }
-            var pickedMinute by remember(reminderTimeDraft) {
-                mutableIntStateOf(parsed.minute)
-            }
-            LiquidAlertDialog(
-                onDismissRequest = { showTimePicker = false },
-                title = {
-                    Text(
-                        stringResource(R.string.settings_choose_reminder_time),
-                        modifier = Modifier.fillMaxWidth(),
-                        textAlign = TextAlign.Center
-                    )
-                },
-                text = {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 8.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        WheelColumn(
-                            label = stringResource(R.string.time_hour),
-                            range = 0..23,
-                            value = pickedHour,
-                            onValueChange = { pickedHour = it },
-                            modifier = Modifier.weight(1f)
-                        )
-                        WheelColumn(
-                            label = stringResource(R.string.time_minute),
-                            range = 0..59,
-                            value = pickedMinute,
-                            onValueChange = { pickedMinute = it },
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                },
-                confirmButton = {
-                    TextButton(
-                        text = stringResource(R.string.action_confirm),
-                        onClick = {
-                            reminderTimeDirty = true
-                            reminderTimeDraft = String.format(
-                                Locale.ROOT,
-                                "%02d:%02d",
-                                pickedHour,
-                                pickedMinute
-                            )
-                            if (dailyReminderEnabled && inactiveReminderEnabled) {
-                                settingsViewModel.applyRecommendedReminders(
-                                    true,
-                                    reminderTimeDraft
-                                )
-                            }
-                            showTimePicker = false
-                        },
-                        colors = liquidDialogConfirmButtonColors()
-                    )
-                },
-                dismissButton = {
-                    TextButton(
-                        text = stringResource(R.string.action_cancel),
-                        onClick = { showTimePicker = false },
-                        colors = liquidDialogCancelButtonColors()
-                    )
-                }
-            )
-                }
-
-                if (showNotificationBlockedDialog) {
-            LiquidAlertDialog(
-                onDismissRequest = { showNotificationBlockedDialog = false },
-                title = { Text(stringResource(R.string.settings_notification_blocked_title)) },
-                text = { Text(stringResource(R.string.settings_notification_blocked_message)) },
-                confirmButton = {
-                    TextButton(
-                        text = stringResource(R.string.settings_open_system_settings),
-                        onClick = {
-                            showNotificationBlockedDialog = false
-                            openReminderNotificationSettings(context)
-                        },
-                        colors = liquidDialogConfirmButtonColors()
-                    )
-                },
-                dismissButton = {
-                    TextButton(
-                        text = stringResource(R.string.action_cancel),
-                        onClick = { showNotificationBlockedDialog = false },
-                        colors = liquidDialogCancelButtonColors()
-                    )
-                }
-            )
-                }
-
-                if (showExactAlarmDialog) {
-            LiquidAlertDialog(
-                onDismissRequest = { showExactAlarmDialog = false },
-                title = { Text(stringResource(R.string.settings_exact_alarm_dialog_title)) },
-                text = { Text(stringResource(R.string.settings_exact_alarm_dialog_message)) },
-                confirmButton = {
-                    TextButton(
-                        text = stringResource(R.string.settings_open_system_settings),
-                        onClick = {
-                            showExactAlarmDialog = false
-                            openExactAlarmSettings(context)
-                        },
-                        colors = liquidDialogConfirmButtonColors()
-                    )
-                },
-                dismissButton = {
-                    TextButton(
-                        text = stringResource(R.string.action_cancel),
-                        onClick = { showExactAlarmDialog = false },
-                        colors = liquidDialogCancelButtonColors()
-                    )
-                }
-            )
-                }
-                LiquidDialogHost(
-                    state = dialogHostState,
-                    backdrop = backdrop
-                )
             }
         }
     }
+}
+
+private fun onboardingNotificationsAllowed(context: Context): Boolean = runCatching {
+    NotificationManagerCompat.from(context).areNotificationsEnabled() &&
+        (Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED)
+}.getOrDefault(false)
+
+private fun openOnboardingSystemPage(context: Context, intent: Intent) {
+    try { context.startActivity(intent) }
+    catch (_: Exception) { context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, "package:${context.packageName}".toUri())) }
 }

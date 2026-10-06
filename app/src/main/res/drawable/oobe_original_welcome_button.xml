@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Copyright (C) 2023-2026 HyperCeiler Contributions
+  Copyright (C) 2026 sky-shunfengjun
+  SPDX-License-Identifier: AGPL-3.0-only
+  Adapted from fixed HyperCeiler 5e4686069dd7ab1f3697e256d5fc7d68fb73e317.
+  See LICENSES/AGPL-3.0.txt and THIRD-PARTY-NOTICES.
+-->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android" android:color="#33FFFFFF">
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="#99000000" />
+        </shape>
+    </item>
+    <item android:id="@android:id/mask">
+        <shape android:shape="oval"><solid android:color="@android:color/white" /></shape>
+    </item>
+</ripple>

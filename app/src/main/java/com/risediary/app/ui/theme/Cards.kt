@@ -23,6 +23,22 @@ enum class RiseCardStyle {
     Metric,
 }
 
+/** Shared surface color for independent glass capture leaves. */
+@Composable
+internal fun riseCardBackgroundColor(style: RiseCardStyle = RiseCardStyle.Standard): Color {
+    val isDark = LocalRiseDarkTheme.current
+    return when (style) {
+        RiseCardStyle.Standard ->
+            if (isDark) Color(0xFF20242B) else Color(0xF7FFFFFF)
+        RiseCardStyle.Emphasis ->
+            if (isDark) MiuixTheme.colorScheme.primary.copy(alpha = 0.16f)
+            else MiuixTheme.colorScheme.primary.copy(alpha = 0.10f)
+        RiseCardStyle.Metric ->
+            if (isDark) Color.White.copy(alpha = 0.055f)
+            else Color(0xFFF4F7FB)
+    }
+}
+
 internal fun riseCardPressFeedbackEnabled(
     hasOnClick: Boolean,
     enabled: Boolean
@@ -46,16 +62,7 @@ fun RiseCard(
     content: @Composable ColumnScope.() -> Unit
 ) {
     val isDark = LocalRiseDarkTheme.current
-    val containerColor = when (style) {
-        RiseCardStyle.Standard ->
-            if (isDark) Color(0xFF20242B) else Color(0xF7FFFFFF)
-        RiseCardStyle.Emphasis ->
-            if (isDark) MiuixTheme.colorScheme.primary.copy(alpha = 0.16f)
-            else MiuixTheme.colorScheme.primary.copy(alpha = 0.10f)
-        RiseCardStyle.Metric ->
-            if (isDark) Color.White.copy(alpha = 0.055f)
-            else Color(0xFFF4F7FB)
-    }
+    val containerColor = riseCardBackgroundColor(style)
     val cornerRadius = 24.dp
     val shape = RoundedCornerShape(cornerRadius)
     val border = if (isDark) {

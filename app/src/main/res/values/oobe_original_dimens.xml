@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Copyright (C) 2023-2026 HyperCeiler Contributions
+  Copyright (C) 2026 sky-shunfengjun
+  SPDX-License-Identifier: AGPL-3.0-only
+  Adapted from fixed HyperCeiler 5e4686069dd7ab1f3697e256d5fc7d68fb73e317.
+  See LICENSES/AGPL-3.0.txt and THIRD-PARTY-NOTICES.
+-->
+<resources>
+    <dimen name="oobe_original_logo_size">90dp</dimen>
+    <dimen name="oobe_original_logo_text_gap">20dp</dimen>
+    <dimen name="oobe_original_title_size">32sp</dimen>
+    <dimen name="oobe_original_subtitle_size">14sp</dimen>
+    <dimen name="oobe_original_next_size">70dp</dimen>
+    <dimen name="oobe_original_next_padding">4.5dp</dimen>
+    <dimen name="oobe_original_welcome_min_gap">24dp</dimen>
+    <dimen name="oobe_original_action_corner">18dp</dimen>
+</resources>

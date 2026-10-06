@@ -1,5 +1,6 @@
 package com.risediary.app.ui.form
 
+import com.risediary.app.testing.retainForTest
 import android.content.Context
 import android.content.ContextWrapper
 import androidx.room.Room
@@ -540,7 +541,7 @@ class FormPersistenceTest {
             context,
             registry,
             RecordFormSessionStore(preferences.maintenanceGate)
-        ).also { store.put(UUID.randomUUID().toString(), it) }
+        ).also { store.retainForTest(UUID.randomUUID().toString(), it) }
     }
 
     private suspend fun initDirect(vm: FormViewModel) {

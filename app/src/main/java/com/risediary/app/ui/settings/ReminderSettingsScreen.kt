@@ -76,6 +76,13 @@ fun ReminderSettingsScreen(
     var editingReminderTime by remember { mutableStateOf<ReminderType?>(null) }
     var editingMonthlyDay by remember { mutableStateOf(false) }
 
+    fun promptExactAlarm() {
+        val dialogs = reminderEnabledDialogs(ReminderPermissionDialogs(
+            showNotificationBlockedDialog, showExactAlarmDialog), exactAlarmsAllowed)
+        showNotificationBlockedDialog = dialogs.notificationBlocked
+        showExactAlarmDialog = dialogs.exactAlarm
+    }
+
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) { granted ->
@@ -89,7 +96,7 @@ fun ReminderSettingsScreen(
         if (granted && notificationsAvailable) {
             target?.let {
                 vm.setReminderEnabled(it, true)
-                if (!exactAlarmsAllowed) showNotificationBlockedDialog = false; showExactAlarmDialog = true
+                promptExactAlarm()
             }
             if (shouldTest) testSent = vm.sendTestNotification()
             if (shouldScheduleBackgroundTest) {
@@ -159,7 +166,7 @@ fun ReminderSettingsScreen(
         notificationsAvailable = reminderNotificationsAvailable(context)
         if (notificationsAvailable) {
             vm.setReminderEnabled(type, true)
-            if (!exactAlarmsAllowed) showNotificationBlockedDialog = false; showExactAlarmDialog = true
+            promptExactAlarm()
         } else {
             requestPermission(type = type)
         }
@@ -169,7 +176,10 @@ fun ReminderSettingsScreen(
         notificationsAvailable = reminderNotificationsAvailable(context)
         if (notificationsAvailable) {
             testSent = vm.sendTestNotification()
-            if (!testSent) showExactAlarmDialog = false; showNotificationBlockedDialog = true
+            val dialogs = reminderTestDialogs(ReminderPermissionDialogs(
+                showNotificationBlockedDialog, showExactAlarmDialog), testSent)
+            showNotificationBlockedDialog = dialogs.notificationBlocked
+            showExactAlarmDialog = dialogs.exactAlarm
         } else {
             requestPermission(immediateTest = true)
         }
@@ -191,7 +201,7 @@ fun ReminderSettingsScreen(
             backgroundTestScheduled = vm.scheduleBackgroundReminderTest()
             if (!backgroundTestScheduled) {
                 exactAlarmsAllowed = vm.exactAlarmsAllowed()
-                if (!exactAlarmsAllowed) showNotificationBlockedDialog = false; showExactAlarmDialog = true
+                promptExactAlarm()
             }
         }
     }
@@ -455,4 +465,21 @@ fun ReminderSettingsScreen(
             openExactAlarmSettings(context)
         }
     )
+}
+
+internal data class ReminderPermissionDialogs(val notificationBlocked: Boolean = false,
+    val exactAlarm: Boolean = false)
+
+internal fun reminderEnabledDialogs(previous: ReminderPermissionDialogs,
+    exactAlarmsAllowed: Boolean): ReminderPermissionDialogs {
+    return if (!exactAlarmsAllowed) {
+        ReminderPermissionDialogs(notificationBlocked = false, exactAlarm = true)
+    } else previous
+}
+
+internal fun reminderTestDialogs(previous: ReminderPermissionDialogs,
+    testSent: Boolean): ReminderPermissionDialogs {
+    return if (!testSent) {
+        ReminderPermissionDialogs(notificationBlocked = true, exactAlarm = false)
+    } else previous
 }

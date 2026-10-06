@@ -38,6 +38,9 @@ interface FlightDao {
     @Query("SELECT DISTINCT videoUri FROM flights WHERE videoUri IS NOT NULL")
     suspend fun getVideoUris(): List<String>
 
+    @Query("SELECT methodTags FROM flights")
+    suspend fun getAllMethodTags(): List<String>
+
     // --- Statistics queries ---
 
     @Query("SELECT COUNT(*) FROM flights WHERE startTime >= :dayStart AND startTime < :dayEnd")

@@ -24,7 +24,7 @@ class TimeChangeReceiver : BroadcastReceiver() {
         val pendingResult = goAsync()
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             try {
-                scheduler.syncAll()
+                scheduler.syncAll(recalculate = shouldRecalculateReminderTime(intent?.action))
             } catch (_: Exception) {
                 // WorkManager keeps the existing requests if rescheduling temporarily fails.
             } finally {
@@ -33,6 +33,9 @@ class TimeChangeReceiver : BroadcastReceiver() {
         }
     }
 }
+
+internal fun shouldRecalculateReminderTime(action: String?): Boolean =
+    action == Intent.ACTION_TIME_CHANGED || action == Intent.ACTION_TIMEZONE_CHANGED
 
 internal fun isSupportedTimeChangeAction(action: String?): Boolean = action in setOf(
     Intent.ACTION_BOOT_COMPLETED,

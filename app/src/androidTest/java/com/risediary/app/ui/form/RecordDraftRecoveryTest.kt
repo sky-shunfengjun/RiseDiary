@@ -1,5 +1,6 @@
 package com.risediary.app.ui.form
 
+import com.risediary.app.testing.retainForTest
 import android.content.Context
 import android.content.ContextWrapper
 import androidx.lifecycle.ViewModelStore
@@ -85,7 +86,7 @@ class RecordFormSessionLifecycleTest {
                 override fun discard(sessionId: String) = Unit
                 override fun reset(sessionId: String) = Unit
             }, context, videoRegistry, forms).also {
-            models.put(UUID.randomUUID().toString(), it)
+            models.retainForTest(UUID.randomUUID().toString(), it)
             it.initSession(formId)
         }
     }

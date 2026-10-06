@@ -30,6 +30,45 @@ import java.io.IOException
 @OptIn(ExperimentalCoroutinesApi::class)
 class OnboardingPersistenceTest {
     @Test
+    fun nicknameLimitKeepsFortyCompleteUnicodeCharacters() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val prefs = UserPreferences(FailingStore(), DataMaintenanceGate())
+        val vm = OnboardingViewModel(prefs)
+        try {
+            vm.saveProfile("🚀".repeat(41)) {}
+            runCurrent()
+            assertEquals("🚀".repeat(40), prefs.username.first())
+        } finally {
+            vm.viewModelScope.cancel()
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
+    fun repeatedContinueWhileSavingProducesOnlyOneSaveAndAdvance() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val barrier = CompletableDeferred<Unit>()
+        val store = FailingStore().also { it.writeBarrier = barrier }
+        val prefs = UserPreferences(store, DataMaintenanceGate())
+        val vm = OnboardingViewModel(prefs)
+        try {
+            var advances = 0
+            vm.saveProfile("第一次") { advances++ }
+            runCurrent()
+            vm.saveProfile("重复点击") { advances++ }
+            runCurrent()
+            barrier.complete(Unit)
+            runCurrent()
+            assertEquals(1, advances)
+            assertEquals("第一次", prefs.username.first())
+        } finally {
+            barrier.complete(Unit)
+            vm.viewModelScope.cancel()
+            Dispatchers.resetMain()
+        }
+    }
+
+    @Test
     fun profileWriteFailureKeepsPageCallbackPendingAndCanRetrySameDraft() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val store = FailingStore()
@@ -149,8 +188,10 @@ class OnboardingPersistenceTest {
     private class FailingStore : DataStore<Preferences> {
         private val values = MutableStateFlow(emptyPreferences())
         var writeFailure: Exception? = null
+        var writeBarrier: CompletableDeferred<Unit>? = null
         override val data: Flow<Preferences> = values
         override suspend fun updateData(transform: suspend (Preferences) -> Preferences): Preferences {
+            writeBarrier?.await()
             writeFailure?.let { throw it }
             val result = transform(values.value)
             values.value = result

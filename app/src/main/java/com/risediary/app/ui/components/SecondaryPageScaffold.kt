@@ -247,12 +247,15 @@ fun LiquidAddButton(
 fun LiquidBackButton(
     onClick: () -> Unit,
     backdrop: Backdrop,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
 ) {
     LiquidGlassButton(
         onClick = onClick,
         backdrop = backdrop,
         modifier = modifier.size(48.dp),
+        enabled = enabled,
+        isInteractive = enabled,
         tint = MiuixTheme.colorScheme.primary.copy(alpha = 0.035f),
         height = 48.dp,
         horizontalPadding = 0.dp,

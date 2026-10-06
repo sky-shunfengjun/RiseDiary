@@ -13,6 +13,31 @@
   - 液态玻璃组件（开关、滑杆、底部导航栏）以及拖拽动画、手势检测、交互高光工具改编自该项目示例代码，并进行了本地化修改；对应源码文件头部使用 `SPDX-License-Identifier: GPL-3.0-only AND Apache-2.0` 双声明，改编部分在 GPL-3.0 项目中继续适用 Apache License 2.0。
   - Apache License 2.0 完整正文见 `LICENSES/Apache-2.0.txt`（与上游许可证文本一致）。
 
+### KernelSU Manager 流动光晕
+
+- 项目地址：https://github.com/tiann/KernelSU
+- 许可证：GNU General Public License v3.0（GPL-3.0-only）
+- 用途：既有关于页的澎湃3背景、绘制节点及配置改编；Dev33将这些文件移到`ui/components/effect`供引导共用，保留源码原许可声明。关于页默认效果不变。
+
+### miuix 示例的澎湃2流动光晕
+
+- 项目地址：https://github.com/compose-miuix-ui/miuix
+- 来源：v0.9.4，提交`39c40f99844227b853f0049a0933b1f3ae6c00ba`的`example/shared/src/commonMain/kotlin/component/effect/`。
+- 许可证：Apache License 2.0，Copyright 2026, compose-miuix-ui contributors；全文见`LICENSES/Apache-2.0.txt`。
+- 用途：`OS2BgFrag.kt`的原着色器以及`BgEffectConfig.kt`的OS2手机/平板浅深色预设；源码保留上游版权、许可和来源，包名调整为共用组件。Dev33将OS2配置加入既有GPL光晕封装，增加效果选择及Android能力回退；原始OS2色值和着色器不改。
+
+### HyperCeiler 初始引导、完整背景与动画
+
+- 项目地址：https://github.com/ReChronoRain/HyperCeiler
+- 许可证：GNU Affero General Public License v3.0；Copyright (C) 2023-2026 HyperCeiler Contributions。
+- 固定来源：提交 `5e4686069dd7ab1f3697e256d5fc7d68fb73e317` 的 provision 模块；许可全文 `LICENSES/AGPL-3.0.txt` 与上游逐字节一致。
+- Dev35 完整保留 `glow.glsl`，本地为 `app/src/main/res/raw/oobe_original_glow.glsl`，SHA-256 `6100d759b3810ccd99de8bcbecb82d22d7b4227ac095cce599f9f4592e4e76db`；未叠加 Dev34 的 miuix OS2 子背景或第二套光波。
+- `ui/onboarding/original/OriginalGlowPainterApi33.kt`、`OriginalIntroBackground.kt`、`OriginalMotionCurves.kt` 改编自 GlowPainter、GlowController、RenderViewLayout 与 AnimHelper；保留完整参数、0.2 绘制比例和原版时序，以当前会话时钟及公开 API 代替原私有控制器。原版标志 alpha 未显式给出时长，300ms 为本项目适配。
+- `OriginalOnboardingLayouts.kt`、`res/layout/oobe_original_welcome.xml`、`res/values/oobe_original_*`、`res/drawable/oobe_original_*` 改编原欢迎布局、尺寸、色值与按钮；使用本项目名称、现有图标及八步内容。fan 控件、私有模糊、Root/Xposed/品牌检测、AIDL/Service 和 ActivityOptionsHelper 不引入。
+- 改编源文件保留 AGPL-3.0-only 版权与来源。`OnboardingOriginalVisualTest.kt` 的独立原版 shader 对照夹具同样保留上游声明。公开单容器裁切及后端能力策略是本项目的新实现，按 GPL-3.0-only 提供。
+- Android 12/12L 用 Canvas 保留原彩色环带、显露几何和配色渐变，以渐变代替完整 simplex 噪声；不可用时静态回退。公开圆形展开代替 MIUI 跨 Activity 特效，不能宣称私有效果在所有品牌上逐像素相同。
+- GPL-3.0 LICENSE 第13节允许与 AGPL-3.0 组合，组合部分按各自许可提供源码，不把 AGPL 来源标成 MIT/Apache。原 Dev34 分层绘制文件已退役；共用“关于”页光晕不变。
+- 详细来源与必要差异见 `docs/reviews/2026-10-05-dev35-source-map.md`。
 ## 设计灵感
 
 ### luleme

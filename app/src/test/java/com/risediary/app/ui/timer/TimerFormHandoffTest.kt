@@ -24,6 +24,26 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TimerFormHandoffTest {
+    @Test fun cancellingRunningNotificationFinishAcceptsTheRunningAcknowledgementWithoutTimeout() = runTest {
+        Dispatchers.setMain(StandardTestDispatcher(testScheduler))
+        val fixture = Fixture()
+        try {
+            val running = fixture.holder.state.value.copy(status = TimerStatus.RUNNING,
+                resumedAtElapsedRealtime = 30_000L)
+            fixture.holder.set(running.copy(finishCandidate =
+                TimerFinishPolicy.capture(running, 120_000L, 30_000L)))
+            runCurrent()
+            fixture.model.cancelFinish()
+            runCurrent()
+            assertEquals(TimerStatus.RUNNING, fixture.holder.state.value.status)
+            assertNull(fixture.holder.state.value.finishCandidate)
+            assertFalse("A successful running acknowledgement must release the controls", fixture.model.busy)
+            advanceTimeBy(6_001L)
+            runCurrent()
+            assertNull("Successful cancellation must not later become a failure", fixture.model.error)
+        } finally { fixture.close(); Dispatchers.resetMain() }
+    }
+
     @Test fun lateDiscardAcknowledgementStillExitsAfterTheTimeout() = runTest {
         Dispatchers.setMain(StandardTestDispatcher(testScheduler))
         val fixture = Fixture()

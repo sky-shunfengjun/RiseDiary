@@ -17,10 +17,20 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import com.risediary.app.data.backup.BackupRecoveryJournal
+import com.risediary.app.data.backup.newBackupRecoveryJournal
+import android.content.Context
+import dagger.hilt.android.qualifiers.ApplicationContext
 
 /** Only data replacement is exclusive; timer and update persistence use separate stores. */
 @Singleton
-class DataMaintenanceGate @Inject constructor() {
+class DataMaintenanceGate() {
+    internal var recoveryJournal: BackupRecoveryJournal? = null
+        private set
+    @Inject constructor(@ApplicationContext context: Context) : this() {
+        attachRecoveryJournal(newBackupRecoveryJournal(context))
+    }
+    internal constructor(journal: BackupRecoveryJournal) : this() { attachRecoveryJournal(journal) }
     enum class State { IDLE, WORKING, RECOVERY_REQUIRED }
     private val writes = Mutex()
     private val operation = Mutex()
@@ -30,6 +40,17 @@ class DataMaintenanceGate @Inject constructor() {
     val state = mutableState.asStateFlow()
     private val mutableNotices = MutableSharedFlow<String>(extraBufferCapacity = 8)
     val notices = mutableNotices.asSharedFlow()
+
+    private fun attachRecoveryJournal(journal: BackupRecoveryJournal) = synchronized(guard) {
+        if (recoveryJournal == null) recoveryJournal = journal
+        if (recoveryJournal?.pending() == true) mutableState.value = State.RECOVERY_REQUIRED
+    }
+
+    /** Directly constructed callers share the same startup protection as the injected gate. */
+    internal fun recoveryJournal(context: Context): BackupRecoveryJournal = synchronized(guard) {
+        if (recoveryJournal == null) attachRecoveryJournal(newBackupRecoveryJournal(context))
+        checkNotNull(recoveryJournal)
+    }
 
     /** Call while holding the write permit, so replacement cannot occur between the check and write. */
     fun <T : Any> requireCurrent(expected: T, current: T?) {
@@ -100,7 +121,9 @@ class DataMaintenanceGate @Inject constructor() {
                 writes.withLock {
                     try { block() } finally {
                         synchronized(guard) {
-                            if (mutableState.value == State.WORKING) mutableState.value = State.IDLE
+                            if (mutableState.value == State.WORKING) {
+                                mutableState.value = if (recoveryJournal?.pending() == true) State.RECOVERY_REQUIRED else State.IDLE
+                            }
                         }
                     }
                 }

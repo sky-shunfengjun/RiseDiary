@@ -1,5 +1,6 @@
 package com.risediary.app.media
 
+import com.risediary.app.data.RecordTimestamps
 import com.risediary.app.data.DataMaintenanceGate
 import com.risediary.app.data.entity.Flight
 import com.risediary.app.data.repository.FlightRepository
@@ -20,7 +21,7 @@ class RecordVideoRelinker @Inject constructor(
                 gate.requireCurrent(expected, flights.getById(expected.id))
                 val video = grants.acquire(owner, uri, flags, setOfNotNull(expected.videoUri)).getOrThrow()
                 val updated = expected.copy(videoUri = video.uriString,
-                    videoDisplayName = video.displayName, videoMimeType = video.mimeType, updatedAt = clock.millis())
+                    videoDisplayName = video.displayName, videoMimeType = video.mimeType, updatedAt = RecordTimestamps.updatedAt(expected.createdAt, expected.updatedAt, clock.millis()))
                 flights.update(updated)
                 updated
             }

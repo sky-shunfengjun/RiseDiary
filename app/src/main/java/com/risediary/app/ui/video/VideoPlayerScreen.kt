@@ -29,6 +29,7 @@ import com.risediary.app.R
 import com.risediary.app.ui.components.LocalPageBackdrop
 import com.risediary.app.ui.icons.AppIcons
 import com.risediary.app.ui.theme.RiseCard
+import com.risediary.app.ui.theme.riseCardBackgroundColor
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import androidx.compose.foundation.layout.Arrangement
@@ -210,50 +211,55 @@ internal fun VideoStateContent(
     val colors = MiuixTheme.colorScheme
     val foreground = if (fullScreen) Color.White else colors.onSurface
     val secondary = if (fullScreen) Color.White.copy(alpha = 0.7f) else colors.onSurfaceVariantSummary
-    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        // Animate only Compose status content, never the AndroidView or player ownership branch.
-        AnimatedContent(targetState = loading to problem, label = "video_state_content",
-            transitionSpec = {
-                (fadeIn(tween(170)) togetherWith fadeOut(tween(120)))
-                    .using(SizeTransform(clip = false, sizeAnimationSpec = { _, _ -> tween(190) }))
-            }) { (stateLoading, stateProblem) ->
-            Column(horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                if (stateLoading) {
-                    CircularProgressIndicator()
-                    Text(stringResource(R.string.video_loading), fontSize = 14.sp, color = secondary)
-                } else {
-                    Box(Modifier.size(76.dp).background(colors.primary.copy(alpha = 0.08f), RoundedCornerShape(24.dp)),
-                        contentAlignment = Alignment.Center) {
-                        Icon(if (stateProblem == null) AppIcons.Video else AppIcons.Info,
-                            contentDescription = null, tint = if (fullScreen) Color.White else colors.primary,
-                            modifier = Modifier.size(32.dp))
-                    }
-                    Text(stateProblem ?: stringResource(R.string.video_empty_title), color = foreground,
-                        fontSize = if (stateProblem == null) 17.sp else 14.sp,
-                        fontWeight = if (stateProblem == null) FontWeight.SemiBold else FontWeight.Normal,
-                        textAlign = TextAlign.Center)
-                    if (stateProblem == null && timerMode) {
-                        Text(stringResource(R.string.video_start_hint), color = secondary, fontSize = 12.sp)
+    val cardBackground = riseCardBackgroundColor()
+    val retryBackdrop = rememberLayerBackdrop { drawRect(cardBackground); drawContent() }
+    Box(modifier) {
+        if (!fullScreen) Box(Modifier.matchParentSize().layerBackdrop(retryBackdrop))
+        Column(horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            // Animate only Compose status content, never the AndroidView or player ownership branch.
+            AnimatedContent(targetState = loading to problem, label = "video_state_content",
+                transitionSpec = {
+                    (fadeIn(tween(170)) togetherWith fadeOut(tween(120)))
+                        .using(SizeTransform(clip = false, sizeAnimationSpec = { _, _ -> tween(190) }))
+                }) { (stateLoading, stateProblem) ->
+                Column(horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    if (stateLoading) {
+                        CircularProgressIndicator()
+                        Text(stringResource(R.string.video_loading), fontSize = 14.sp, color = secondary)
+                    } else {
+                        Box(Modifier.size(76.dp).background(colors.primary.copy(alpha = 0.08f), RoundedCornerShape(24.dp)),
+                            contentAlignment = Alignment.Center) {
+                            Icon(if (stateProblem == null) AppIcons.Video else AppIcons.Info,
+                                contentDescription = null, tint = if (fullScreen) Color.White else colors.primary,
+                                modifier = Modifier.size(32.dp))
+                        }
+                        Text(stateProblem ?: stringResource(R.string.video_empty_title), color = foreground,
+                            fontSize = if (stateProblem == null) 17.sp else 14.sp,
+                            fontWeight = if (stateProblem == null) FontWeight.SemiBold else FontWeight.Normal,
+                            textAlign = TextAlign.Center)
+                        if (stateProblem == null && timerMode) {
+                            Text(stringResource(R.string.video_start_hint), color = secondary, fontSize = 12.sp)
+                        }
                     }
                 }
             }
-        }
-        AnimatedUiVisibility(visible = !loading && problem != null) { active ->
-            if (fullScreen) {
-                VideoGlassButton(onRetry, backdrop, icon = AppIcons.Refresh,
-                    description = stringResource(R.string.action_retry), accent = true, fullScreen = true,
-                    enabled = active, dimWhenDisabled = false, modifier = Modifier.size(52.dp))
-            } else {
-                LiquidActionButton(stringResource(R.string.action_retry), AppIcons.Refresh, onRetry,
-                    backdrop, enabled = active)
+            AnimatedUiVisibility(visible = !loading && problem != null) { active ->
+                if (fullScreen) {
+                    VideoGlassButton(onRetry, backdrop, icon = AppIcons.Refresh,
+                        description = stringResource(R.string.action_retry), accent = true, fullScreen = true,
+                        enabled = active, dimWhenDisabled = false, modifier = Modifier.size(52.dp))
+                } else {
+                    LiquidActionButton(stringResource(R.string.action_retry), AppIcons.Refresh, onRetry,
+                        retryBackdrop, enabled = active)
+                }
             }
-        }
-        onExitFullScreen?.let {
-            VideoGlassButton(it, backdrop, icon = AppIcons.ExitFullscreen,
-                description = stringResource(R.string.video_exit_fullscreen), fullScreen = true,
-                modifier = Modifier.size(52.dp))
+            onExitFullScreen?.let {
+                VideoGlassButton(it, backdrop, icon = AppIcons.ExitFullscreen,
+                    description = stringResource(R.string.video_exit_fullscreen), fullScreen = true,
+                    modifier = Modifier.size(52.dp))
+            }
         }
     }
 }

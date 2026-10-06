@@ -6,9 +6,10 @@
  * Adapted from KernelSU Manager (https://github.com/tiann/KernelSU),
  * GPL-3.0-only. Portions mirrored from the compose-miuix-ui example.
  */
-package com.risediary.app.ui.about.effect
+package com.risediary.app.ui.components.effect
 
 import androidx.compose.animation.core.Animatable
+import android.os.Build
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -34,10 +35,11 @@ fun BgEffectBackground(
     bgModifier: Modifier = Modifier,
     isFullSize: Boolean = false,
     effectBackground: Boolean = true,
+    isOs3Effect: Boolean = true,
     alpha: () -> Float = { 1f },
     content: @Composable BoxScope.() -> Unit,
 ) {
-    if (!isRuntimeShaderSupported()) {
+    if (Build.VERSION.SDK_INT < 33 || !isRuntimeShaderSupported()) {
         Box(modifier = modifier, content = content)
         return
     }
@@ -48,10 +50,10 @@ fun BgEffectBackground(
         val isTablet = LocalConfiguration.current.smallestScreenWidthDp >= 600
         val deviceType = if (isTablet) DeviceType.PAD else DeviceType.PHONE
         val isDarkTheme = LocalRiseDarkTheme.current
-        val painter = remember { BgEffectPainter() }
+        val painter = remember(isOs3Effect) { BgEffectPainter(isOs3Effect) }
 
-        val preset = remember(deviceType, isDarkTheme) {
-            BgEffectConfig.get(deviceType, isDarkTheme)
+        val preset = remember(deviceType, isDarkTheme, isOs3Effect) {
+            BgEffectConfig.get(deviceType, isDarkTheme, isOs3Effect)
         }
 
         val colorStage = remember { Animatable(0f) }

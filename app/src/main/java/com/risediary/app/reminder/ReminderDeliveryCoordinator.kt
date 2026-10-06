@@ -4,9 +4,6 @@ import com.risediary.app.data.UserPreferences
 import com.risediary.app.data.repository.FlightRepository
 import com.risediary.app.data.repository.LengthRecordRepository
 import com.risediary.app.util.LocalTimeRanges
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import java.time.Clock
 import java.time.Instant
 import java.time.LocalDate
@@ -14,6 +11,8 @@ import java.time.YearMonth
 import java.time.ZoneId
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 @Singleton
 class ReminderDeliveryCoordinator internal constructor(
@@ -21,96 +20,86 @@ class ReminderDeliveryCoordinator internal constructor(
     private val flightRepository: FlightRepository,
     private val lengthRepository: LengthRecordRepository,
     private val clock: Clock,
+    private val plans: ReminderPlanRepository? = null,
     private val postReminder: (ReminderType) -> Boolean
 ) {
-    @Inject constructor(
-        preferences: UserPreferences,
-        flightRepository: FlightRepository,
-        lengthRepository: LengthRecordRepository,
-        notifier: ReminderNotifier,
-        clock: Clock
-    ) : this(preferences, flightRepository, lengthRepository, clock, notifier::post)
+    @Inject internal constructor(preferences: UserPreferences, flightRepository: FlightRepository,
+        lengthRepository: LengthRecordRepository, notifier: ReminderNotifier, clock: Clock,
+        plans: ReminderPlanStore) : this(preferences, flightRepository, lengthRepository, clock, plans,
+        notifier::post)
     private val deliveryMutex = Mutex()
 
-    suspend fun deliver(type: ReminderType) {
-        // Permission precedes the delivery lock: reads, notification and marker
-        // are one operation, so maintenance cannot replace data in between.
+    internal suspend fun deliver(type: ReminderType, expected: ReminderPlan? = null) {
+        // Reads, notification, marker and plan consumption share the maintenance permit.
         preferences.maintenanceGate.write {
             deliveryMutex.withLock {
-                val configuration = preferences.reminderConfiguration.first()
+                val configuration = preferences.getReminderConfiguration()
                 if (!configuration.isEnabled(type)) return@withLock
-                when (type) {
-                    ReminderType.DAILY -> deliverDaily()
-                    ReminderType.INACTIVE -> deliverInactive(configuration)
-                    ReminderType.MONTHLY_LENGTH -> deliverMonthly()
+                val zone = ZoneId.systemDefault()
+                val now = Instant.now(clock).atZone(zone)
+                val current = plans?.load(type)
+                val currentMatches = current?.matches(type, configuration, zone) == true
+                val plan = if (expected != null) {
+                    if (!currentMatches || current.consumed ||
+                        expected.consumed || !current.sameOccurrence(expected)) return@withLock
+                    if (current.targetMillis > now.toInstant().toEpochMilli()) return@withLock
+                    current
+                } else {
+                    // Old installed jobs had no payload. A matching due ledger still gives
+                    // them the original target; otherwise infer the last configured occurrence.
+                    if (currentMatches && current.consumed) return@withLock
+                    current?.takeIf { currentMatches && !it.consumed &&
+                        it.targetMillis <= now.toInstant().toEpochMilli() }
                 }
+                val target = plan?.let { Instant.ofEpochMilli(it.targetMillis).atZone(ZoneId.of(it.zoneId)) }
+                    ?: ReminderScheduleCalculator.previousOccurrence(now, type, configuration)
+                when (type) {
+                    ReminderType.DAILY -> deliverDaily(target.toLocalDate(), target.zone)
+                    ReminderType.INACTIVE -> deliverInactive(configuration, target.toLocalDate(), target.zone)
+                    ReminderType.MONTHLY_LENGTH -> deliverMonthly(YearMonth.from(target), target.zone)
+                }
+                // Skipped records, already-delivered targets and denied notification access
+                // all complete this occurrence. Only an actual successful post writes sent.
+                plan?.let { plans?.save(it.copy(consumed = true)) }
             }
         }
     }
-    private suspend fun deliverDaily() {
-        val zoneId = ZoneId.systemDefault()
-        val today = Instant.now(clock).atZone(zoneId).toLocalDate()
-        val (dayStart, dayEnd) = LocalTimeRanges.day(today, zoneId)
+
+    private suspend fun deliverDaily(day: LocalDate, zone: ZoneId) {
+        val (dayStart, dayEnd) = LocalTimeRanges.day(day, zone)
         val runtime = preferences.getReminderRuntimeState()
-        if (
-            ReminderDeliveryPolicy.shouldDeliverDaily(
+        if (ReminderDeliveryPolicy.shouldDeliverDaily(
                 hasRecordToday = flightRepository.countByRange(dayStart, dayEnd) > 0,
                 lastSentEpochDay = runtime.dailyLastSentEpochDay,
-                todayEpochDay = today.toEpochDay()
-            ) &&
-            postReminder(ReminderType.DAILY)
-        ) {
-            preferences.markDailyReminderSent(today.toEpochDay())
+                todayEpochDay = day.toEpochDay()) && postReminder(ReminderType.DAILY)) {
+            preferences.markDailyReminderSent(day.toEpochDay())
         }
     }
 
-    private suspend fun deliverInactive(configuration: ReminderConfiguration) {
-        val zoneId = ZoneId.systemDefault()
-        val today = Instant.now(clock).atZone(zoneId).toLocalDate()
+    private suspend fun deliverInactive(configuration: ReminderConfiguration, day: LocalDate, zone: ZoneId) {
         val runtime = preferences.getReminderRuntimeState()
-        val latestRecordDate = flightRepository.getRecent(1)
-            .firstOrNull()
-            ?.let { flight ->
-                Instant.ofEpochMilli(flight.startTime).atZone(zoneId).toLocalDate()
+        val latestRecordDate = flightRepository.getRecent(1).firstOrNull()?.let {
+            Instant.ofEpochMilli(it.startTime).atZone(zone).toLocalDate()
+        }
+        val anchorDate = latestRecordDate ?: runtime.inactiveEnabledEpochDay.takeIf { it >= 0L }
+            ?.let(LocalDate::ofEpochDay) ?: day.also {
+                preferences.ensureInactiveReminderAnchor(it.toEpochDay())
             }
-        val anchorDate = latestRecordDate ?: runtime.inactiveEnabledEpochDay
-            .takeIf { it >= 0L }
-            ?.let(LocalDate::ofEpochDay)
-            ?: today.also { preferences.ensureInactiveReminderAnchor(it.toEpochDay()) }
-        val lastSentDate = runtime.inactiveLastSentEpochDay
-            .takeIf { it >= 0L }
-            ?.let(LocalDate::ofEpochDay)
-        if (
-            ReminderScheduleCalculator.isInactiveDue(
-                today = today,
-                anchorDate = anchorDate,
-                lastSentDate = lastSentDate,
-                intervalDays = configuration.inactiveDays
-            ) &&
-            postReminder(ReminderType.INACTIVE)
-        ) {
-            preferences.markInactiveReminderSent(today.toEpochDay())
+        val lastSentDate = runtime.inactiveLastSentEpochDay.takeIf { it >= 0L }?.let(LocalDate::ofEpochDay)
+        if (ReminderScheduleCalculator.isInactiveDue(day, anchorDate, lastSentDate,
+                configuration.inactiveDays) && postReminder(ReminderType.INACTIVE)) {
+            preferences.markInactiveReminderSent(day.toEpochDay())
         }
     }
 
-    private suspend fun deliverMonthly() {
-        val zoneId = ZoneId.systemDefault()
-        val currentMonth = YearMonth.from(Instant.now(clock).atZone(zoneId))
+    private suspend fun deliverMonthly(month: YearMonth, zone: ZoneId) {
         val runtime = preferences.getReminderRuntimeState()
-        val hasCurrentMonthRecord = lengthRepository.getAll().any { record ->
-            YearMonth.from(
-                Instant.ofEpochMilli(record.recordDate).atZone(zoneId)
-            ) == currentMonth
+        val hasMonthRecord = lengthRepository.getAll().any {
+            YearMonth.from(Instant.ofEpochMilli(it.recordDate).atZone(zone)) == month
         }
-        if (
-            ReminderDeliveryPolicy.shouldDeliverMonthly(
-                hasRecordThisMonth = hasCurrentMonthRecord,
-                lastSentYearMonth = runtime.monthlyLastSent,
-                currentYearMonth = currentMonth.toString()
-            ) &&
-            postReminder(ReminderType.MONTHLY_LENGTH)
-        ) {
-            preferences.markMonthlyReminderSent(currentMonth.toString())
+        if (ReminderDeliveryPolicy.shouldDeliverMonthly(hasMonthRecord, runtime.monthlyLastSent,
+                month.toString()) && postReminder(ReminderType.MONTHLY_LENGTH)) {
+            preferences.markMonthlyReminderSent(month.toString())
         }
     }
 }

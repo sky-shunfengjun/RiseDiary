@@ -6,7 +6,7 @@
  * Adapted from KernelSU Manager (https://github.com/tiann/KernelSU),
  * GPL-3.0-only. Portions mirrored from the compose-miuix-ui example.
  */
-package com.risediary.app.ui.about.effect
+package com.risediary.app.ui.components.effect
 
 import android.os.Build
 import androidx.annotation.RequiresApi
@@ -17,10 +17,10 @@ import kotlin.math.cos
 import kotlin.math.sin
 
 @RequiresApi(Build.VERSION_CODES.TIRAMISU)
-internal class BgEffectPainter {
+internal class BgEffectPainter(private val isOs3: Boolean = true) {
 
     val runtimeShader by lazy {
-        RuntimeShader(OS3_BG_FRAG).also {
+        RuntimeShader(if (isOs3) OS3_BG_FRAG else OS2_BG_FRAG).also {
             initStaticUniforms(it)
         }
     }
@@ -149,7 +149,7 @@ internal class BgEffectPainter {
     }
 
     private fun applyPreset(deviceType: DeviceType, isDark: Boolean) {
-        val preset = BgEffectConfig.get(deviceType, isDark)
+        val preset = BgEffectConfig.get(deviceType, isDark, isOs3)
 
         runtimeShader.setFloatUniform("uPoints", preset.points)
         runtimeShader.setFloatUniform("uLightOffset", preset.lightOffset)

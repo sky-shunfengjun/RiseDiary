@@ -138,10 +138,7 @@ class BackupManager @Inject constructor(
         }.getOrElse { BackupResult.Failure("导出失败：${it.readableMessage()}", it) }
     }
 
-    private data class Preimage(val data: BackupData, val preferences: Preferences,
-        val drafts: List<com.risediary.app.data.draft.RecordDraftEntity>,
-        val timer: com.risediary.app.service.TimerSession)
-    private var recoveryPreimage: Preimage? = null
+    private val recoveryJournal = preferences.maintenanceGate.recoveryJournal(context)
     val maintenanceState get() = preferences.maintenanceGate.state
 
     suspend fun restoreFromUri(uri: Uri): BackupResult = withContext(Dispatchers.IO) {
@@ -172,20 +169,22 @@ class BackupManager @Inject constructor(
             val currentTimer = timerStore.load()
             check(!currentTimer.isActive) { "请先处理当前计时，再恢复或清除数据" }
             val raw = preferences.rawSnapshot()
-            val original = Preimage(snapshotLocked(raw), raw, database.recordDraftDao().getAll(), currentTimer)
-            recoveryPreimage = original
+            val originalData = snapshotLocked(raw)
+            val original = BackupRecoverySnapshot(originalData.flights, originalData.lengthRecords,
+                originalData.tags, originalData.achievements, raw, database.recordDraftDao().getAll(), currentTimer)
+            // A failed durable write cannot reach any destructive database or settings operation.
+            recoveryJournal.persist(original)
             try {
                 replaceDatabase(replacement)
                 preferences.applySettingsForMaintenance(replacement.settings)
                 if (clearLock) preferences.clearAppLockForMaintenance()
                 timerStore.save(com.risediary.app.service.TimerSession())
                 timerHolder.set(com.risediary.app.service.TimerSession())
-                recoveryPreimage = null
+                recoveryJournal.clear()
                 BackupResult.Success(if (clearLock) "所有数据已清除" else "数据恢复成功")
             } catch (failure: Throwable) {
-                val rollback = runCatching { restorePreimage(original) }
+                val rollback = runCatching { restorePreimage(original); recoveryJournal.clear() }
                 if (rollback.isSuccess) {
-                    recoveryPreimage = null
                     BackupResult.Failure("操作失败，已还原原数据：${failure.readableMessage()}", failure)
                 } else {
                     preferences.maintenanceGate.requireRecovery()
@@ -198,10 +197,10 @@ class BackupManager @Inject constructor(
     suspend fun retryRecovery(): BackupResult = withContext(Dispatchers.IO) {
         try {
             preferences.maintenanceGate.maintenance(recovery = true) {
-                val original = checkNotNull(recoveryPreimage) { "没有待还原的操作" }
                 try {
+                    val original = checkNotNull(recoveryJournal.load()) { "没有待还原的操作" }
                     restorePreimage(original)
-                    recoveryPreimage = null
+                    recoveryJournal.clear()
                     BackupResult.Success("原数据已完整还原")
                 } catch (failure: Throwable) {
                     preferences.maintenanceGate.requireRecovery()
@@ -211,15 +210,18 @@ class BackupManager @Inject constructor(
         } catch (failure: Throwable) { BackupResult.Failure("还原尚未完成，请稍后重试。", failure) }
     }
 
-    private suspend fun restorePreimage(original: Preimage) {
-        replaceDatabase(original.data, original.drafts)
+    private suspend fun restorePreimage(original: BackupRecoverySnapshot) {
+        replaceDatabaseRows(original.flights, original.lengthRecords, original.tags, original.achievements, original.drafts)
         preferences.restoreRaw(original.preferences)
         timerStore.save(original.timer)
         timerHolder.set(original.timer)
     }
 
     private suspend fun snapshot(): BackupData = preferences.maintenanceGate.write {
-        snapshotLocked(preferences.rawSnapshot())
+        snapshotLocked(preferences.rawSnapshot()).let { data ->
+            data.copy(flights = data.flights.map { flight -> flight.copy(updatedAt =
+                com.risediary.app.data.RecordTimestamps.updatedAt(flight.createdAt, flight.updatedAt, flight.updatedAt)) })
+        }
     }
 
     private suspend fun snapshotLocked(raw: Preferences): BackupData = database.withTransaction {
@@ -230,16 +232,21 @@ class BackupManager @Inject constructor(
         )
     }
     private suspend fun replaceDatabase(data: BackupData, drafts: List<com.risediary.app.data.draft.RecordDraftEntity> = emptyList()) {
+        replaceDatabaseRows(data.flights, data.lengthRecords, data.tags, data.achievements, drafts)
+    }
+
+    private suspend fun replaceDatabaseRows(flights: List<Flight>, lengths: List<LengthRecord>, tags: List<Tag>,
+        achievements: List<Achievement>, drafts: List<com.risediary.app.data.draft.RecordDraftEntity>) {
         database.withTransaction {
             database.recordDraftDao().nuke()
             database.flightDao().nuke()
             database.lengthRecordDao().nuke()
             database.tagDao().nuke()
             database.achievementDao().nuke()
-            data.flights.forEach { database.flightDao().insert(it) }
-            data.lengthRecords.forEach { database.lengthRecordDao().insert(it) }
-            data.tags.forEach { database.tagDao().insert(it) }
-            data.achievements.forEach { database.achievementDao().insert(it) }
+            flights.forEach { database.flightDao().insert(it) }
+            lengths.forEach { database.lengthRecordDao().insert(it) }
+            tags.forEach { database.tagDao().insert(it) }
+            achievements.forEach { database.achievementDao().insert(it) }
             drafts.forEach { database.recordDraftDao().insert(it) }
         }
     }

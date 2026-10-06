@@ -1,126 +1,168 @@
+/* Copyright (C) 2026 sky-shunfengjun. SPDX-License-Identifier: GPL-3.0-only */
 package com.risediary.app.ui.onboarding
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.runtime.Composable
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.kyant.backdrop.Backdrop
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.risediary.app.R
-import com.risediary.app.ui.settings.SettingsThemeItem
-import com.risediary.app.ui.theme.CardBlue
-import com.risediary.app.ui.theme.CardGreen
-import com.risediary.app.ui.theme.RiseCard
-import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.Surface
+import com.risediary.app.ui.components.LiquidSlider
+import com.risediary.app.ui.icons.AppIcons
+import com.risediary.app.ui.onboarding.original.originalOnboardingSurface
+import com.risediary.app.ui.onboarding.original.originalOnboardingSummary
+import com.risediary.app.ui.onboarding.original.originalOnboardingText
+import com.risediary.app.ui.policy.PolicyDocument
+import com.risediary.app.util.PredictionQuantitySettings
+import kotlin.math.roundToInt
+import top.yukonga.miuix.kmp.basic.Checkbox
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
-import top.yukonga.miuix.kmp.theme.MiuixTheme
-import com.risediary.app.ui.icons.AppIcons
+import top.yukonga.miuix.kmp.basic.RadioButton
 
 @Composable
-internal fun ProfileOnboardingPage(username: String, onUsernameChange: (String) -> Unit) {
-    SetupPage(AppIcons.Person, stringResource(R.string.onboarding_profile_title), stringResource(R.string.onboarding_profile_subtitle)) {
-        RiseCard(modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                TextField(
-                    value = username,
-                    onValueChange = onUsernameChange,
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    label = stringResource(R.string.settings_username),
-                    useLabelAsPlaceholder = false
-                )
-                Text(
-                    stringResource(R.string.onboarding_profile_support),
-                    fontSize = MiuixTheme.textStyles.footnote1.fontSize,
-                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                )
-                InfoRow(AppIcons.Storage, stringResource(R.string.onboarding_local_data_title), stringResource(R.string.onboarding_local_data_summary), CardGreen)
-                InfoRow(AppIcons.Backup, stringResource(R.string.onboarding_backup_title), stringResource(R.string.onboarding_backup_summary), CardBlue)
-            }
+internal fun StatementOnboardingPage(
+    accepted: Boolean, enabled: Boolean, scrollState: ScrollState, backdrop: Backdrop,
+    onAccepted: (Boolean) -> Unit, onRead: (PolicyDocument) -> Unit,
+) {
+    OnboardingPage(stringResource(R.string.oobe_statement_title), "", scrollState, icon = AppIcons.Notes) {
+        OnboardingCard(Modifier.fillMaxWidth()) {
+            Text(
+                stringResource(R.string.oobe_statement_subtitle), Modifier.padding(20.dp),
+                fontSize = 16.sp, color = originalOnboardingSummary(),
+            )
+        }
+        OnboardingAction(stringResource(R.string.policy_terms_title), AppIcons.Notes, backdrop,
+            { if (enabled) onRead(PolicyDocument.TERMS) }, enabled = enabled, centered = true)
+        OnboardingAction(stringResource(R.string.policy_privacy_title), AppIcons.Lock, backdrop,
+            { if (enabled) onRead(PolicyDocument.PRIVACY) }, enabled = enabled, centered = true)
+        Row(
+            Modifier.fillMaxWidth().heightIn(min = 56.dp).testTag("oobe_agreement")
+                .toggleable(accepted, enabled = enabled, role = Role.Checkbox,
+                    onValueChange = { if (enabled) onAccepted(it) }).padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Checkbox(
+                state = if (accepted) ToggleableState.On else ToggleableState.Off,
+                onClick = { if (enabled) onAccepted(!accepted) }, enabled = enabled,
+                modifier = Modifier.clearAndSetSemantics {},
+            )
+            Text(
+                stringResource(R.string.oobe_statement_accept), Modifier.weight(1f),
+                fontSize = 14.sp, color = originalOnboardingSummary(),
+            )
         }
     }
 }
 
 @Composable
-internal fun ThemeOnboardingPage(themeMode: String, backdrop: Backdrop, onThemeSelected: (String) -> Unit) {
-    SetupPage(AppIcons.Dashboard, stringResource(R.string.onboarding_theme_title), stringResource(R.string.onboarding_theme_subtitle)) {
-        RiseCard(modifier = Modifier.fillMaxWidth()) {
-            SettingsThemeItem(AppIcons.Dashboard, stringResource(R.string.settings_theme), themeMode, onThemeSelected)
-        }
-        MiniDashboardPreview()
-        Text(
-            stringResource(R.string.onboarding_theme_hint),
-            fontSize = MiuixTheme.textStyles.body2.fontSize,
-            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-            textAlign = TextAlign.Center,
-            modifier = Modifier.fillMaxWidth()
+internal fun ProfileOnboardingPage(
+    username: String, enabled: Boolean, scrollState: ScrollState, onUsernameChange: (String) -> Unit,
+) {
+    OnboardingPage(stringResource(R.string.oobe_profile_title), stringResource(R.string.oobe_profile_subtitle), scrollState, icon = AppIcons.Person) {
+        TextField(
+            value = username, onValueChange = { if (enabled) onUsernameChange(it) },
+            modifier = Modifier.fillMaxWidth().testTag("oobe_username"), singleLine = true,
+            enabled = enabled, label = stringResource(R.string.settings_username), useLabelAsPlaceholder = false,
         )
     }
 }
 
 @Composable
-private fun MiniDashboardPreview() {
-    RiseCard(modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Row(Modifier.fillMaxWidth(), Arrangement.SpaceBetween, Alignment.CenterVertically) {
-                Column {
-                    Text(
-                        stringResource(R.string.onboarding_preview_greeting),
-                        fontSize = MiuixTheme.textStyles.title4.fontSize,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    Text(
-                        stringResource(R.string.onboarding_preview_summary),
-                        fontSize = MiuixTheme.textStyles.body2.fontSize,
-                        color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-                    )
-                }
-                Surface(
-                    shape = CircleShape,
-                    color = MiuixTheme.colorScheme.primary.copy(alpha = 0.14f),
-                    modifier = Modifier.size(44.dp)
+internal fun ThemeOnboardingPage(
+    themeMode: String, scrollState: ScrollState, onThemeSelected: (String) -> Unit,
+    enabled: Boolean = true,
+) {
+    val options = listOf(
+        "system" to stringResource(R.string.settings_theme_system),
+        "light" to stringResource(R.string.settings_theme_light),
+        "dark" to stringResource(R.string.settings_theme_dark),
+    )
+    val currentEnabled by rememberUpdatedState(enabled)
+    val currentSelection by rememberUpdatedState(onThemeSelected)
+    OnboardingPage(stringResource(R.string.oobe_theme_title), stringResource(R.string.oobe_theme_subtitle), scrollState, icon = AppIcons.Palette) {
+        options.forEach { (key, label) ->
+            OnboardingCard(Modifier.fillMaxWidth()) {
+                Row(
+                    Modifier.fillMaxWidth().heightIn(min = 56.dp).testTag("oobe_theme_" + key)
+                        .selectable(
+                            selected = themeMode == key, enabled = enabled, role = Role.RadioButton,
+                            onClick = { if (currentEnabled) currentSelection(key) },
+                        ).padding(horizontal = 20.dp, vertical = 16.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Icon(
-                            AppIcons.FlightTakeoff,
-                            null,
-                            tint = MiuixTheme.colorScheme.primary
-                        )
-                    }
+                    Text(label, Modifier.weight(1f), fontSize = 18.sp, color = originalOnboardingText())
+                    RadioButton(themeMode == key, { if (currentEnabled) currentSelection(key) },
+                        modifier = Modifier.clearAndSetSemantics {}, enabled = enabled)
                 }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                PreviewMetric("7", stringResource(R.string.onboarding_preview_week), Modifier.weight(1f))
-                PreviewMetric("12m", stringResource(R.string.onboarding_preview_average), Modifier.weight(1f))
-                PreviewMetric("3", stringResource(R.string.onboarding_preview_badges), Modifier.weight(1f))
             }
         }
     }
 }
 
+/** The glass slider samples only its static card content. */
 @Composable
-private fun PreviewMetric(value: String, label: String, modifier: Modifier = Modifier) {
-    Surface(
-        modifier = modifier,
-        shape = RoundedCornerShape(14.dp),
-        color = MiuixTheme.colorScheme.secondaryContainer.copy(alpha = 0.55f)
-    ) {
-        Column(Modifier.padding(vertical = 10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(value, fontWeight = FontWeight.Bold, color = MiuixTheme.colorScheme.primary)
-            Text(label, fontSize = MiuixTheme.textStyles.footnote1.fontSize)
+internal fun RecordingOnboardingPage(
+    predictionMaxTicks: Int?, scrollState: ScrollState, onPredictionMaximumChange: (Int) -> Unit,
+    enabled: Boolean = true,
+) {
+    val currentEnabled by rememberUpdatedState(enabled)
+    val currentChange by rememberUpdatedState(onPredictionMaximumChange)
+    OnboardingPage(stringResource(R.string.oobe_prediction_title), stringResource(R.string.oobe_prediction_subtitle), scrollState, icon = AppIcons.WaterDrop) {
+        if (predictionMaxTicks != null) {
+            var previewTicks by remember { mutableIntStateOf(predictionMaxTicks) }
+            var adjusting by remember { mutableStateOf(false) }
+            LaunchedEffect(predictionMaxTicks) { if (!adjusting) previewTicks = predictionMaxTicks }
+            LaunchedEffect(enabled) { if (!enabled) adjusting = false }
+            val surface by rememberUpdatedState(originalOnboardingSurface())
+            val localBackdrop = rememberLayerBackdrop { drawRect(surface); drawContent() }
+            OnboardingCard(Modifier.fillMaxWidth()) {
+                Box(Modifier.fillMaxWidth()) {
+                    Column(
+                        Modifier.fillMaxWidth().layerBackdrop(localBackdrop)
+                            .padding(horizontal = 20.dp, vertical = 20.dp),
+                    ) {
+                        Text(
+                            stringResource(R.string.settings_prediction_summary, PredictionQuantitySettings.formatTicks(previewTicks)),
+                            fontSize = 18.sp, fontWeight = FontWeight.Medium, color = originalOnboardingText(),
+                        )
+                        Spacer(Modifier.height(60.dp))
+                    }
+                    LiquidSlider(
+                        value = { previewTicks / 10f },
+                        onValueChange = {
+                            if (currentEnabled) {
+                                adjusting = true
+                                previewTicks = (it * 10).roundToInt().coerceIn(1, PredictionQuantitySettings.MAX_SETTING_TICKS)
+                            }
+                        },
+                        valueRange = 0.1f..15f, steps = 148, backdrop = localBackdrop,
+                        modifier = Modifier.align(Alignment.BottomCenter).padding(horizontal = 18.dp, vertical = 10.dp)
+                            .testTag("oobe_prediction_slider"),
+                        onValueChangeFinished = {
+                            adjusting = false
+                            if (currentEnabled) currentChange(previewTicks)
+                        },
+                        enabled = enabled,
+                    )
+                }
+            }
         }
     }
 }

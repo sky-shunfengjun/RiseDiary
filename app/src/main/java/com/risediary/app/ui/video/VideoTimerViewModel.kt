@@ -19,18 +19,29 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 
 @HiltViewModel
-class VideoTimerViewModel @Inject constructor(
-    @ApplicationContext context: Context,
+class VideoTimerViewModel internal constructor(
+    val controller: VideoPlayerController,
     private val access: VideoFileAccess,
     private val grants: VideoGrantRegistry,
     private val timer: TimerController,
-    private val timerStore: TimerSessionStore,
+    private val readTimer: suspend () -> TimerSession,
     private val holder: TimerStateHolder,
     private val wallClock: Clock,
     private val elapsedClock: ElapsedRealtimeClock,
     private val savedState: SavedStateHandle
 ) : ViewModel() {
-    val controller: VideoPlayerController = Media3VideoPlayerController(context)
+    @Inject constructor(
+        @ApplicationContext context: Context,
+        access: VideoFileAccess,
+        grants: VideoGrantRegistry,
+        timer: TimerController,
+        timerStore: TimerSessionStore,
+        holder: TimerStateHolder,
+        wallClock: Clock,
+        elapsedClock: ElapsedRealtimeClock,
+        savedState: SavedStateHandle
+    ) : this(Media3VideoPlayerController(context), access, grants, timer,
+        timerStore::load, holder, wallClock, elapsedClock, savedState)
     val session = timer.state
     private val loadingState = MutableStateFlow(true)
     val loading = loadingState.asStateFlow()
@@ -137,9 +148,16 @@ class VideoTimerViewModel @Inject constructor(
     fun open(id: String) {
         if (sessionId != null) return
         sessionId = id
+        initialize(id)
+    }
+
+    /** Initialization failures must restore the session and retry its original video again. */
+    private fun initialize(id: String) {
+        loadingState.value = true
+        errorState.value = null
         viewModelScope.launch {
             try {
-                val current = holder.restoreIfIdle(timerStore::load)
+                val current = holder.restoreIfIdle(readTimer)
                 if (current.status != TimerStatus.IDLE && current.sessionId != id) {
                     errorState.value = "已有其他计时，请返回处理"
                     return@launch
@@ -155,7 +173,7 @@ class VideoTimerViewModel @Inject constructor(
                 ready = true
             } catch (_: DataMaintenanceBusyException) { errorState.value = "数据处理中，请稍后再试" }
             catch (cancelled: CancellationException) { throw cancelled }
-            catch (_: Exception) { errorState.value = "无法读取计时，请返回后重试" }
+            catch (_: Exception) { errorState.value = "无法读取计时或视频，请重试" }
             finally { loadingState.value = false }
         }
     }
@@ -233,6 +251,11 @@ class VideoTimerViewModel @Inject constructor(
 
     fun retry() {
         if (loadingState.value) return
+        if (!ready) {
+            initialize(sessionId ?: return)
+            return
+        }
+        loadingState.value = true
         viewModelScope.launch {
             try {
                 if (gate.state == VideoStartState.REQUESTED && !startedState.value) {
@@ -252,6 +275,7 @@ class VideoTimerViewModel @Inject constructor(
                 if (cancelled !is TimeoutCancellationException) throw cancelled
                 errorState.value = "无法重试，请返回后再试"
             } catch (_: Exception) { errorState.value = "视频无法访问，请返回后处理计时" }
+            finally { loadingState.value = false }
         }
     }
 

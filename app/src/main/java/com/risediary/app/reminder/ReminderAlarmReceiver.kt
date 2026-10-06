@@ -22,11 +22,14 @@ class ReminderAlarmReceiver : BroadcastReceiver() {
         val type = ReminderType.fromStoredValue(
             intent?.getStringExtra(ReminderWorker.KEY_REMINDER_TYPE)
         ) ?: return
+        val payload = intent?.getStringExtra(ReminderWorker.KEY_PLAN)
+        val plan = payload?.let { runCatching { ReminderPlanCodec.decode(it) }.getOrNull() }
+        if (payload != null && (plan == null || plan.type != type)) return
         val pendingResult = goAsync()
         CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
             var deliveryCompleted = false
             try {
-                deliveryCoordinator.deliver(type)
+                deliveryCoordinator.deliver(type, plan)
                 deliveryCompleted = true
             } catch (_: Exception) {
                 // The WorkManager fallback will retry delivery.

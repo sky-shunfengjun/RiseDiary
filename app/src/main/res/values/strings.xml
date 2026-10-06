@@ -57,59 +57,13 @@
     <string name="home_recording_tip_9">不确定是否适合自己的情况时，不要用应用统计代替医生判断</string>
     <string name="home_recording_tip_10">数据仅保存在本机，需要时可以导出备份自行保管</string>
 
-    <string name="onboarding_setup_progress">%1$02d / %2$02d</string>
-    <string name="onboarding_setup_label">个性化设置</string>
-    <string name="onboarding_welcome_title">欢迎使用起飞日记</string>
-    <string name="onboarding_welcome_subtitle">花一分钟，把记录方式、隐私和提醒调成适合你的样子。</string>
-    <string name="usage_disclaimer">本软件仅用于个人记录，不构成医学参考、诊断或治疗建议。如有不适，请及时就医。</string>
-    <string name="onboarding_usage_disclaimer_title">用途说明</string>
-    <string name="onboarding_status_local">本地保存</string>
-    <string name="onboarding_status_no_account">无需账号</string>
-    <string name="onboarding_status_editable">随时可修改</string>
-    <string name="onboarding_begin_setup">开始设置</string>
-    <string name="onboarding_age_notice">点击“开始设置”即表示您已年满 18 周岁</string>
-    <string name="onboarding_later">稍后设置</string>
-    <string name="onboarding_save_continue">保存并继续</string>
-    <string name="onboarding_finish_later">以后再说</string>
-    <string name="onboarding_save_and_start">保存并开始</string>
-    <string name="onboarding_done">完成</string>
 
-    <string name="onboarding_profile_title">设置你的称呼</string>
-    <string name="onboarding_profile_subtitle">它会出现在首页问候中，不会上传到任何地方。</string>
-    <string name="onboarding_profile_support">最多 40 个字符，留空时使用“机长”</string>
-    <string name="onboarding_local_data_title">数据保存在本机</string>
-    <string name="onboarding_local_data_summary">记录只保存在本机；检查更新时仅读取 GitHub Release 信息</string>
-    <string name="onboarding_backup_title">备份由你保管</string>
-    <string name="onboarding_backup_summary">之后可在设置中导出或恢复 ZIP 备份</string>
 
-    <string name="onboarding_theme_title">选择界面主题</string>
-    <string name="onboarding_theme_subtitle">选择后会立即预览，保存后整款应用都会使用它。</string>
-    <string name="onboarding_theme_hint">以后仍可在设置中随时切换</string>
-    <string name="onboarding_preview_greeting">你好，机长</string>
-    <string name="onboarding_preview_summary">这里会汇总近期记录与趋势</string>
-    <string name="onboarding_preview_week">本周</string>
-    <string name="onboarding_preview_average">平均</string>
-    <string name="onboarding_preview_badges">成就</string>
 
-    <string name="onboarding_recording_title">设置记录习惯</string>
-    <string name="onboarding_recording_subtitle">选择新记录默认使用的精液量输入方式。</string>
-    <string name="onboarding_timer_title">计时记录</string>
-    <string name="onboarding_timer_summary">实时计时，结束后补充详情</string>
-    <string name="onboarding_direct_title">直接记录</string>
-    <string name="onboarding_direct_summary">跳过计时，直接填写表单</string>
 
-    <string name="onboarding_privacy_setup_title">保护数据并设置提醒</string>
-    <string name="onboarding_privacy_setup_subtitle">应用锁和提醒都是可选项，以后也能随时调整。</string>
     <string name="onboarding_app_lock_summary">开启后使用 4 位 PIN；离开应用会自动锁定，计时中不打断</string>
     <string name="onboarding_enable_app_lock">开启应用锁</string>
     <string name="onboarding_manage_app_lock">管理应用锁</string>
-    <string name="onboarding_enable_biometric">启用指纹解锁</string>
-    <string name="onboarding_recommended_reminders">推荐提醒</string>
-    <string name="onboarding_recommended_reminders_summary">每天 %1$s，以及连续 7 天未记录时提醒</string>
-    <string name="onboarding_reminder_time">提醒时间 · %1$s</string>
-    <string name="onboarding_feature_dashboard">数据看板</string>
-    <string name="onboarding_feature_trends">趋势分析</string>
-    <string name="onboarding_feature_achievements">成就记录</string>
     <string name="reminder_accuracy_notice">提醒可能受手机省电、后台限制或权限设置影响而延迟；应用被强行停止后，需要重新打开才能恢复。</string>
 
     <string name="settings_title">设置</string>
@@ -212,7 +166,6 @@
     <string name="settings_version">版本 %1$s</string>
     <string name="form_data_subtitle">请预测射精量或填写具体毫升数，距离可选</string>
     <string name="form_quick_input_note">快捷输入仅为方便填写，不代表推荐范围</string>
-    <string name="about_usage_title">用途说明</string>
     <string name="about_github_title">GitHub 仓库</string>
     <string name="about_github_url">https://github.com/sky-shunfengjun/RiseDiary</string>
     <string name="about_github_content_description">打开起飞日记 GitHub 仓库</string>
@@ -220,7 +173,6 @@
     <string name="about_qq_group_url">https://qm.qq.com/q/Z3XTPXXEEW</string>
     <string name="about_qq_group_content_description">打开起飞日记 QQ 群组</string>
     <string name="about_libraries_title">第三方库</string>
-    <string name="about_privacy_content">所有记录仅存储在本地，不上传至任何服务器；检查更新时只读取 GitHub Release 信息。</string>
     <string name="update_check_button">检查更新</string>
     <string name="update_checking">正在检查…</string>
     <string name="update_button_content_description">检查起飞日记 GitHub Release 更新</string>
@@ -266,7 +218,6 @@
     </string-array>
 
     <string name="about_title">关于</string>
-    <string name="about_data_privacy">数据隐私</string>
 
     <string name="achievement_wall_title">成就墙</string>
     <string name="achievement_locked_content_description">尚未解锁</string>
@@ -594,7 +545,6 @@
     <string name="settings_prediction_summary">%1$s 毫升</string>
     <string name="settings_prediction_loading">读取中…</string>
     <string name="record_detail_original_quantity">升级前原数量</string>
-    <string name="onboarding_prediction_subtitle">设置预测滑块的最大值</string>
     <string name="video_title">视频</string>
     <string name="video_select">选择视频</string>
     <string name="video_change">更换视频</string>
@@ -658,4 +608,41 @@
     <string name="detail_video_hide">隐藏视频</string>
     <string name="detail_video_unavailable">视频无法访问，请重试或重新关联</string>
     <string name="record_detail_time_details">时间细节</string>
+    <!-- Dev33: shared offline policy documents and focused eight-step setup. -->
+    <string name="policy_terms_title">使用协议</string>
+    <string name="policy_privacy_title">隐私说明</string>
+    <string name="policy_date">更新日期：%1$s</string>
+    <string name="policy_close">关闭说明</string>
+    <string name="policy_project">项目页面</string>
+    <string name="policy_terms_body">1. 起飞日记面向年满 18 周岁的用户，用于个人记录、计时、统计和本地视频回看。请确认自己已年满 18 周岁，再继续使用。\n\n2. 数量预测、统计和健康提示仅供个人参考，不构成医学诊断或治疗建议。记录内容由用户填写或确认；如有身体不适，请及时就医。\n\n3. App 无需注册账号。记录保存在本机；更换设备时，可自行导出、导入备份。请妥善保管备份文件，并在清除数据、卸载或更换设备前确认需要保留的内容。\n\n4. 视频功能只关联用户自行选择的文件。请关联自己有权使用的内容。原文件被删除、移动或失去访问权限后，可能需要重新关联；App 不提供视频内容。\n\n5. 应用锁、指纹解锁、视频隐藏和提醒均可自行设置。应用锁用于限制 App 内的访问，不代表记录和导出的备份已被加密。系统权限被拒绝时，部分对应功能可能无法使用。\n\n6. 检查和下载更新会访问 GitHub。选择 7ED 下载通道时，安装包下载会经过第三方加速服务；自动检查更新可在设置中关闭。个人记录不会随更新请求上传。\n\n7. 本项目按 GPL-3.0 开源，第三方组件按各自许可使用。可在“关于”中查看开源说明，并通过项目页面反馈问题。</string>
+    <string name="policy_privacy_body">1. 本地保存的内容：用户填写的称呼、记录日期、开始与结束时间、用时、数量、方式、标签、备注、长度记录，以及应用设置、计时状态和视频关联信息。这些内容用于本机记录、统计、计时、提醒和回看。\n\n2. 数据传输：App 不要求注册账号，不自动将上述个人记录上传至服务器。当前版本没有云同步或手环联网同步功能。\n\n3. 更新联网：检查更新会请求 GitHub Release 信息，下载更新会访问对应安装包地址；选择 7ED 通道时会访问第三方加速服务。网络服务可能获知正常连接所需的信息，例如 IP 地址和请求信息；更新请求不包含个人记录。主动打开项目、交流群等外部链接时，将由对应浏览器或应用处理。\n\n4. 本地视频：App 通过系统文件选择器取得用户所选视频的访问权限，保存文件关联信息和显示名称，不另存一份视频。关联信息会随记录备份，视频文件本身不会打包。换设备后可能需要重新关联。\n\n5. 权限用途：通知用于计时状态和提醒；精确闹钟用于提高提醒时间的准确性；生物识别用于可选的解锁验证；安装权限用于安装用户选择的更新。进入引导不会自动弹出通知或指纹验证，相关操作由用户主动选择。\n\n6. 访问保护与备份：应用锁使用本地密码验证；指纹等生物识别由 Android 系统验证，App 不保存指纹图像。视频隐藏用于遮住画面。导出的 ZIP 备份没有密码保护，请自行保管。\n\n7. 管理与删除：用户可以编辑、删除记录，调整设置，导出、恢复或清除本机数据。卸载或清除 App 数据通常会移除其本地数据；自行导出的备份和原视频文件需要用户另行管理。\n\n8. 查看与反馈：两份说明随 App 提供，可在“关于”中重新阅读。有关功能或隐私的问题，可通过项目页面反馈；反馈时请自行决定是否提供日志、截图或记录内容。</string>
+    <string name="oobe_welcome_subtitle">记录、回看，了解自己的节奏。</string>
+    <string name="oobe_statement_title">开始前，请先了解</string>
+    <string name="oobe_statement_subtitle">仅供个人记录；数据保存在本机；检查和下载更新会联网。</string>
+    <string name="oobe_statement_accept">已阅读并同意《使用协议》《隐私说明》，且已年满18周岁</string>
+    <string name="oobe_profile_title">怎样称呼你</string>
+    <string name="oobe_profile_subtitle">留空时使用“机长”，以后也能修改。</string>
+    <string name="oobe_theme_title">选择喜欢的外观</string>
+    <string name="oobe_theme_subtitle">当前页面会随选择即时变化。</string>
+    <string name="oobe_prediction_title">设置预测最大值</string>
+    <string name="oobe_prediction_subtitle">用于新建记录的预测滑块，以后可在设置中调整。</string>
+    <string name="oobe_privacy_title">保护你的隐私</string>
+    <string name="oobe_privacy_subtitle">这些选项由你决定，以后可以随时调整。</string>
+    <string name="oobe_notifications_title">通知设置</string>
+    <string name="oobe_notifications_subtitle">开启通知，随时查看计时状态。</string>
+    <string name="oobe_complete_title">设置完成</string>
+    <string name="oobe_complete_subtitle">以后可以在设置中调整。</string>
+    <string name="oobe_start">开始使用</string>
+    <string name="oobe_next">下一步</string>
+    <string name="oobe_saving">正在保存</string>
+    <string name="oobe_loading">正在读取设置</string>
+    <string name="oobe_enable_notifications">开启通知</string>
+    <string name="oobe_notifications_on">通知已开启</string>
+    <string name="oobe_notifications_off">通知未开启</string>
+    <string name="oobe_notifications_off_summary">可以稍后在系统设置中开启，不影响继续设置。</string>
+    <string name="oobe_notifications_on_summary">可显示计时状态和已开启的提醒。</string>
+    <string name="oobe_lock_summary">设置密码，限制进入 App。</string>
+    <string name="oobe_biometric_unavailable">当前设备暂不可用指纹解锁。</string>
+    <string name="oobe_video_hide_summary">用遮罩隐藏画面，点击显示后手动播放。</string>
+    <string name="oobe_system_action_error">无法打开系统设置，请重试</string>
 </resources>

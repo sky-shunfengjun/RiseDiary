@@ -80,7 +80,7 @@ class AchievementWallViewModel @Inject constructor(
     }
 
     private suspend fun countDistinctTags(): Int {
-        val flights = flightRepo.getRecent(1000)
-        return flights.flatMap { TagJson.decode(it.methodTags) }.distinct().size
+        val tags = flightRepo.getAllMethodTags()
+        return tags.flatMap(TagJson::decode).distinct().size
     }
 }

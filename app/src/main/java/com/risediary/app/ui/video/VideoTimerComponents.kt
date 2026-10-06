@@ -13,6 +13,7 @@ import com.risediary.app.ui.icons.AppIcons
 import com.risediary.app.ui.components.AnimatedUiVisibility
 import com.risediary.app.ui.components.InlineStatusContent
 import com.risediary.app.ui.theme.RiseCard
+import com.risediary.app.ui.theme.riseCardBackgroundColor
 
 @Composable
 internal fun VideoTimerSummary(
@@ -51,6 +52,7 @@ internal fun VideoTimerProblems(
     onRetry: () -> Unit,
     enabled: Boolean = true
 ) {
+    val cardBackground = riseCardBackgroundColor()
     val problems = listOfNotNull(problem,
         if (persistenceError) stringResource(R.string.timer_error_save) else null)
     val presentation = TimerProblemPresentation(notice, problems, persistenceError)
@@ -63,11 +65,12 @@ internal fun VideoTimerProblems(
             horizontalAlignment = if (fullScreen) Alignment.CenterHorizontally else Alignment.Start,
             verticalArrangement = Arrangement.spacedBy(8.dp)) {
             displayed.notice?.let {
-                InlineStatusContent(listOf(it), backdrop = backdrop, fullScreen = fullScreen, error = false)
+                InlineStatusContent(listOf(it), backdrop = backdrop, fullScreen = fullScreen, error = false,
+                    backgroundColor = cardBackground)
             }
             InlineStatusContent(displayed.problems, backdrop = backdrop,
                 onRetry = if (displayed.canRetry && !fullScreen) onRetry else null,
-                enabled = active && enabled, fullScreen = fullScreen)
+                enabled = active && enabled, fullScreen = fullScreen, backgroundColor = cardBackground)
             if (displayed.canRetry && fullScreen) {
                 VideoGlassButton(onRetry, backdrop, icon = AppIcons.Refresh,
                     description = stringResource(R.string.action_retry), fullScreen = true,

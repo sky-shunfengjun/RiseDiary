@@ -18,6 +18,7 @@ import com.risediary.app.data.UserPreferences
 import com.risediary.app.data.entity.Flight
 import com.risediary.app.data.entity.RecordVolumeMode
 import com.risediary.app.data.entity.Tag
+import com.risediary.app.data.RecordTimestamps
 import com.risediary.app.data.DataMaintenanceBusyException
 import com.risediary.app.data.repository.AchievementDetector
 import com.risediary.app.data.repository.FlightRepository
@@ -516,7 +517,7 @@ class FormViewModel @Inject constructor(
                     methodTags = TagJson.encode(selectedTags),
                     moodNote = if (existing != null && moodNote == existing.moodNote) moodNote else moodNote.trim(),
                     createdAt = existing?.createdAt ?: now,
-                    updatedAt = now,
+                    updatedAt = existing?.let { RecordTimestamps.updatedAt(it.createdAt, it.updatedAt, now) } ?: now,
                     videoUri = video?.uriString,
                     videoDisplayName = video?.displayName,
                     videoMimeType = video?.mimeType,

@@ -6,7 +6,7 @@
  * Adapted from KernelSU Manager (https://github.com/tiann/KernelSU),
  * GPL-3.0-only. Portions mirrored from the compose-miuix-ui example.
  */
-package com.risediary.app.ui.about.effect
+package com.risediary.app.ui.components.effect
 
 enum class DeviceType {
     PHONE,
