@@ -23,9 +23,9 @@
 
 |    首页    |   记录页   | 新建记录页 |
 | :--------: | :--------: | :--------: |
-|            |            |            |
+| <img src="screenshots/home.jpg" alt="首页" width="240"> | <img src="screenshots/records.jpg" alt="记录页" width="240"> | <img src="screenshots/new-record.jpg" alt="新建记录页" width="240"> |
 | **计时页** | **设置页** | **应用锁** |
-|            |            |            |
+| <img src="screenshots/timer.jpg" alt="计时页" width="240"> | <img src="screenshots/settings.jpg" alt="设置页" width="240"> | <img src="screenshots/app-lock.jpg" alt="应用锁" width="240"> |
 
 ## 功能特性
 
