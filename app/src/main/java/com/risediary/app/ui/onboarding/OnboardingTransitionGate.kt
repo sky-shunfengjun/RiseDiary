@@ -2,15 +2,11 @@
 package com.risediary.app.ui.onboarding
 
 internal class OnboardingTransitionGate {
-    private var sequence = 0L
-    private var current: OnboardingTransitionTicket? = null
-    fun begin(from: OnboardingStep, to: OnboardingStep): OnboardingTransitionTicket =
-        OnboardingTransitionTicket(++sequence, from, to).also { current = it }
-    fun complete(ticket: OnboardingTransitionTicket): Boolean = consume(ticket)
-    fun cancel(ticket: OnboardingTransitionTicket): Boolean = consume(ticket)
-    private fun consume(ticket: OnboardingTransitionTicket): Boolean {
-        if (current != ticket) return false
-        current = null
-        return true
-    }
+    internal val sceneGate = GuideTransitionGate()
+    fun begin(from: OnboardingStep, to: OnboardingStep) =
+        sceneGate.begin(from.ordinal, to.ordinal).let { OnboardingTransitionTicket(it.id, from, to) }
+    fun complete(ticket: OnboardingTransitionTicket) =
+        sceneGate.complete(GuideTransitionTicket(ticket.id, ticket.from.ordinal, ticket.to.ordinal))
+    fun cancel(ticket: OnboardingTransitionTicket) =
+        sceneGate.cancel(GuideTransitionTicket(ticket.id, ticket.from.ordinal, ticket.to.ordinal))
 }

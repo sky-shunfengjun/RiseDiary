@@ -219,12 +219,12 @@ fun OnboardingScreen(
     }
 }
 
-private fun onboardingNotificationsAllowed(context: Context): Boolean = runCatching {
+internal fun onboardingNotificationsAllowed(context: Context): Boolean = runCatching {
     NotificationManagerCompat.from(context).areNotificationsEnabled() &&
         (Build.VERSION.SDK_INT < 33 || ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED)
 }.getOrDefault(false)
 
-private fun openOnboardingSystemPage(context: Context, intent: Intent) {
+internal fun openOnboardingSystemPage(context: Context, intent: Intent) {
     try { context.startActivity(intent) }
     catch (_: Exception) { context.startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, "package:${context.packageName}".toUri())) }
 }

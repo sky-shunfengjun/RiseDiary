@@ -14,6 +14,8 @@ interface FlightRepository {
 
     suspend fun insert(flight: Flight): Long
     suspend fun insertOnce(flight: Flight): Flight
+    /** Undo preserves identity and aborts collisions; unlike new submission it accepts existing IDs. */
+    suspend fun restoreDeleted(flight: Flight)
     suspend fun update(flight: Flight)
     suspend fun delete(flight: Flight)
     suspend fun getById(id: Long): Flight?
@@ -56,6 +58,12 @@ class RoomFlightRepository @Inject constructor(
 
     override suspend fun insert(flight: Flight): Long = maintenanceGate.write { dao.insert(flight) }
     override suspend fun insertOnce(flight: Flight): Flight = maintenanceGate.write { dao.insertOnce(flight) }
+    override suspend fun restoreDeleted(flight: Flight) = maintenanceGate.write {
+        require(flight.id > 0L)
+        if (dao.getById(flight.id) != null) throw com.risediary.app.data.DataWriteConflictException("记录已变化，无法撤销")
+        dao.insertNew(flight)
+        Unit
+    }
     override suspend fun update(flight: Flight) = maintenanceGate.write { dao.update(flight) }
     override suspend fun delete(flight: Flight) = maintenanceGate.write {
         maintenanceGate.requireCurrent(flight, dao.getById(flight.id))

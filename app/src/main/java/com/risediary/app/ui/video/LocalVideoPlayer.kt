@@ -1,6 +1,7 @@
 @file:androidx.annotation.OptIn(markerClass = [androidx.media3.common.util.UnstableApi::class])
 package com.risediary.app.ui.video
 
+import com.risediary.app.ui.projectState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
@@ -38,6 +39,8 @@ import com.risediary.app.media.VideoPlayerController
 import com.risediary.app.ui.icons.AppIcons
 import com.risediary.app.ui.theme.RiseCard
 import com.risediary.app.ui.theme.LocalRiseDarkTheme
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
@@ -61,16 +64,18 @@ internal fun LocalVideoPlayer(
     controlsEnabled: Boolean = true,
     surfaceEnabled: Boolean = true,
     coverContent: (@Composable (Backdrop) -> Unit)? = null,
-    compactConcealed: Boolean = false
+    compactConcealed: Boolean = false,
+    fullscreenOverlayNeedsBackdrop: Boolean = false
 ) {
     val actionable = controlsEnabled && !concealed && coverContent == null
-    val snapshot by controller.playback.collectAsStateWithLifecycle()
+    val videoFlow = remember(controller) { controller.playback.projectState { it?.video } }
+    val video by videoFlow.collectAsStateWithLifecycle()
     val isPlaying by controller.isPlaying.collectAsStateWithLifecycle()
     val player = controller.player
     var duration by remember(player) { mutableLongStateOf(player.duration) }
     var wantsPlay by remember(player) { mutableStateOf(player.playWhenReady) }
     var ended by remember(player) { mutableStateOf(player.playbackState == Player.STATE_ENDED) }
-    var controlsVisible by rememberSaveable(fullScreen, snapshot?.video?.uriString) { mutableStateOf(true) }
+    var controlsVisible by rememberSaveable(fullScreen, video?.uriString) { mutableStateOf(true) }
     var interaction by remember { mutableIntStateOf(0) }
     var controlsTouched by remember(fullScreen) { mutableStateOf(false) }
     val keepControls: () -> Unit = { controlsVisible = true; interaction++ }
@@ -106,7 +111,7 @@ internal fun LocalVideoPlayer(
     val controlsAlpha by controlsTransition.animateFloat(
         transitionSpec = { tween(if (targetState) 170 else 120) }, label = "video_controls_alpha"
     ) { if (it) 1f else 0f }
-    val retainControls = controlsTransition.currentState || controlsTransition.targetState
+    val retainControls = controlsTransition.currentState || controlsTransition.targetState || controlsTransition.isRunning
     val controlsFade = Modifier.graphicsLayer {
         alpha = controlsAlpha
         compositingStrategy = CompositingStrategy.ModulateAlpha
@@ -131,7 +136,8 @@ internal fun LocalVideoPlayer(
     }
     if (fullScreen) {
         Box(modifier.background(Color.Black)) {
-            Box(Modifier.fillMaxSize().layerBackdrop(surfaceBackdrop)) {
+            Box(Modifier.fillMaxSize().then(if (retainControls || fullscreenOverlayNeedsBackdrop)
+                Modifier.layerBackdrop(surfaceBackdrop) else Modifier)) {
                 surface()
                 // Only the readable backdrop fades; the native video surface is never animated.
                 Box(Modifier.fillMaxSize().drawBehind {
@@ -162,7 +168,7 @@ internal fun LocalVideoPlayer(
                 .padding(horizontal = 24.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (retainControls) {
-                    VideoTransportControls(controller, snapshot, duration, wantsPlay, ended,
+                    VideoTransportControls(controller, null, duration, wantsPlay, ended,
                         surfaceBackdrop, true, keepControls, modifier = controlsFade,
                         onTouch = { controlsTouched = it }, enabled = controlsVisible && actionable)
                 }
@@ -177,7 +183,7 @@ internal fun LocalVideoPlayer(
                     verticalAlignment = Alignment.CenterVertically) {
                     Icon(AppIcons.Video, contentDescription = null,
                         tint = MiuixTheme.colorScheme.primary, modifier = Modifier.size(20.dp))
-                    Text(snapshot?.video?.displayName.orEmpty(), fontWeight = FontWeight.Medium,
+                    Text(video?.displayName.orEmpty(), fontWeight = FontWeight.Medium,
                         maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
                 }
             }
@@ -206,10 +212,11 @@ internal fun LocalVideoPlayer(
                             )
                         }
                         Box(Modifier.fillMaxWidth()) {
-                            // The captured gradient and glass are siblings: never sample their own controls.
+                            // Round only the captured tint leaf; keep sibling glass shadows uncut.
                             Box(Modifier.matchParentSize().layerBackdrop(controlsBackdrop)
-                                .background(Brush.horizontalGradient(listOf(currentControlsColor, Color.Transparent))))
-                            VideoTransportControls(controller, snapshot, duration, wantsPlay, ended,
+                                .background(Brush.horizontalGradient(listOf(currentControlsColor, Color.Transparent)),
+                                    RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp)))
+                            VideoTransportControls(controller, null, duration, wantsPlay, ended,
                                 controlsBackdrop, false, keepControls,
                                 Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 14.dp), enabled = actionable)
                         }

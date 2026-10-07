@@ -36,6 +36,7 @@ internal class DetailVideoSession(
     private var settingsJob: Job? = null
     private var loadJob: Job? = null
     private var epoch = 0L
+    private var presentationActive = true
     // A previous record may use the same URI; its position must not carry into the new record.
     private var loadedRecordId: Long? = null
 
@@ -56,6 +57,7 @@ internal class DetailVideoSession(
         val current = state.value
         if (current.recordId == recordId && current.video == video) return
         cancelLoad()
+        controller.setPresentationActive(false)
         controller.pause()
         loadedRecordId = null
         mutableState.value = current.copy(recordId = recordId, video = video, hidden = !current.settingsReady || hiddenByDefault,
@@ -67,15 +69,24 @@ internal class DetailVideoSession(
         if (!state.value.settingsReady || state.value.video == null) return
         mutableState.value = state.value.copy(hidden = false)
         if (!state.value.prepared || state.value.problem != null || controller.error.value != null) load()
+        else controller.setPresentationActive(presentationActive)
     }
 
     fun hide() {
+        controller.setPresentationActive(false)
         controller.pause()
         cancelLoad()
         mutableState.value = state.value.copy(hidden = true, loading = false)
     }
 
+    fun setPresentationActive(active: Boolean) {
+        presentationActive = active
+        controller.setPresentationActive(active && state.value.settingsReady && !state.value.hidden && state.value.prepared &&
+            loadedRecordId == state.value.recordId && controller.playback.value?.video == state.value.video)
+    }
+
     fun onBackground() {
+        setPresentationActive(false)
         controller.pause()
         if (hiddenByDefault || !state.value.settingsReady) hide()
     }
@@ -87,6 +98,7 @@ internal class DetailVideoSession(
 
     private fun retrySettings() {
         settingsJob?.cancel()
+        controller.setPresentationActive(false)
         controller.pause()
         cancelLoad()
         mutableState.value = state.value.copy(settingsReady = false, hidden = true, loading = false,
@@ -131,6 +143,7 @@ internal class DetailVideoSession(
                 }
                 val previous = controller.playback.value?.takeIf { loadedRecordId == target.recordId && it.video == video }
                 controller.load(previous ?: VideoPlaybackSnapshot(video))
+                controller.setPresentationActive(presentationActive)
                 loadedRecordId = target.recordId
                 mutableState.value = state.value.copy(loading = false, prepared = true, problem = controller.error.value)
             } catch (cancelled: CancellationException) { throw cancelled }

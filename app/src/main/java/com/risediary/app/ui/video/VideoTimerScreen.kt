@@ -1,5 +1,6 @@
 package com.risediary.app.ui.video
 
+import com.risediary.app.ui.projectState
 import android.Manifest
 import android.app.Activity
 import android.content.pm.PackageManager
@@ -27,6 +28,9 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
+import com.risediary.app.service.forControls
 import com.risediary.app.service.TimerStatus
 import com.risediary.app.ui.components.LocalPageEffectsActive
 import com.risediary.app.ui.components.AnimatedUiVisibility
@@ -43,7 +47,8 @@ fun VideoTimerScreen(route: Route.VideoTimer,
     val navigator = LocalNavigator.current
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
-    val liveSession by vm.session.collectAsStateWithLifecycle()
+    val controlsFlow = remember(vm) { vm.session.projectState { it.forControls() } }
+    val liveSession by controlsFlow.collectAsStateWithLifecycle()
     val session = timerVm.discardDisplaySession ?: timerVm.handoffSession ?: liveSession
     val started by vm.started.collectAsStateWithLifecycle()
     val starting by vm.starting.collectAsStateWithLifecycle()
@@ -53,7 +58,8 @@ fun VideoTimerScreen(route: Route.VideoTimer,
     val problem by vm.error.collectAsStateWithLifecycle()
     val notice by vm.notice.collectAsStateWithLifecycle()
     val playbackError by vm.controller.error.collectAsStateWithLifecycle()
-    val snapshot by vm.controller.playback.collectAsStateWithLifecycle()
+    val videoFlow = remember(vm) { vm.controller.playback.projectState { it?.video } }
+    val video by videoFlow.collectAsStateWithLifecycle()
     val persistenceError by timerVm.persistenceError.collectAsStateWithLifecycle()
     val commandError by timerVm.commandError.collectAsStateWithLifecycle()
     val active = LocalPageEffectsActive.current && navigator.current() == route
@@ -101,20 +107,17 @@ fun VideoTimerScreen(route: Route.VideoTimer,
         if (showLeaveConfirm && !vm.starting.value && vm.session.value.status == TimerStatus.IDLE &&
             !timerVm.discarding && !timerVm.busy) showLeaveConfirm = false
     }
-    LaunchedEffect(active) { if (!active) vm.pause() }
-    DisposableEffect(lifecycle, vm) {
-        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_STOP) vm.pause() }
-        lifecycle.addObserver(observer)
-        onDispose { lifecycle.removeObserver(observer); vm.pause() }
-    }
     var capsuleExpanded by remember { mutableStateOf(false) }
+    val panelVisibility = remember { androidx.compose.animation.core.MutableTransitionState(false) }
+    panelVisibility.targetState = capsuleExpanded
+    val panelNeedsBackdrop = panelVisibility.currentState || panelVisibility.targetState || !panelVisibility.isIdle
     var capsulePosition by remember { mutableStateOf(FloatingTimerPosition()) }
     val actions: @Composable (Backdrop, Boolean) -> Unit = { backdrop, fullscreen ->
         if (!started) {
             VideoGlassButton(
                 onClick = ::choose, backdrop = backdrop, fullScreen = fullscreen,
                 icon = AppIcons.Video, large = true, accent = true, enabled = canChooseVideo,
-                label = stringResource(if (snapshot == null) R.string.video_select else R.string.video_change),
+                label = stringResource(if (video == null) R.string.video_select else R.string.video_change),
                 modifier = Modifier.fillMaxWidth()
             )
         } else {
@@ -134,9 +137,9 @@ fun VideoTimerScreen(route: Route.VideoTimer,
         Column(Modifier.fillMaxWidth()) {
             AnimatedUiVisibility(visible = started) { active ->
                 VideoTimerSummary(session, false, notice, timerVm.error ?: commandError,
-                    persistenceError, backdrop, timerVm::retryPersistence, enabled = active)
+                    persistenceError, backdrop, timerVm::retryPersistence, enabled = active, sessionFlow = vm.session)
             }
-            AnimatedUiVisibility(visible = !started && snapshot != null) {
+            AnimatedUiVisibility(visible = !started && video != null) {
                 Text(stringResource(R.string.video_start_hint), fontSize = 12.sp,
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                     modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
@@ -146,7 +149,7 @@ fun VideoTimerScreen(route: Route.VideoTimer,
     val overlay: (@Composable (Backdrop) -> Unit)? = if (!started) null else { backdrop ->
         FloatingTimerCapsule(session, backdrop, capsulePosition, { capsulePosition = it },
             capsuleExpanded, { capsuleExpanded = it }, timerVm.error ?: commandError,
-            notice, persistenceError, timerVm::retryPersistence) { actions(backdrop, true) }
+            notice, persistenceError, timerVm::retryPersistence, vm.session, panelVisibility) { actions(backdrop, true) }
     }
     VideoPlayerPage(route = route, controller = vm.controller, loading = loading,
         problem = problem ?: playbackError, title = stringResource(R.string.mode_select_video),
@@ -161,8 +164,9 @@ fun VideoTimerScreen(route: Route.VideoTimer,
             }
         }, extraContent = extra,
         bottomAction = { backdrop -> actions(backdrop, false) },
-        loadingIndicator = showVideoLoadingIndicator(loading, true, snapshot != null, started, selectingVideo),
+        loadingIndicator = showVideoLoadingIndicator(loading, true, video != null, started, selectingVideo),
         fullscreenOverlay = overlay,
+        fullscreenOverlayNeedsBackdrop = panelNeedsBackdrop,
         onChooseVideo = if (canChooseVideo) ::choose else null,
         collapseFullscreenOverlay = {
             val wasExpanded = capsuleExpanded

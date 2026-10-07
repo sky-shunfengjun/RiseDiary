@@ -16,6 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.unit.TextUnit
 import com.risediary.app.R
 import com.risediary.app.ui.onboarding.original.originalOnboardingSummary
 import com.risediary.app.ui.onboarding.original.originalOnboardingText
@@ -25,6 +26,22 @@ import top.yukonga.miuix.kmp.basic.Text
 @Suppress("UNUSED_PARAMETER")
 @Composable
 internal fun OnboardingHero(complete: Boolean, scrollState: ScrollState, animate: Boolean) {
+    GuideHero(
+        R.drawable.app_icon,
+        stringResource(if (complete) R.string.oobe_complete_title else R.string.app_name),
+        stringResource(if (complete) R.string.oobe_complete_subtitle else R.string.oobe_welcome_subtitle),
+        scrollState, if (complete) 24.sp else 32.sp,
+        if (complete) Color.White else originalOnboardingText(),
+        if (complete) Color.White.copy(alpha = 0.7f) else originalOnboardingSummary(),
+    )
+}
+
+@Composable
+internal fun GuideHero(
+    icon: Int?, title: String, subtitle: String?, scrollState: ScrollState,
+    titleSize: TextUnit = 32.sp, titleColor: Color = Color.White,
+    subtitleColor: Color = Color.White.copy(alpha = 0.7f),
+) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
         Column(
             Modifier.fillMaxWidth().verticalScroll(scrollState).heightIn(min = maxHeight)
@@ -32,23 +49,17 @@ internal fun OnboardingHero(complete: Boolean, scrollState: ScrollState, animate
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Image(
-                painterResource(R.drawable.app_icon), null,
-                Modifier.size(90.dp).testTag("oobe_hero_icon"),
-            )
-            Spacer(Modifier.height(30.dp))
-            Text(
-                stringResource(if (complete) R.string.oobe_complete_title else R.string.app_name),
-                Modifier.fillMaxWidth(), fontSize = if (complete) 24.sp else 32.sp,
-                fontWeight = FontWeight.Medium, textAlign = TextAlign.Center,
-                color = if (complete) Color.White else originalOnboardingText(),
-            )
-            Spacer(Modifier.height(8.dp))
-            Text(
-                stringResource(if (complete) R.string.oobe_complete_subtitle else R.string.oobe_welcome_subtitle),
-                Modifier.fillMaxWidth(), fontSize = 14.sp, textAlign = TextAlign.Center,
-                color = if (complete) Color.White.copy(alpha = 0.7f) else originalOnboardingSummary(),
-            )
+            if (icon != null) {
+                Image(painterResource(icon), null, Modifier.size(90.dp).testTag("oobe_hero_icon"))
+                Spacer(Modifier.height(30.dp))
+            }
+            Text(title, Modifier.fillMaxWidth(), fontSize = titleSize,
+                fontWeight = FontWeight.Medium, textAlign = TextAlign.Center, color = titleColor)
+            if (!subtitle.isNullOrBlank()) {
+                Spacer(Modifier.height(8.dp))
+                Text(subtitle, Modifier.fillMaxWidth(), fontSize = 14.sp,
+                    textAlign = TextAlign.Center, color = subtitleColor)
+            }
         }
     }
 }

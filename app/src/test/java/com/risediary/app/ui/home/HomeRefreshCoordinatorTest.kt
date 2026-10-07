@@ -35,7 +35,12 @@ class HomeRefreshCoordinatorTest {
         val coordinator = HomeRefreshCoordinator(backgroundScope,
             load = { calls++; if (calls == 2) error("temporary read failure") else calls },
             publish = { published += it })
-        repeat(3) { coordinator.request(silent = true); runCurrent() }
+        coordinator.request(silent = true); runCurrent()
+        assertFalse(coordinator.readFailed.value)
+        coordinator.request(silent = true); runCurrent()
+        assertTrue(coordinator.readFailed.value); assertEquals(listOf(1),published)
+        coordinator.request(silent = true); runCurrent()
+        assertFalse(coordinator.readFailed.value)
         assertEquals(listOf(1, 3), published)
     }
 

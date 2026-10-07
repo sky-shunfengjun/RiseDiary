@@ -1,5 +1,6 @@
 package com.risediary.app.ui.timer
 
+import com.risediary.app.ui.projectState
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
@@ -46,6 +47,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.risediary.app.R
 import com.risediary.app.ui.navigation3.LocalNavigator
 import com.risediary.app.ui.navigation3.Route
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
+import com.risediary.app.service.forControls
 import com.risediary.app.service.TimerMath
 import com.risediary.app.service.TimerSession
 import com.risediary.app.service.TimerStatus
@@ -61,7 +65,10 @@ fun TimerScreen(
 ) {
     val navigator = LocalNavigator.current
     val context = LocalContext.current
-    val liveSession by viewModel.session.collectAsStateWithLifecycle()
+    val controlsFlow = remember(viewModel) { viewModel.session.projectState {
+        it.forControls().copy(elapsedMillis = it.elapsedMillis / 60000L * 60000L)
+    } }
+    val liveSession by controlsFlow.collectAsStateWithLifecycle()
     val session = viewModel.discardDisplaySession ?: viewModel.handoffSession ?: liveSession
     val persistenceError by viewModel.persistenceError.collectAsStateWithLifecycle()
     val commandError by viewModel.commandError.collectAsStateWithLifecycle()
@@ -192,7 +199,7 @@ fun TimerScreen(
                 val availableHeight = maxHeight
                 Box(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).heightIn(min = availableHeight),
                     contentAlignment = Alignment.Center) {
-                    TimerInstrument(session = session, modifier = Modifier.fillMaxWidth())
+                    TimerInstrument(session = session, modifier = Modifier.fillMaxWidth(), sessionFlow = viewModel.session)
                 }
             }
         }

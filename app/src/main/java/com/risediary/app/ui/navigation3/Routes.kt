@@ -88,4 +88,7 @@ sealed interface Route : NavKey {
 
     @Serializable
     data object OnboardingReview : Route
+
+    @Serializable
+    data object UpdateIntroReview : Route
 }

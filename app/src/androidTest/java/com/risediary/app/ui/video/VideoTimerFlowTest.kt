@@ -54,10 +54,11 @@ class VideoTimerFlowTest {
         var model: VideoTimerViewModel? = null
         try {
             withContext(Dispatchers.Main) {
-                model = VideoTimerViewModel(context, access, grants, fixture, timerStore, holder,
+                model = VideoTimerViewModel(com.risediary.app.media.VideoPlayerFactory(context, com.risediary.app.media.VideoResourceCoordinator(), com.risediary.app.media.VideoDiagnostics()), access, grants, fixture, timerStore, holder,
                     clock.wall, clock, SavedStateHandle(mapOf("prepared_playback" to
                         Json.encodeToString(VideoPlaybackSnapshot(video)))))
                 models.put("video", model!!)
+                model!!.controller.setPresentationActive(true)
                 model!!.open("session")
                 texture = SurfaceTexture(0).apply { setDefaultBufferSize(320, 240) }
                 surface = Surface(texture!!)

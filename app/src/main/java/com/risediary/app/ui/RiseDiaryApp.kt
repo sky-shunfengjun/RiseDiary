@@ -59,6 +59,9 @@ import com.risediary.app.ui.navigation3.Route
 import com.risediary.app.ui.navigation3.rememberNavigator
 import com.risediary.app.ui.onboarding.OnboardingScreen
 import com.risediary.app.ui.onboarding.OnboardingMode
+import com.risediary.app.ui.updateintro.UpdateIntroScreen
+import com.risediary.app.ui.updateintro.UpdateIntroMode
+import com.risediary.app.ui.updateintro.UpdateIntroViewModel
 import com.risediary.app.ui.records.RecordsScreen
 import com.risediary.app.ui.records.RecordDetailScreen
 import com.risediary.app.ui.records.RecordsViewModel
@@ -76,6 +79,7 @@ import com.risediary.app.ui.update.UpdateSheetHost
 import com.risediary.app.ui.update.UpdateSheetBackdrop
 import com.risediary.app.ui.update.UpdateSheetPresentation
 import com.risediary.app.update.UpdateViewModel
+import com.risediary.app.service.forControls
 import com.risediary.app.service.TimerStatus
 import com.risediary.app.service.TimerNotificationEntry
 import com.risediary.app.service.resolveTimerNotificationRoute
@@ -87,6 +91,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.job
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.utils.MiuixPopupUtils
@@ -158,12 +164,30 @@ fun RiseDiaryApp(
     }
     val appState by viewModel.state.collectAsStateWithLifecycle()
     val retainMain by viewModel.retainMainContent.collectAsStateWithLifecycle()
+    val retainIntro by viewModel.retainUpdateIntroContent.collectAsStateWithLifecycle()
+    // Restore live timing even when the update presentation defers mounting its destination.
+    hiltViewModel<TimerCoordinatorViewModel>()
     val maintenanceState by viewModel.maintenanceState.collectAsStateWithLifecycle()
     val requestedDestination by
         notificationDestination.collectAsStateWithLifecycle()
     val requestedTimerEntry by timerNotificationEntry.collectAsStateWithLifecycle()
 
     when {
+        appState == AppGateState.UPDATE_INTRO || (retainIntro &&
+            (appState == AppGateState.LOCKED || appState == AppGateState.ERROR)) -> {
+            val active = appState == AppGateState.UPDATE_INTRO
+            Box(Modifier.fillMaxSize()) {
+                CompositionLocalProvider(LocalPageEffectsActive provides active) {
+                    PageBackScope(active) {
+                        UpdateIntroScreen(UpdateIntroMode.AUTO, viewModel::onUpdateIntroFinished,
+                            viewModel = hiltViewModel<UpdateIntroViewModel>(key = "update-intro-auto"))
+                    }
+                }
+                if (appState == AppGateState.ERROR) AppGateReadError(viewModel::retryRead)
+                else if (appState == AppGateState.LOCKED) AppLockScreen(
+                    mode = LockMode.VERIFY, onDone = {}, onCredentialVerified = viewModel::onCredentialVerified)
+            }
+        }
         keepsMainContentMounted(appState) || (retainMain && appState == AppGateState.ERROR) -> {
             val locked = appState != AppGateState.MAIN
             Box(modifier = Modifier.fillMaxSize()) {
@@ -173,7 +197,13 @@ fun RiseDiaryApp(
                     timerNotificationEntry = requestedTimerEntry,
                     onTimerNotificationConsumed = onTimerNotificationConsumed,
                     onNotificationDestinationConsumed = onNotificationDestinationConsumed,
-                    updateViewModel = updateViewModel
+                    updateViewModel = updateViewModel,
+                    onRestartUpdateIntro = {
+                        viewModel.restartUpdateIntro {
+                            android.widget.Toast.makeText(noticeContext, R.string.developer_save_error,
+                                android.widget.Toast.LENGTH_LONG).show()
+                        }
+                    },
                 )
                 if (!locked && maintenanceState != com.risediary.app.data.DataMaintenanceGate.State.IDLE) {
                     Box(Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(12.dp)
@@ -276,11 +306,13 @@ private fun MainAppContent(
     onTimerNotificationConsumed: (TimerNotificationEntry) -> Unit,
     onNotificationDestinationConsumed: (NotificationDestination) -> Unit,
     timerCoordinator: TimerCoordinatorViewModel = hiltViewModel(),
-    updateViewModel: UpdateViewModel
+    updateViewModel: UpdateViewModel,
+    onRestartUpdateIntro: () -> Unit,
 ) {
     val navigator = rememberNavigator(Route.Main)
     remember(navigator) { navigator.discardExpiredForms(timerCoordinator::isFormLive); true }
-    val timerSession by timerCoordinator.session.collectAsStateWithLifecycle()
+    val timerControls = remember(timerCoordinator) { timerCoordinator.session.projectState { it.forControls() } }
+    val timerSession by timerControls.collectAsStateWithLifecycle()
     val timerRestorationReady by timerCoordinator.restorationReady.collectAsStateWithLifecycle()
     val timerPersistenceError by timerCoordinator.persistenceError.collectAsStateWithLifecycle()
     val timerNoticeContext = androidx.compose.ui.platform.LocalContext.current
@@ -288,14 +320,26 @@ private fun MainAppContent(
     val pagerState = rememberPagerState(pageCount = { 3 })
     val pagerCoroutineScope = rememberCoroutineScope()
     val recordsViewModel: RecordsViewModel = hiltViewModel()
+    val writeError by recordsViewModel.writeError.collectAsStateWithLifecycle()
+    val canRetryRecordWrite by recordsViewModel.canRetryWrite.collectAsStateWithLifecycle()
+    val recordsWriting by recordsViewModel.isWriting.collectAsStateWithLifecycle()
+    if (writeError != null) com.risediary.app.ui.components.LiquidAlertDialog(
+        onDismissRequest = { if (!recordsWriting) recordsViewModel.clearWriteError() },
+        title = { top.yukonga.miuix.kmp.basic.Text("操作未完成") },
+        text = { top.yukonga.miuix.kmp.basic.Text(writeError.orEmpty()) },
+        confirmButton = { top.yukonga.miuix.kmp.basic.TextButton("重试", enabled = !recordsWriting && canRetryRecordWrite,
+            onClick = recordsViewModel::retryWrite) },
+        dismissButton = { top.yukonga.miuix.kmp.basic.TextButton("关闭", enabled = !recordsWriting,
+            onClick = recordsViewModel::clearWriteError) }
+    )
     val deletedMessage = stringResource(R.string.records_deleted)
     val undoAction = stringResource(R.string.action_undo)
     fun showDetailDeletionUndo(target: com.risediary.app.data.entity.Flight) {
-        if (recordsViewModel.pendingDeletions.value.none { it.flight == target }) return
+        val token = recordsViewModel.pendingDeletions.value.firstOrNull { it.flight == target }?.token ?: return
         pagerCoroutineScope.launch {
             val result = snackbarHostState.showLiquidSnackbar(deletedMessage, undoAction, LiquidSnackbarTone.UNDO)
-            if (result == SnackbarResult.ActionPerformed) recordsViewModel.undoDelete(target)
-            else recordsViewModel.finalizeDeletion(target.id)
+            if (result == SnackbarResult.ActionPerformed) recordsViewModel.undoDelete(target, token)
+            else recordsViewModel.finalizeDeletion(target.id, token)
         }
     }
     val mainPagerState = remember(pagerState) {
@@ -319,6 +363,8 @@ private fun MainAppContent(
     val currentKey = navigator.current()
     val isMain = currentKey is Route.Main
     val navigationKeys = navigator.backStack.map { it as Route }
+    // Manual review, including its reading panel, has the same priority as the automatic intro.
+    val updateIntroReviewOpen = navigationKeys.any { it is Route.UpdateIntroReview }
     val navigationMotion = remember { HyperIslandNavigationMotion(navigationKeys) }
     val navigationTransition = remember(navigationMotion, navigationKeys) {
         navigationMotion.updateStack(navigationKeys)
@@ -330,10 +376,10 @@ private fun MainAppContent(
         derivedStateOf { isMain && !navigationMotion.rootPageReady }
     }
 
-    LaunchedEffect(timerNotificationEntry, interactionsBlocked, timerRestorationReady,
+    LaunchedEffect(timerNotificationEntry, interactionsBlocked, updateIntroReviewOpen, timerRestorationReady,
         timerSession.sessionId, timerSession.status, timerPersistenceError) {
         val entry = timerNotificationEntry ?: return@LaunchedEffect
-        if (interactionsBlocked || !timerRestorationReady) return@LaunchedEffect
+        if (interactionsBlocked || updateIntroReviewOpen || !timerRestorationReady) return@LaunchedEffect
         if (timerPersistenceError && timerSession.sessionId != entry.sessionId) {
             // Keep the request while the existing timer page offers recovery retry.
             navigator.push(Route.Timer)
@@ -346,9 +392,9 @@ private fun MainAppContent(
         onTimerNotificationConsumed(entry)
     }
 
-    LaunchedEffect(notificationDestination, interactionsBlocked) {
+    LaunchedEffect(notificationDestination, interactionsBlocked, updateIntroReviewOpen) {
         val destination = notificationDestination ?: return@LaunchedEffect
-        if (interactionsBlocked) return@LaunchedEffect
+        if (interactionsBlocked || updateIntroReviewOpen) return@LaunchedEffect
         when (destination) {
             NotificationDestination.RECORDS -> {
                 navigator.popUntil { it is Route.Main }
@@ -495,6 +541,10 @@ private fun MainAppContent(
                                                 onCancel = { navigator.pop() }
                                             )
                                         }
+                                        pageEntry<Route.UpdateIntroReview>(navigationMotion) {
+                                            UpdateIntroScreen(UpdateIntroMode.REVIEW, { navigator.pop() },
+                                                viewModel = hiltViewModel<UpdateIntroViewModel>(key = "update-intro-review"))
+                                        }
                                         pageEntry<Route.OnboardingReview>(navigationMotion) {
                                             OnboardingScreen(
                                                 mode = OnboardingMode.REVIEW,
@@ -532,7 +582,7 @@ private fun MainAppContent(
                     // their state into the popup host; without it the popup never renders
                     // and the triggering row stays stuck in its pressed state.
                     MiuixPopupUtils.MiuixPopupHost()
-                    UpdateSheetHost(updateViewModel, interactionsBlocked, updateSheetPresentation)
+                    UpdateSheetHost(updateViewModel, interactionsBlocked, updateSheetPresentation, onRestartUpdateIntro)
                 }
             }
         }

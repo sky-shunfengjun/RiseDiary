@@ -49,6 +49,14 @@ internal class AndroidBackupRecoveryStorage(private val file: File) : BackupReco
     private val atomic = AtomicFile(file)
     override fun exists(): Boolean = hasCommittedRecoveryFile(file)
 
+    override fun openRead(): java.io.InputStream = atomic.openRead()
+
+    override fun writeStream(block: (java.io.OutputStream) -> Unit) {
+        val stream = atomic.startWrite()
+        try { block(stream); stream.flush(); stream.fd.sync(); atomic.finishWrite(stream) }
+        catch (failure: Throwable) { atomic.failWrite(stream); throw failure }
+    }
+
     override fun read(): ByteArray = atomic.openRead().use { input ->
         val output = ByteArrayOutputStream()
         val buffer = ByteArray(DEFAULT_BUFFER_SIZE)

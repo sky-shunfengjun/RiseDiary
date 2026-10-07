@@ -25,17 +25,18 @@ internal fun VideoTimerSummary(
     backdrop: Backdrop,
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    sessionFlow: kotlinx.coroutines.flow.StateFlow<TimerSession>? = null
 ) {
     if (fullScreen) {
         Column(modifier) {
-            com.risediary.app.ui.timer.TimerInstrument(session, compact = true, fullScreen = true)
+            com.risediary.app.ui.timer.TimerInstrument(session, compact = true, fullScreen = true, sessionFlow = sessionFlow)
             VideoTimerProblems(notice, problem, persistenceError, true, backdrop, onRetry, enabled)
         }
     } else {
         RiseCard(modifier.fillMaxWidth(), allowContentOverflow = true) {
             Column(Modifier.fillMaxWidth().padding(14.dp)) {
-                com.risediary.app.ui.timer.TimerInstrument(session, Modifier.fillMaxWidth(), dense = true)
+                com.risediary.app.ui.timer.TimerInstrument(session, Modifier.fillMaxWidth(), dense = true, sessionFlow = sessionFlow)
                 VideoTimerProblems(notice, problem, persistenceError, false, backdrop, onRetry, enabled)
             }
         }

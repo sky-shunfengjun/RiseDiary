@@ -1,6 +1,11 @@
 package com.risediary.app.ui.settings
 
 import java.io.IOException
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.emptyPreferences
+import com.risediary.app.data.DataMaintenanceGate
+import com.risediary.app.data.UserPreferences
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.test.*
@@ -9,6 +14,45 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class DetailVideoSettingsEditorTest {
+    @Test fun blockedMaintenanceWriteReleasesTheToggleAndCanBeRetried() = runTest {
+        val gate = DataMaintenanceGate()
+        val store = object : DataStore<Preferences> {
+            override val data = MutableStateFlow(emptyPreferences())
+            override suspend fun updateData(transform: suspend (Preferences) -> Preferences) =
+                transform(data.value).also { data.value = it }
+        }
+        val preferences = UserPreferences(store, gate)
+        val editor = DetailVideoSettingsEditor(backgroundScope, preferences.detailVideoHiddenByDefault,
+            preferences::setDetailVideoHiddenByDefault, "read failed", "save failed")
+        runCurrent()
+        val release = CompletableDeferred<Unit>()
+        val operation = backgroundScope.launch { gate.maintenance { release.await() } }
+        runCurrent()
+        try {
+            editor.setHidden(true)
+            runCurrent()
+            assertFalse("A rejected write must not leave the switch permanently busy", editor.state.value.saving)
+            assertEquals("save failed", editor.state.value.error)
+            assertFalse(editor.state.value.hiddenByDefault)
+        } finally { release.complete(Unit); operation.join() }
+        editor.retry()
+        runCurrent()
+        assertTrue(editor.state.value.hiddenByDefault)
+        assertFalse(editor.state.value.saving)
+        assertNull(editor.state.value.error)
+    }
+
+    @Test fun ordinaryCancellationDoesNotReportASaveFailureOrLeaveTheToggleBusy() = runTest {
+        val editor = DetailVideoSettingsEditor(backgroundScope, MutableStateFlow(false),
+            { throw CancellationException("page closed") }, "read failed", "save failed")
+        runCurrent()
+        editor.setHidden(true)
+        runCurrent()
+        assertFalse(editor.state.value.saving)
+        assertNull(editor.state.value.error)
+        assertFalse(editor.state.value.hiddenByDefault)
+    }
+
     @Test fun toggleDoesNotChangeBeforeSuccessfulCommitAndRejectsDuplicateWrites() = runTest {
         val value = MutableStateFlow(false)
         val release = CompletableDeferred<Unit>()

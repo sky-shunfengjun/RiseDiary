@@ -57,7 +57,7 @@ fun RecordDetailScreen(
     val controller = videoViewModel.controller
     val fullscreen = rememberVideoFullscreenState(controller, active)
     val owner = remember(controller) { VideoSurfaceOwner(controller) }
-    DisposableEffect(owner) { onDispose { owner.release(); controller.pause() } }
+    DisposableEffect(owner) { onDispose { owner.release(); videoViewModel.session.setPresentationActive(false) } }
     val video = flight?.localVideoRef()
     val matching = videoState.recordId == flightId && videoState.video == video
     val shownState = if (matching) videoState else DetailVideoState(recordId = flightId, video = video)
@@ -94,6 +94,7 @@ fun RecordDetailScreen(
     LaunchedEffect(flightId, video) { videoViewModel.session.bind(flightId, video) }
     LaunchedEffect(active) {
         if (!active) { videoViewModel.session.onBackground(); fullscreen.exit() }
+        else videoViewModel.session.setPresentationActive(lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED))
     }
     LaunchedEffect(shownState.hidden, shownState.settingsReady, matching) {
         if (shownState.hidden || !shownState.settingsReady || !matching) fullscreen.exit()
@@ -107,6 +108,7 @@ fun RecordDetailScreen(
                 videoViewModel.session.onBackground()
                 if (videoViewModel.state.value.hidden) currentFullscreen.exit()
             }
+            if (event == Lifecycle.Event.ON_START && currentActive) videoViewModel.session.setPresentationActive(true)
             if (event == Lifecycle.Event.ON_RESUME && currentActive) viewModel.refresh()
         }
         lifecycle.addObserver(observer)
@@ -177,7 +179,7 @@ fun RecordDetailScreen(
                     if (error != null) TextButton(stringResource(R.string.action_retry), viewModel::refresh)
                 }
                 else -> RecordDetailContent(checkNotNull(flight), padding, scrollState, error, videoBusy,
-                    viewModel::refresh, videoContent = video?.let { ref -> ({
+                    { viewModel.retry(deleteForUndo) }, videoContent = video?.let { ref -> ({
                         DetailVideoCard(ref, displayState, controller, owner,
                             videoViewModel.session::show, videoViewModel.session::hide, onRetryVideo, ::pickVideo,
                             { if (displayState.controlsEnabled && !videoBusy) fullscreen.enter() },

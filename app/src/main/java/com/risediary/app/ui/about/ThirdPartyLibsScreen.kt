@@ -26,35 +26,14 @@ import com.risediary.app.ui.navigation3.LocalNavigator
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
+import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 import androidx.compose.foundation.shape.RoundedCornerShape
 
-private data class ThirdPartyLib(val name: String, val url: String)
-
 internal val thirdPartyLibCardCornerRadius = CardDefaults.CornerRadius
-
-private val thirdPartyLibs = listOf(
-    ThirdPartyLib("Jetpack Compose", "https://developer.android.com/jetpack/compose"),
-    ThirdPartyLib("AndroidX Media3", "https://developer.android.com/media/media3"),
-    ThirdPartyLib("Markdown Renderer (Apache 2.0)", "https://github.com/mikepenz/multiplatform-markdown-renderer"),
-    ThirdPartyLib("JetBrains Markdown (Apache 2.0)", "https://github.com/JetBrains/markdown"),
-    ThirdPartyLib("Miuix", "https://github.com/YuKongA/miuix"),
-    ThirdPartyLib("AndroidLiquidGlass", "https://github.com/Kyant0/AndroidLiquidGlass"),
-    ThirdPartyLib("Miuix Nav", "https://github.com/compose-miuix-ui/miuix"),
-    ThirdPartyLib("HyperIsland", "https://github.com/1812z/HyperIsland"),
-    ThirdPartyLib("kotlinx.serialization", "https://github.com/Kotlin/kotlinx.serialization"),
-    ThirdPartyLib("Room", "https://developer.android.com/jetpack/androidx/releases/room"),
-    ThirdPartyLib("DataStore", "https://developer.android.com/jetpack/androidx/releases/datastore"),
-    ThirdPartyLib("Hilt", "https://dagger.dev/hilt/"),
-    ThirdPartyLib("WorkManager", "https://developer.android.com/jetpack/androidx/releases/work"),
-    ThirdPartyLib("AndroidX Biometric", "https://developer.android.com/jetpack/androidx/releases/biometric"),
-    ThirdPartyLib("kotlinx.coroutines", "https://github.com/Kotlin/kotlinx.coroutines"),
-    ThirdPartyLib("Vico", "https://github.com/patrykandpatrick/vico"),
-    ThirdPartyLib("KernelSU-Style-UI-Kit", "https://github.com/chenaizhang/KernelSU-Style-UI-Kit"),
-)
 
 @Composable
 fun ThirdPartyLibsScreen() {
@@ -78,43 +57,35 @@ fun ThirdPartyLibsScreen() {
             verticalArrangement = Arrangement.spacedBy(12.dp),
             overscrollEffect = null
         ) {
+            item(key = "thanks") {
+                Text(
+                    text = stringResource(R.string.about_libraries_acknowledgement),
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    style = MiuixTheme.textStyles.paragraph,
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary
+                )
+            }
             item(key = "libraries") {
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     cornerRadius = thirdPartyLibCardCornerRadius,
-                    colors = CardDefaults.defaultColors(
-                        color = MiuixTheme.colorScheme.surfaceContainer
-                    )
+                    colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)
                 ) {
                     Column {
-                        thirdPartyLibs.forEachIndexed { index, lib ->
-                            if (index > 0) {
-                                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                            }
-                            val rowShape = when (index) {
-                                0 -> RoundedCornerShape(
-                                    topStart = thirdPartyLibCardCornerRadius,
-                                    topEnd = thirdPartyLibCardCornerRadius
-                                )
-                                thirdPartyLibs.lastIndex ->
-                                    RoundedCornerShape(
-                                        bottomStart = thirdPartyLibCardCornerRadius,
-                                        bottomEnd = thirdPartyLibCardCornerRadius
-                                    )
-                                else -> RoundedCornerShape(0.dp)
-                            }
+                        thirdPartyProjects.forEachIndexed { index, project ->
+                            if (index > 0) HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                            val rowShape = RoundedCornerShape(
+                                topStart = if (index == 0) thirdPartyLibCardCornerRadius else 0.dp,
+                                topEnd = if (index == 0) thirdPartyLibCardCornerRadius else 0.dp,
+                                bottomStart = if (index == thirdPartyProjects.lastIndex) thirdPartyLibCardCornerRadius else 0.dp,
+                                bottomEnd = if (index == thirdPartyProjects.lastIndex) thirdPartyLibCardCornerRadius else 0.dp
+                            )
                             ArrowPreference(
-                                title = lib.name,
-                                summary = lib.url,
-                                modifier = Modifier
-                                    .clip(rowShape),
-                                insideMargin = PaddingValues(
-                                    horizontal = 16.dp,
-                                    vertical = 16.dp
-                                ),
-                                onClick = {
-                                    runCatching { uriHandler.openUri(lib.url) }
-                                }
+                                title = project.name,
+                                summary = project.url,
+                                modifier = Modifier.clip(rowShape),
+                                insideMargin = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
+                                onClick = { runCatching { uriHandler.openUri(project.url) } }
                             )
                         }
                     }

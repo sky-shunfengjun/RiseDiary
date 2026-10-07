@@ -52,14 +52,15 @@ data class Flight(
 
 @Entity(
     tableName = "length_records",
-    indices = [Index(value = ["recordDate"])]
+    indices = [Index(value = ["recordDate"]), Index(value = ["globalId"], unique = true)]
 )
 data class LengthRecord(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val recordDate: Long,
     val flaccidLengthCm: Float,
     val erectLengthCm: Float,
-    val note: String = ""
+    val note: String = "",
+    @ColumnInfo(defaultValue = "''") val globalId: String = com.risediary.app.data.sync.RecordIdentity.newId()
 )
 
 @Entity(

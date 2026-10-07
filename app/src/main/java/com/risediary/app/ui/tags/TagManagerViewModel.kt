@@ -23,11 +23,10 @@ class TagManagerViewModel @Inject constructor(
     @ApplicationContext private val context: Context,
     private val maintenanceGate: DataMaintenanceGate = DataMaintenanceGate()
 ) : ViewModel() {
-    val tags: StateFlow<List<Tag>> = repository.allTags.stateIn(
-        viewModelScope,
-        SharingStarted.WhileSubscribed(5_000),
-        emptyList()
-    )
+    private val reads = com.risediary.app.ui.RetainedReadFlow(viewModelScope, repository.allTags, emptyList())
+    val tags = reads.data
+    val readFailed = reads.failed
+    fun retryRead() = reads.retry()
 
     private val _error = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = _error.asStateFlow()
@@ -47,45 +46,49 @@ class TagManagerViewModel @Inject constructor(
             return
         }
 
-        maintenanceGate.launchWrite(viewModelScope) {
-            _isSaving.value = true
-            try {
-                runCatching {
-                    val duplicate = repository.getAll().firstOrNull {
-                        it.name.equals(normalized, ignoreCase = true)
-                    }
-                    if (duplicate != null && duplicate.id != existing?.id) {
-                        error(context.getString(R.string.tag_manager_error_duplicate))
-                    }
-                    if (existing == null) {
-                        repository.insert(
-                            Tag(
-                                name = normalized,
-                                color = color.uppercase(),
-                                sortOrder = tags.value.size
-                            )
-                        )
-                    } else {
-                        maintenanceGate.requireCurrent(existing, repository.getById(existing.id))
-                        repository.update(
-                            existing.copy(name = normalized, color = color.uppercase())
-                        )
-                    }
-                }.onSuccess {
-                    _error.value = null
-                    onSaved()
-                }.onFailure {
-                    _error.value = it.message?.takeIf(String::isNotBlank)
-                        ?: context.getString(R.string.tag_manager_error_save_failed)
-                }
-            } finally {
-                _isSaving.value = false
+        perform {
+            val duplicate = repository.getAll().firstOrNull { it.name.equals(normalized, ignoreCase = true) }
+            require(duplicate == null || duplicate.id == existing?.id) { context.getString(R.string.tag_manager_error_duplicate) }
+            if (existing == null) repository.insert(Tag(name = normalized, color = color.uppercase(), sortOrder = tags.value.size))
+            else {
+                maintenanceGate.requireCurrent(existing, repository.getById(existing.id))
+                repository.update(existing.copy(name = normalized, color = color.uppercase()))
             }
+            onSaved()
         }
     }
 
-    fun delete(tag: Tag) {
-        maintenanceGate.launchWrite(viewModelScope) { repository.delete(tag) }
+    fun delete(tag: Tag, onDeleted: () -> Unit = {}) {
+        perform {
+            maintenanceGate.requireCurrent(tag, repository.getById(tag.id))
+            repository.delete(tag)
+            onDeleted()
+        }
+    }
+
+    private var retryOperation: (() -> Unit)? = null
+    fun retryWrite() { retryOperation?.invoke() }
+    fun clearError() { _error.value = null; retryOperation = null }
+    private fun perform(expectedGeneration: Long = maintenanceGate.snapshotGeneration(),
+        onRejected: () -> Unit = {}, work: suspend () -> Unit) {
+        if (_isSaving.value || readFailed.value) return
+        _isSaving.value = true
+        _error.value = null
+        retryOperation = null
+        viewModelScope.launch {
+            try {
+                maintenanceGate.write { maintenanceGate.requireGeneration(expectedGeneration); work() }
+            } catch (conflict: com.risediary.app.data.DataWriteConflictException) {
+                _error.value = "标签已变化，请重新打开后再试"; onRejected()
+            } catch (busy: com.risediary.app.data.DataMaintenanceBusyException) {
+                _error.value = "数据已更新或正在处理，请重新打开后再试"; onRejected()
+            } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+            catch (failure: Exception) {
+                _error.value = failure.message?.takeIf(String::isNotBlank) ?: context.getString(R.string.tag_manager_error_save_failed)
+                retryOperation = { perform(expectedGeneration, onRejected, work) }
+                onRejected()
+            } finally { _isSaving.value = false }
+        }
     }
 
     fun move(fromIndex: Int, toIndex: Int) {
@@ -96,7 +99,7 @@ class TagManagerViewModel @Inject constructor(
         val reordered = current.toMutableList().apply {
             add(toIndex, removeAt(fromIndex))
         }.mapIndexed { index, tag -> tag.copy(sortOrder = index) }
-        maintenanceGate.launchWrite(viewModelScope) {
+        perform {
             maintenanceGate.requireCurrent(current.map { it.copy(sortOrder = 0) }.sortedBy(Tag::id), repository.getAll().map { it.copy(sortOrder = 0) }.sortedBy(Tag::id))
             repository.updateAll(reordered)
         }
@@ -106,19 +109,10 @@ class TagManagerViewModel @Inject constructor(
         val normalized = ordered.mapIndexed { index, tag ->
             tag.copy(sortOrder = index)
         }
-        maintenanceGate.launchWrite(viewModelScope) {
-            try {
-                // A preceding drag may have already saved its order while Room's UI emission is pending.
-                // Compare the record identity and content, allowing the user's next order to replace that order.
-                maintenanceGate.requireCurrent(ordered.map { it.copy(sortOrder = 0) }.sortedBy(Tag::id),
-                    repository.getAll().map { it.copy(sortOrder = 0) }.sortedBy(Tag::id))
-                repository.updateAll(normalized)
-            } catch (cancelled: kotlinx.coroutines.CancellationException) {
-                throw cancelled
-            } catch (_: Exception) {
-                _error.value = context.getString(R.string.tag_manager_error_save_failed)
-                onRejected()
-            }
-        }.invokeOnCompletion { failure -> if (failure != null) onRejected() }
+        perform(onRejected = onRejected) {
+            maintenanceGate.requireCurrent(ordered.map { it.copy(sortOrder = 0) }.sortedBy(Tag::id),
+                repository.getAll().map { it.copy(sortOrder = 0) }.sortedBy(Tag::id))
+            repository.updateAll(normalized)
+        }
     }
 }

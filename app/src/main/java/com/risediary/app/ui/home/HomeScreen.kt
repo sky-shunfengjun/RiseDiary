@@ -66,6 +66,7 @@ fun HomeScreen(
     val scrollState = rememberScrollState()
 
     val username by vm.username.collectAsStateWithLifecycle()
+    val readFailed by vm.readFailed.collectAsStateWithLifecycle()
     val stats by vm.statistics.collectAsStateWithLifecycle()
     val todayCount = stats.todayCount
     val weekCount = stats.weekCount
@@ -131,6 +132,7 @@ fun HomeScreen(
                     .padding(bottom = bottomSpacing),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
+                if (readFailed) com.risediary.app.ui.components.DataReadError(vm::retryRead)
                 Text(
                     text = dateStr,
                     style = MiuixTheme.textStyles.body1,

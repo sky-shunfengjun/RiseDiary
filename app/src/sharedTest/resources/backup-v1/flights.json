@@ -1,0 +1,44 @@
+[
+  {
+    "id": 9,
+    "startTime": 1700000000000,
+    "endTime": 1700000120000,
+    "durationSeconds": 120,
+    "spurtCount": 3,
+    "semenVolumeMl": 5.25,
+    "volumeInputMode": "spurts",
+    "ejaculationDistanceCm": 31.5,
+    "methodTags": "[\"原标签\",\"测试方式\"]",
+    "moodNote": "旧版备注\n第二行 😀",
+    "createdAt": 1700000001000,
+    "updatedAt": 1700000003000
+  },
+  {
+    "id": 2,
+    "startTime": 1700086400000,
+    "endTime": 1700086460000,
+    "durationSeconds": 60,
+    "spurtCount": null,
+    "semenVolumeMl": 8.25,
+    "volumeInputMode": "milliliters",
+    "ejaculationDistanceCm": null,
+    "methodTags": "[]",
+    "moodNote": "毫升输入",
+    "createdAt": 1700086401000,
+    "updatedAt": 1700086401000
+  },
+  {
+    "id": 13,
+    "startTime": 1700172800000,
+    "endTime": 1700172830000,
+    "durationSeconds": 30,
+    "spurtCount": 2,
+    "semenVolumeMl": null,
+    "volumeInputMode": "spurts",
+    "ejaculationDistanceCm": null,
+    "methodTags": "[\"仅股数\"]",
+    "moodNote": "不生成额外毫升值",
+    "createdAt": 1700172801000,
+    "updatedAt": 1700172801000
+  }
+]

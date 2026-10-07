@@ -106,8 +106,7 @@ class LengthHistoryViewModel internal constructor(
                     } else {
                         val expected = original ?: error("请重新打开这条记录后再保存。")
                         maintenanceGate.requireCurrent(expected, repo.getById(record.id))
-                        repo.update(record)
-                        record
+                        record.copy(globalId = expected.globalId).also { repo.update(it) }
                     }
                     committed = true
                     setSaveError(null)

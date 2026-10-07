@@ -77,7 +77,21 @@ class UserPreferences internal constructor(
         maintenanceGate.write { dataStore.edit(block) }
     }
 
-    val securitySettings: Flow<SecuritySettingsSnapshot> = dataStore.data.map { prefs ->
+    val securitySettings: Flow<SecuritySettingsSnapshot> = dataStore.data.map(::securitySnapshot)
+
+    val launchSettings: Flow<AppLaunchSnapshot> = dataStore.data.map { prefs ->
+        AppLaunchSnapshot(securitySnapshot(prefs), prefs[KEY_UPDATE_INTRO_COMPLETED])
+    }
+
+    val updateIntroSettings: Flow<UpdateIntroSettingsSnapshot> = dataStore.data.map { prefs ->
+        UpdateIntroSettingsSnapshot(
+            predictionMaxTicks = com.risediary.app.util.PredictionQuantitySettings.normalizeStoredMaximum(prefs[KEY_PREDICTION_MAX_TICKS] ?: 80),
+            liveUpdatesEnabled = prefs[KEY_LIVE_UPDATES_ENABLED] ?: true,
+            detailVideoHiddenByDefault = prefs[KEY_DETAIL_VIDEO_HIDDEN] ?: false,
+        )
+    }
+
+    private fun securitySnapshot(prefs: Preferences): SecuritySettingsSnapshot =
         SecuritySettingsSnapshot(
             onboardingCompleted = prefs[KEY_ONBOARDING_COMPLETED] ?: false,
             lockEnabled = prefs[KEY_APP_LOCK_ENABLED] ?: false,
@@ -88,7 +102,6 @@ class UserPreferences internal constructor(
             backgroundAutoLock = prefs[KEY_BACKGROUND_AUTO_LOCK_ENABLED] ?: false,
             backgroundMode = BackgroundLockMode.fromStoredValue(prefs[KEY_BACKGROUND_LOCK_MODE])
         ).requireConsistent()
-    }
 
     val quantitySettings: Flow<QuantitySettingsSnapshot> = dataStore.data.map { prefs ->
         val ticks = com.risediary.app.util.PredictionQuantitySettings.normalizeStoredMaximum(prefs[KEY_PREDICTION_MAX_TICKS] ?: 80)
@@ -162,6 +175,7 @@ class UserPreferences internal constructor(
 
     internal suspend fun clearAppLockForMaintenance() {
         dataStore.edit {
+            it[KEY_ONBOARDING_COMPLETED] = false
             it[KEY_APP_LOCK_ENABLED] = false
             it[KEY_APP_LOCK_PIN] = ""
             it[KEY_APP_LOCK_ATTEMPTS] = 0
@@ -545,8 +559,19 @@ class UserPreferences internal constructor(
                 it[KEY_DAILY_REMINDER_TIME] = normalizedTime
                 it[KEY_INACTIVE_REMINDER_TIME] = normalizedTime
             }
-            if (firstRun) it[KEY_ONBOARDING_COMPLETED] = true
+            if (firstRun) {
+                it[KEY_ONBOARDING_COMPLETED] = true
+                it[KEY_UPDATE_INTRO_COMPLETED] = UpdateIntroCampaign.ID
+            }
         }
+    }
+
+    suspend fun finishUpdateIntro() {
+        edit { it[KEY_UPDATE_INTRO_COMPLETED] = UpdateIntroCampaign.ID }
+    }
+
+    suspend fun resetUpdateIntroCompletion() {
+        edit { it.remove(KEY_UPDATE_INTRO_COMPLETED) }
     }
 
     suspend fun markDefaultTagsInitialized() {
@@ -588,7 +613,7 @@ class UserPreferences internal constructor(
             prefs[KEY_THEME_MODE] = settings.themeMode
             prefs[KEY_HOME_CARD_ORDER] = settings.homeCardOrder
             prefs[KEY_HOME_CARD_VISIBILITY] = settings.homeCardVisibility
-            prefs[KEY_ONBOARDING_COMPLETED] = settings.onboardingCompleted
+            // Onboarding, update-intro completion and credentials belong to this device.
             // Reminder runtime state is device-local: clear stale sent-marks from
             // the previous device so reminders are not suppressed after restore,
             // and re-anchor the inactive reminder window.
@@ -709,6 +734,7 @@ class UserPreferences internal constructor(
         private val KEY_HOME_CARD_ORDER = stringPreferencesKey("home_card_order")
         private val KEY_HOME_CARD_VISIBILITY = stringPreferencesKey("home_card_visibility")
         private val KEY_ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
+        private val KEY_UPDATE_INTRO_COMPLETED = stringPreferencesKey("last_completed_update_intro_id")
         private val KEY_DEFAULT_TAGS_INITIALIZED =
             booleanPreferencesKey("default_tags_initialized")
     }

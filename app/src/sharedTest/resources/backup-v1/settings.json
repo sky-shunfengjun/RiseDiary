@@ -1,0 +1,21 @@
+{
+  "username": "旧机长",
+  "ml_per_spurt": 2.5,
+  "default_volume_mode": "spurts",
+  "daily_reminder_enabled": true,
+  "daily_reminder_time": "21:35",
+  "inactive_reminder_enabled": false,
+  "inactive_reminder_days": 7,
+  "inactive_reminder_time": "22:00",
+  "monthly_length_reminder_enabled": false,
+  "monthly_length_reminder_day": 1,
+  "monthly_length_reminder_time": "22:00",
+  "reminder_sound": false,
+  "reminder_vibration": true,
+  "background_auto_lock_enabled": false,
+  "background_lock_mode": "always",
+  "theme_mode": "dark",
+  "home_card_order": "[\"overview\",\"trend\",\"length\"]",
+  "home_card_visibility": "{\"trend\":false}",
+  "onboarding_completed": true
+}

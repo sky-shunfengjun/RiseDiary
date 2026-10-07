@@ -1,5 +1,8 @@
 package com.risediary.app.ui.video
 
+import com.risediary.app.ui.projectState
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.core.tween
@@ -96,7 +99,8 @@ internal fun VideoPlayerPage(
     fullscreenOverlay: (@Composable (Backdrop) -> Unit)? = null,
     collapseFullscreenOverlay: () -> Boolean = { false },
     loadingIndicator: Boolean = loading,
-    onChooseVideo: (() -> Unit)? = null
+    onChooseVideo: (() -> Unit)? = null,
+    fullscreenOverlayNeedsBackdrop: Boolean = false
 ) {
     val navigator = LocalNavigator.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
@@ -104,12 +108,29 @@ internal fun VideoPlayerPage(
     val fullscreen = rememberVideoFullscreenState(controller, active)
     val fullScreen = fullscreen.fullScreen
     val fullscreenSession = fullscreen.inSession
-    val snapshot by controller.playback.collectAsStateWithLifecycle()
-    LaunchedEffect(active) { if (!active) onPause() }
+    val videoFlow = remember(controller) { controller.playback.projectState { it?.video } }
+    val video by videoFlow.collectAsStateWithLifecycle()
+    val activity = androidx.compose.ui.platform.LocalContext.current.findVideoActivity()
+    var foreground by remember { mutableStateOf(lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)) }
+    val currentActive by rememberUpdatedState(active)
+    val currentPause by rememberUpdatedState(onPause)
+    LaunchedEffect(active, foreground) {
+        if (!active || !foreground) { currentPause(); controller.setPresentationActive(false) }
+        else controller.setPresentationActive(true)
+    }
     DisposableEffect(lifecycle, controller) {
-        val observer = VideoPlaybackLifecycleObserver(controller)
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_STOP && activity?.isChangingConfigurations != true) {
+                foreground = false; currentPause(); controller.setPresentationActive(false)
+            } else if (event == androidx.lifecycle.Lifecycle.Event.ON_START) {
+                foreground = true
+                if (currentActive) controller.setPresentationActive(true)
+            }
+        }
         lifecycle.addObserver(observer)
-        onDispose { lifecycle.removeObserver(observer); onPause() }
+        onDispose { lifecycle.removeObserver(observer)
+            if (activity?.isChangingConfigurations != true) { currentPause(); controller.setPresentationActive(false) }
+        }
     }
     fun exitFullscreen() { collapseFullscreenOverlay(); fullscreen.exit() }
     PageBackHandler(enabled = fullscreenSession || interceptBack) {
@@ -127,11 +148,11 @@ internal fun VideoPlayerPage(
             if (fullScreen) Modifier.fillMaxSize() else Modifier.fillMaxWidth(),
             onToggleOrientation = fullscreen.toggleOrientation,
             direction = fullscreen.direction, fullscreenOverlay = fullscreenOverlay,
-            onBlankTap = collapseFullscreenOverlay)
+            onBlankTap = collapseFullscreenOverlay, fullscreenOverlayNeedsBackdrop = fullscreenOverlayNeedsBackdrop)
     }
     val fullBackdrop = rememberLayerBackdrop { drawRect(Color.Black); drawContent() }
     if (fullScreen) {
-        if (loading || problem != null || snapshot == null) {
+        if (loading || problem != null || video == null) {
             Box(Modifier.fillMaxSize().background(Color.Black)) {
                 Box(Modifier.matchParentSize().layerBackdrop(fullBackdrop)
                     .background(Brush.verticalGradient(listOf(Color(0xFF17202B), Color.Black))))
@@ -149,7 +170,7 @@ internal fun VideoPlayerPage(
             val backdrop = requireNotNull(LocalPageBackdrop.current)
             BoxWithConstraints(Modifier.fillMaxSize().padding(padding)) {
                 val videoOrState: @Composable () -> Unit = {
-                    if (loading || problem != null || snapshot == null) {
+                    if (loading || problem != null || video == null) {
                         VideoPlaceholderCard(loading, loadingIndicator, problem, bottomAction != null,
                             backdrop, onRetry, onChooseVideo = onChooseVideo)
                     } else videoContent()

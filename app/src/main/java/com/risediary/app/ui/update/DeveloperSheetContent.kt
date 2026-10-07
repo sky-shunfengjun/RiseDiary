@@ -28,6 +28,7 @@ internal fun DeveloperSheetContent(
     viewModel: UpdateViewModel,
     authorized: Boolean,
     show: Boolean,
+    onRestartUpdateIntro: (() -> Unit)? = null,
     onChannelExpanded: (Boolean) -> Unit,
 ) {
     var password by remember { mutableStateOf("") }
@@ -98,6 +99,23 @@ internal fun DeveloperSheetContent(
                     }
                 }
             }
+            PlayerDiagnosticsEntry(viewModel.videoDiagnostics, enabled)
+            if (onRestartUpdateIntro != null) Card(
+                Modifier.fillMaxWidth().testTag("developer_update_intro"),
+                colors = CardDefaults.defaultColors(color = updateSheetCardColor()),
+                onClick = { if (enabled) onRestartUpdateIntro() },
+            ) {
+                Row(Modifier.padding(16.dp), verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Icon(com.risediary.app.ui.icons.AppIcons.Refresh, null, Modifier.size(24.dp))
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(stringResource(R.string.developer_update_intro))
+                        Text(stringResource(R.string.developer_update_intro_summary),
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            style = MiuixTheme.textStyles.body2)
+                    }
+                }
+            }
             Card(
                 Modifier.fillMaxWidth(),
                 colors = CardDefaults.defaultColors(color = updateSheetCardColor()),
@@ -130,6 +148,39 @@ internal fun DeveloperResetDialog(show: Boolean, viewModel: UpdateViewModel) {
                     onClick = viewModel::cancelDeveloperReset)
                 TextButton(text = stringResource(R.string.developer_reset_confirm), modifier = Modifier.weight(1f),
                     colors = ButtonDefaults.textButtonColorsPrimary(), onClick = viewModel::confirmDeveloperReset)
+            }
+        }
+    }
+}
+@Composable
+private fun PlayerDiagnosticsEntry(diagnostics: com.risediary.app.media.VideoDiagnostics, enabled: Boolean) {
+    var show by remember { mutableStateOf(false) }
+    val active by diagnostics.enabled.collectAsState()
+    val snapshot by diagnostics.snapshot.collectAsState()
+    val context = androidx.compose.ui.platform.LocalContext.current
+    Card(Modifier.fillMaxWidth(), colors = CardDefaults.defaultColors(color = updateSheetCardColor()),
+        onClick = { if (enabled) show = true }) {
+        Row(Modifier.padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+            Icon(com.risediary.app.ui.icons.AppIcons.Video, null, Modifier.size(24.dp))
+            Column { Text("播放器诊断"); Text(if (active) "已开启，仅保留当前会话" else "查看掉帧与缓冲情况",
+                style = MiuixTheme.textStyles.body2, color = MiuixTheme.colorScheme.onSurfaceVariantSummary) }
+        }
+    }
+    OverlayDialog(show = show, title = "播放器诊断", renderInRootScaffold = false,
+        onDismissRequest = { show = false }) {
+        Column(Modifier.heightIn(max = 480.dp).verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            SwitchPreference(title = "开启诊断", summary = "仅保存在内存，不包含文件名、路径或记录内容",
+                checked = active, onCheckedChange = diagnostics::setEnabled)
+            if (active) Text(snapshot.report())
+            else Text("开启后播放同一视频，可对比普通与全屏模式的掉帧和缓冲。")
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                TextButton("关闭", modifier = Modifier.weight(1f), onClick = { show = false })
+                TextButton("复制", modifier = Modifier.weight(1f), enabled = active, onClick = {
+                    val clipboard = context.getSystemService(android.content.ClipboardManager::class.java)
+                    clipboard.setPrimaryClip(android.content.ClipData.newPlainText("播放器诊断", snapshot.report()))
+                })
             }
         }
     }

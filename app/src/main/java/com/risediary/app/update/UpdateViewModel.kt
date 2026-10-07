@@ -46,7 +46,7 @@ data class UpdateUiState(
     val retryingOriginalVersion: Boolean
         get() = (resolveUpdateDownloadTarget(this) as? UpdateDownloadTarget.Authorized)?.retryOriginal == true
     val downloadEligibilityError: UpdateError?
-        get() = if (download.isActive() || download is DownloadState.Ready) null
+        get() = if (download.isActive() || (download is DownloadState.Ready && cachedPackageIsApplicable(this, download.record))) null
             else (resolveUpdateDownloadTarget(this) as? UpdateDownloadTarget.Blocked)?.reason
 }
 
@@ -54,7 +54,8 @@ data class UpdateUiState(
 class UpdateViewModel @Inject constructor(
     private val releaseSource: ReleaseSource,
     private val preferences: UpdatePreferences,
-    private val downloads: UpdateDownloads
+    private val downloads: UpdateDownloads,
+    val videoDiagnostics: com.risediary.app.media.VideoDiagnostics = com.risediary.app.media.VideoDiagnostics()
 ) : ViewModel() {
     val currentVersion = BuildConfig.VERSION_NAME
     private val _ui = MutableStateFlow(UpdateUiState())
@@ -143,6 +144,7 @@ class UpdateViewModel @Inject constructor(
                     error = if (available && asset == null) UpdateError.APK_UNAVAILABLE else null,
                     visible = it.visible || (automatic && !it.developer.visible))
             }
+            downloadMutex.withLock { refreshDownloadLocked() }
         } catch (cancelled: CancellationException) { throw cancelled }
         catch (_: Exception) {
             if (token == checkGeneration) _ui.update { it.copy(check = UpdateCheckState.Failed, release = null, checkAuthorization = null, error = UpdateError.CHECK) }
@@ -248,7 +250,7 @@ class UpdateViewModel @Inject constructor(
             downloadRestored.await()
             if (restoreFailed) { reportActionError(UpdateError.SETTINGS); return@launch }
             downloadMutex.withLock {
-                if (_ui.value.download.isActive() || _ui.value.download is DownloadState.Ready) return@withLock
+                if (_ui.value.download.isActive() || (_ui.value.download as? DownloadState.Ready)?.let { cachedPackageIsApplicable(_ui.value, it.record) } == true) return@withLock
                 preferenceMutex.withLock preferenceLock@{
                     val token = checkGeneration
                     val existing = record
@@ -262,8 +264,8 @@ class UpdateViewModel @Inject constructor(
                             return@preferenceLock
                         }
                         if (existing != null) {
-                            refreshDownloadLocked()
-                            if (_ui.value.download.isActive() || _ui.value.download is DownloadState.Ready) return@preferenceLock
+                            if (!refreshDownloadLocked()) return@preferenceLock
+                            if (_ui.value.download.isActive() || (_ui.value.download as? DownloadState.Ready)?.let { cachedPackageIsApplicable(_ui.value.copy(settings = liveSettings), it.record) } == true) return@preferenceLock
                         }
                         // A query can suspend; validate both the check generation and current strategy again before enqueue.
                         val latestSettings = preferences.settings.first()
@@ -292,18 +294,26 @@ class UpdateViewModel @Inject constructor(
         }
     }
     fun refreshDownload() { viewModelScope.launch { downloadMutex.withLock { refreshDownloadLocked() } } }
-    private suspend fun refreshDownloadLocked() {
-        val current = record ?: return
-        if (_ui.value.download is DownloadState.Verifying) return
+    private suspend fun refreshDownloadLocked(): Boolean {
+        val current = record ?: return true
+        if (_ui.value.download is DownloadState.Verifying) return true
         if (current.verificationFailed) {
             _ui.update { it.copy(download = DownloadState.Failed(current, UpdateError.INTEGRITY)) }
-            return
+            return true
         }
         try {
             val value = downloads.query(current)
             _ui.update { it.copy(download = value, confirmCancel = it.confirmCancel && value.isActive()) }
+            if (value is DownloadState.Ready && !cachedPackageIsApplicable(_ui.value, current)) {
+                try { preferences.saveDownload(null) }
+                catch (cancelled: CancellationException) { throw cancelled }
+                catch (_: Exception) { reportActionError(UpdateError.SETTINGS); return false }
+                record = null
+                _ui.update { it.copy(download = DownloadState.Idle, installUri = null) }
+            }
         } catch (cancelled: CancellationException) { throw cancelled }
-        catch (_: Exception) { _ui.update { it.copy(download = DownloadState.Failed(current, UpdateError.DOWNLOAD), confirmCancel = false) } }
+        catch (_: Exception) { _ui.update { it.copy(download = DownloadState.Failed(current, UpdateError.DOWNLOAD), confirmCancel = false) }; return false }
+        return true
     }
 
     fun requestCancel() {
@@ -340,6 +350,7 @@ class UpdateViewModel @Inject constructor(
         if (installJob?.isActive == true || _ui.value.installUri != null) return
         installJob = viewModelScope.launch { downloadMutex.withLock {
             val current = (_ui.value.download as? DownloadState.Ready)?.record ?: return@withLock
+            if (!cachedPackageIsApplicable(_ui.value, current)) { refreshDownloadLocked(); return@withLock }
             _ui.update { it.copy(download = DownloadState.Verifying(current), error = null) }
             try {
                 val uri = downloads.verifyForInstall(current)

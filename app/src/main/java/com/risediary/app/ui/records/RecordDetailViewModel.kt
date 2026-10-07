@@ -133,11 +133,16 @@ class RecordDetailViewModel @Inject constructor(
         }
     }
 
+    private var deletionFailed = false
+    fun retry(deleteForUndo: suspend (Flight, Long) -> Unit) {
+        if (deletionFailed) delete(deleteForUndo) else refresh()
+    }
     fun delete(deleteForUndo: suspend (Flight, Long) -> Unit) {
         val current = _flight.value ?: return
         if (_loading.value || _videoBusy.value) return
         _videoBusy.value = true
         _deleting.value = true
+        deletionFailed = false
         _error.value = null
         viewModelScope.launch {
             try {
@@ -155,7 +160,8 @@ class RecordDetailViewModel @Inject constructor(
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (_: Exception) {
-                _error.value = "删除失败，请重试"
+                deletionFailed = true
+                _error.value = "删除失败，记录已保留，请重试"
             } finally { _videoBusy.value = false; _deleting.value = false }
         }
     }

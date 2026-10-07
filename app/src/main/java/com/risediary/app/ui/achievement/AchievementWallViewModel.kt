@@ -22,12 +22,13 @@ class AchievementWallViewModel @Inject constructor(
     private val detector: AchievementDetector
 ) : ViewModel() {
 
-    val unlockedAchievements: StateFlow<List<Achievement>> =
-        achievementRepo.allAchievements.stateIn(
-            viewModelScope,
-            SharingStarted.WhileSubscribed(5_000),
-            emptyList()
-        )
+    private val reads = com.risediary.app.ui.RetainedReadFlow(viewModelScope, achievementRepo.allAchievements, emptyList())
+    val unlockedAchievements = reads.data
+    private val progressFailed = MutableStateFlow(false)
+    private var refreshJob: kotlinx.coroutines.Job? = null
+    val readFailed = combine(reads.failed, progressFailed) { a, b -> a || b }
+        .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+    fun retryRead() { reads.retry(); refresh() }
 
     /** All defined achievements (unlocked + locked with progress). */
     val allDefinitions = AchievementCatalog.definitions
@@ -36,13 +37,15 @@ class AchievementWallViewModel @Inject constructor(
     val progressMap = MutableStateFlow<Map<String, Float>>(emptyMap())
 
     fun refresh() {
-        viewModelScope.launch {
+        if (refreshJob?.isActive == true) return
+        refreshJob = viewModelScope.launch {
             try {
                 progressMap.value = buildProgressMap()
+                progressFailed.value = false
             } catch (error: CancellationException) {
                 throw error
             } catch (_: Exception) {
-                // Keep showing the last known progress instead of crashing
+                progressFailed.value = true
             }
         }
     }

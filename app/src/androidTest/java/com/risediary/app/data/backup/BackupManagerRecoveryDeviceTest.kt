@@ -116,7 +116,8 @@ class BackupManagerRecoveryDeviceTest {
             assertTrue(f.manager.exportToUri(uri) is BackupResult.Success)
             assertTrue(f.manager.clearAll() is BackupResult.Success)
             assertTrue(f.manager.restoreFromUri(uri) is BackupResult.Success)
-            f.assertOriginalTables()
+            val restoredFlight = f.database.flightDao().getAll().single()
+            assertEquals(f.original.copy(id=restoredFlight.id),restoredFlight)
             assertEquals(501, f.database.flightDao().getAll().single().spurtCount)
             assertEquals(1002f, f.database.flightDao().getAll().single().semenVolumeMl!!, 0f)
             assertEquals(10_001, f.database.flightDao().getAll().single().moodNote.length)
@@ -136,7 +137,7 @@ class BackupManagerRecoveryDeviceTest {
             val result = f.manager.restoreFromUri(uri)
             assertTrue(result is BackupResult.Success)
             assertTrue((result as BackupResult.Success).message.contains("重新关联"))
-            assertEquals(record, f.database.flightDao().getAll().single())
+            assertEquals(record.copy(id=f.database.flightDao().getAll().single().id), f.database.flightDao().getAll().single())
             assertEquals(DataMaintenanceGate.State.IDLE, f.gate.state.value)
         } finally { f.close() }
     }
@@ -282,6 +283,11 @@ class BackupManagerRecoveryDeviceTest {
         override fun write(bytes: ByteArray) {
             if (failWrite) throw IOException("Controlled journal write failure")
             delegate.write(bytes)
+        }
+        override fun openRead() = delegate.openRead()
+        override fun writeStream(block: (java.io.OutputStream) -> Unit) {
+            if (failWrite) throw IOException("Controlled journal write failure")
+            delegate.writeStream(block)
         }
         override fun delete() = delegate.delete()
     }

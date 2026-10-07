@@ -11,6 +11,8 @@ enum class BackupState { IDLE, WORKING, SUCCESS, ERROR }
 
 @HiltViewModel
 class BackupViewModel @Inject constructor(private val coordinator: BackupOperationCoordinator) : ViewModel() {
+    val previewMessage = coordinator.previewMessage
+    val preview = coordinator.preview
     val state = coordinator.state
     val message = coordinator.message
     val maintenanceState = coordinator.maintenanceState
@@ -22,7 +24,11 @@ class BackupViewModel @Inject constructor(private val coordinator: BackupOperati
     fun dismissClearDialog() { mutableConfirm.value = false }
     fun exportBackup() = coordinator.start(operation = coordinator.manager::exportToDownloads)
     fun exportBackupTo(uri: Uri) = coordinator.start { coordinator.manager.exportToUri(uri) }
-    fun importBackup(uri: Uri) = coordinator.start(true) { coordinator.manager.restoreFromUri(uri) }
+    fun importBackup(uri: Uri) = coordinator.prepare(uri)
+    fun changeRestoreMode(mode: com.risediary.app.data.backup.RestoreMode) = coordinator.changeMode(mode)
+    fun confirmRestore() = coordinator.confirmPreview()
+    fun discardRestore() = coordinator.discardPreview()
+    override fun onCleared() { coordinator.discardPreview() }
     fun clearAllData() = coordinator.start(true, coordinator.manager::clearAll)
     fun retryRecovery() = coordinator.start(true, coordinator.manager::retryRecovery)
     fun resetState() = coordinator.reset()

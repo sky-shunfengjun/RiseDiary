@@ -15,5 +15,7 @@ interface VideoPlayerController {
     fun seekTo(positionMillis: Long)
     fun setSpeed(speed: Float)
     fun setLoop(loop: Boolean)
+    /** Covered/background pages relinquish decoder and buffer resources. */
+    fun setPresentationActive(active: Boolean) {}
     fun release()
 }

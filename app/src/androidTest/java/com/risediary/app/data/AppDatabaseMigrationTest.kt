@@ -57,7 +57,7 @@ class AppDatabaseMigrationTest {
         }
 
         val database = Room.databaseBuilder(context, AppDatabase::class.java, databaseName)
-            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5, AppDatabase.MIGRATION_5_6, AppDatabase.MIGRATION_6_7)
+            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5, AppDatabase.MIGRATION_5_6, AppDatabase.MIGRATION_6_7, AppDatabase.MIGRATION_7_8)
             .allowMainThreadQueries()
             .build()
         val sqlite = database.openHelper.writableDatabase
@@ -98,7 +98,7 @@ class AppDatabaseMigrationTest {
         }
 
         val database = Room.databaseBuilder(context, AppDatabase::class.java, databaseName)
-            .addMigrations(AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5, AppDatabase.MIGRATION_5_6, AppDatabase.MIGRATION_6_7)
+            .addMigrations(AppDatabase.MIGRATION_2_3, AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5, AppDatabase.MIGRATION_5_6, AppDatabase.MIGRATION_6_7, AppDatabase.MIGRATION_7_8)
             .allowMainThreadQueries()
             .build()
         val sqlite = database.openHelper.writableDatabase
@@ -127,10 +127,10 @@ class AppDatabaseMigrationTest {
             """.trimIndent())
         }
         val database = Room.databaseBuilder(context, AppDatabase::class.java, databaseName)
-            .addMigrations(AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5, AppDatabase.MIGRATION_5_6, AppDatabase.MIGRATION_6_7).allowMainThreadQueries().build()
+            .addMigrations(AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5, AppDatabase.MIGRATION_5_6, AppDatabase.MIGRATION_6_7, AppDatabase.MIGRATION_7_8).allowMainThreadQueries().build()
         try {
             val sqlite = database.openHelper.writableDatabase
-            assertEquals(7, sqlite.version)
+            assertEquals(8, sqlite.version)
             assertEquals(3, queryCount(sqlite, "SELECT COUNT(*) FROM flights WHERE " +
                 "legacySpurtCount IS spurtCount AND legacyVolumeMl IS semenVolumeMl AND legacyVolumeInputMode = volumeInputMode"))
             assertEquals(3, queryCount(sqlite, "SELECT COUNT(*) FROM flights WHERE predictionMaxTicks IS NULL"))
@@ -154,10 +154,10 @@ class AppDatabaseMigrationTest {
             db.execSQL("INSERT INTO achievements VALUES(1,'milestone_1',1000,1)")
         }
         val database = Room.databaseBuilder(context, AppDatabase::class.java, databaseName)
-            .addMigrations(AppDatabase.MIGRATION_4_5, AppDatabase.MIGRATION_5_6, AppDatabase.MIGRATION_6_7).allowMainThreadQueries().build()
+            .addMigrations(AppDatabase.MIGRATION_4_5, AppDatabase.MIGRATION_5_6, AppDatabase.MIGRATION_6_7, AppDatabase.MIGRATION_7_8).allowMainThreadQueries().build()
         try {
             val sqlite = database.openHelper.writableDatabase
-            assertEquals(7, sqlite.version)
+            assertEquals(8, sqlite.version)
             assertEquals(1, queryCount(sqlite, """SELECT COUNT(*) FROM flights WHERE id=1 AND
                 startTime=1000 AND endTime=61000 AND durationSeconds=60 AND semenVolumeMl=2.3 AND
                 volumeInputMode='estimated' AND legacySpurtCount=3 AND legacyVolumeMl=6.0 AND
@@ -178,10 +178,10 @@ class AppDatabaseMigrationTest {
                 'content://videos/document/1','video.mp4','video/mp4')""")
         }
         val database = Room.databaseBuilder(context, AppDatabase::class.java, databaseName)
-            .addMigrations(AppDatabase.MIGRATION_5_6, AppDatabase.MIGRATION_6_7).allowMainThreadQueries().build()
+            .addMigrations(AppDatabase.MIGRATION_5_6, AppDatabase.MIGRATION_6_7, AppDatabase.MIGRATION_7_8).allowMainThreadQueries().build()
         try {
             val sqlite = database.openHelper.writableDatabase
-            assertEquals(7, sqlite.version)
+            assertEquals(8, sqlite.version)
             assertEquals("manual", queryString(sqlite, "SELECT timingSource FROM flights WHERE id=7"))
             assertEquals("content://videos/document/1", queryString(sqlite, "SELECT videoUri FROM flights WHERE id=7"))
             assertEquals(1, queryCount(sqlite, "SELECT COUNT(*) FROM flights WHERE recordDraftId IS NULL"))
@@ -206,10 +206,10 @@ class AppDatabaseMigrationTest {
             db.execSQL("INSERT INTO achievements VALUES(1,'milestone_1',1000,1)")
         }
         val database = Room.databaseBuilder(context, AppDatabase::class.java, databaseName)
-            .addMigrations(AppDatabase.MIGRATION_6_7).allowMainThreadQueries().build()
+            .addMigrations(AppDatabase.MIGRATION_6_7, AppDatabase.MIGRATION_7_8).allowMainThreadQueries().build()
         val records = try {
             val sqlite = database.openHelper.writableDatabase
-            assertEquals(7, sqlite.version)
+            assertEquals(8, sqlite.version)
             assertTrue(hasIndex(sqlite, "index_flights_globalId"))
             assertEquals(1, queryCount(sqlite, """SELECT COUNT(*) FROM flights WHERE id=7 AND
                 startTime=1000 AND endTime=13000 AND durationSeconds=8 AND spurtCount IS NULL AND
@@ -242,6 +242,26 @@ class AppDatabaseMigrationTest {
         finally { reopened.close() }
     }
 
+
+    @Test fun migrationFromSevenAssignsLengthIdsAcrossBatchesAndKeepsThemOnEditAndReopen() = kotlinx.coroutines.runBlocking {
+        createVersionTwoDatabase(version=7).use { sqlite ->
+            repeat(501) { index -> sqlite.execSQL("INSERT INTO length_records VALUES(?,1000,8.0,12.0,'keep')",arrayOf<Any>(index+1)) }
+        }
+        val database = Room.databaseBuilder(context,AppDatabase::class.java,databaseName)
+            .addMigrations(AppDatabase.MIGRATION_7_8).build()
+        val originals = try {
+            val rows=database.lengthRecordDao().getAll()
+            assertEquals(501,rows.size); assertEquals(501,rows.map { it.globalId }.distinct().size)
+            assertTrue(rows.all { com.risediary.app.data.sync.RecordIdentity.isValidId(it.globalId) })
+            val edited=rows.first().copy(note="edited")
+            database.lengthRecordDao().update(edited)
+            assertEquals(edited.globalId,database.lengthRecordDao().getById(edited.id)!!.globalId)
+            database.lengthRecordDao().getAll()
+        } finally { database.close() }
+        val reopened=Room.databaseBuilder(context,AppDatabase::class.java,databaseName).build()
+        try { assertEquals(originals,reopened.lengthRecordDao().getAll()) }
+        finally { reopened.close() }
+    }
 
     private fun createVersionOneDatabase(): SupportSQLiteDatabase {
         val configuration = SupportSQLiteOpenHelper.Configuration.builder(context)
@@ -318,6 +338,7 @@ class AppDatabaseMigrationTest {
                     if (version >= 4) AppDatabase.MIGRATION_3_4.migrate(db)
                     if (version >= 5) AppDatabase.MIGRATION_4_5.migrate(db)
                     if (version >= 6) AppDatabase.MIGRATION_5_6.migrate(db)
+                    if (version >= 7) AppDatabase.MIGRATION_6_7.migrate(db)
                     db.execSQL("CREATE INDEX index_flights_startTime ON flights(startTime)")
                     db.execSQL(
                         "CREATE INDEX index_length_records_recordDate ON length_records(recordDate)"

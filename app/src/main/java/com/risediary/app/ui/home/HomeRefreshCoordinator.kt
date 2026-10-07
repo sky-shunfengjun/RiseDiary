@@ -14,6 +14,8 @@ internal class HomeRefreshCoordinator<T>(
     private val load: suspend () -> T,
     private val publish: (T) -> Unit
 ) {
+    private val failed = MutableStateFlow(false)
+    val readFailed = failed.asStateFlow()
     private var revision = 0L
     private var job: Job? = null
     private val _isRefreshing = MutableStateFlow(false)
@@ -34,7 +36,9 @@ internal class HomeRefreshCoordinator<T>(
                     } catch (error: Exception) {
                         Result.failure(error)
                     }
-                    if (requestedRevision == revision) result.onSuccess(publish)
+                    if (requestedRevision == revision) {
+                        result.onSuccess { failed.value = false; publish(it) }.onFailure { failed.value = true }
+                    }
                 } while (requestedRevision != revision)
             } finally {
                 _isRefreshing.value = false

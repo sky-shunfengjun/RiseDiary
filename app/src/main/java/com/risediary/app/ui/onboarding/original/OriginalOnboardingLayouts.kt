@@ -42,6 +42,9 @@ import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 import com.risediary.app.R
 import com.risediary.app.ui.icons.AppIcons
 import com.risediary.app.ui.onboarding.OnboardingStep
+import com.risediary.app.ui.onboarding.GuideSceneSpec
+import com.risediary.app.ui.onboarding.GuideWelcomeGraphic
+import androidx.compose.foundation.shape.CircleShape
 import com.risediary.app.ui.theme.LocalRiseDarkTheme
 import kotlin.math.ceil
 
@@ -69,13 +72,13 @@ internal fun originalOnboardingSummary(): Color =
 
 internal data class OriginalWelcomeViews(
     val root: View,
-    val logo: ImageView,
+    val logo: View,
     val title: TextView,
     val next: View,
 )
 
 /** Native welcome owns one accessible action; the existing vector is decorative only. */
-internal fun createOriginalWelcome(context: Context, onNext: () -> Unit): OriginalWelcomeViews {
+internal fun createOriginalWelcome(context: Context, onNext: () -> Unit, spec: GuideSceneSpec = GuideSceneSpec()): OriginalWelcomeViews {
     val inflationRoot = FrameLayout(context)
     val root = LayoutInflater.from(context).inflate(R.layout.oobe_original_welcome, inflationRoot, false)
     val next = root.findViewById<FrameLayout>(R.id.oobe_original_next)
@@ -102,13 +105,36 @@ internal fun createOriginalWelcome(context: Context, onNext: () -> Unit): Origin
         }
     })
     next.setOnClickListener { if (next.isEnabled && next.alpha > 0f) onNext() }
+    root.findViewById<TextView>(R.id.oobe_original_title).setText(spec.welcomeTitle)
+    root.findViewById<TextView>(R.id.oobe_original_subtitle).setText(spec.welcomeSubtitle)
+    var hero: View = root.findViewById<ImageView>(R.id.oobe_original_logo)
+    if (spec.welcomeGraphic == GuideWelcomeGraphic.UPDATE_CHECK) {
+        val previous = hero
+        val parent = previous.parent as android.view.ViewGroup
+        val index = parent.indexOfChild(previous)
+        val marker = ComposeView(context).apply {
+            id = previous.id
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
+            setContent {
+                Box(Modifier.fillMaxSize().background(OriginalOnboardingAccent, CircleShape),
+                    contentAlignment = Alignment.Center) {
+                    Image(rememberVectorPainter(AppIcons.Check), null, Modifier.size(44.dp),
+                        colorFilter = ColorFilter.tint(Color.White))
+                }
+            }
+        }
+        parent.removeView(previous)
+        parent.addView(marker, index, previous.layoutParams)
+        hero = marker
+    }
     next.isEnabled = false
     next.isClickable = false
     next.isFocusable = false
     root.isSaveEnabled = false
     root.isSaveFromParentEnabled = false
     return OriginalWelcomeViews(
-        root, root.findViewById(R.id.oobe_original_logo),
+        root, hero,
         root.findViewById(R.id.oobe_original_title), next,
     )
 }
@@ -144,8 +170,12 @@ internal fun OriginalOnboardingBody(
     enabled: Boolean,
     content: @Composable () -> Unit,
 ) {
-    val background = if (step == OnboardingStep.WELCOME || step == OnboardingStep.COMPLETE)
-        Color.Transparent else originalOnboardingBackground()
+    GuideSceneBody(step == OnboardingStep.WELCOME || step == OnboardingStep.COMPLETE, enabled, content)
+}
+
+@Composable
+internal fun GuideSceneBody(hero: Boolean, enabled: Boolean, content: @Composable () -> Unit) {
+    val background = if (hero) Color.Transparent else originalOnboardingBackground()
     Box(
         Modifier.fillMaxSize().background(background).then(
             if (enabled) Modifier else Modifier.clearAndSetSemantics {}.pointerInput(Unit) {

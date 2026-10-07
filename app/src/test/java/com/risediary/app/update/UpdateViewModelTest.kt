@@ -530,6 +530,63 @@ class UpdateViewModelTest {
         vm.requestCancel(); vm.confirmCancel(); runCurrent()
         assertNull(prefs.downloadRecord.value)
     }
+    @Test fun installedCachedPackageDoesNotBlockANewRelease() = runTest(dispatcher) {
+        val old = release("v1.0.0")
+        val task = DownloadRecord(7, old, old.assets.single(), UpdateChannel.OFFICIAL)
+        val prefs = FakeUpdatePreferences(record = task)
+        val downloads = FakeDownloads().apply { completed = true }
+        val vm = UpdateViewModel(ReleaseSource { release() }, prefs, downloads)
+        runCurrent(); vm.openAndCheck(); runCurrent()
+        assertEquals(UpdatePrimaryAction.DOWNLOAD, primaryUpdateAction(vm.ui.value))
+        vm.downloadUpdate(); runCurrent()
+        assertEquals("v99.0.0", downloads.tasks.single().release.tagName)
+        assertTrue(downloads.cancelled.isEmpty())
+    }
+
+    @Test fun newerTargetReplacesAnUninstalledOlderCachedTask() = runTest(dispatcher) {
+        val old = release("v98.0.0")
+        val task = DownloadRecord(7, old, old.assets.single(), UpdateChannel.OFFICIAL)
+        val downloads = FakeDownloads().apply { completed = true }
+        val vm = UpdateViewModel(ReleaseSource { release() }, FakeUpdatePreferences(record = task), downloads)
+        runCurrent(); vm.openAndCheck(); runCurrent()
+        assertEquals(UpdatePrimaryAction.DOWNLOAD, primaryUpdateAction(vm.ui.value))
+        vm.downloadUpdate(); runCurrent()
+        assertEquals("v99.0.0", downloads.tasks.single().release.tagName)
+        assertTrue(downloads.cancelled.isEmpty())
+    }
+
+    @Test fun staleTaskSaveFailureNeverEnqueuesAndCanRetryAfterRecovery() = runTest(dispatcher) {
+        val old = release("v98.0.0")
+        val task = DownloadRecord(7, old, old.assets.single(), UpdateChannel.OFFICIAL)
+        val prefs = FakeUpdatePreferences(record = task).apply { failDownloadSave = true }
+        val downloads = FakeDownloads().apply { completed = true }
+        val vm = UpdateViewModel(ReleaseSource { release() }, prefs, downloads)
+        runCurrent(); vm.openAndCheck(); runCurrent()
+        vm.downloadUpdate(); vm.downloadUpdate(); runCurrent()
+        assertEquals(UpdateError.SETTINGS, vm.ui.value.error)
+        assertTrue(downloads.tasks.isEmpty())
+        assertEquals(task, prefs.downloadRecord.value)
+        prefs.failDownloadSave = false
+        vm.downloadUpdate(); vm.downloadUpdate(); runCurrent()
+        assertEquals(1, downloads.tasks.size)
+        assertTrue(downloads.cancelled.isEmpty())
+    }
+
+    @Test fun uninstalledSameCachedPackageStaysInstallableAfterInstallCancellation() = runTest(dispatcher) {
+        val target = release()
+        val task = DownloadRecord(7, target, target.assets.single(), UpdateChannel.OFFICIAL)
+        val prefs = FakeUpdatePreferences(record = task)
+        val downloads = FakeDownloads().apply { completed = true }
+        val vm = UpdateViewModel(ReleaseSource { target }, prefs, downloads)
+        runCurrent(); vm.openAndCheck(); runCurrent()
+        assertEquals(UpdatePrimaryAction.INSTALL, primaryUpdateAction(vm.ui.value))
+        vm.prepareInstall(); runCurrent(); vm.consumeInstallRequest()
+        vm.downloadUpdate(); runCurrent()
+        assertEquals(task, prefs.downloadRecord.value)
+        assertTrue(downloads.tasks.isEmpty())
+        assertEquals(UpdatePrimaryAction.INSTALL, primaryUpdateAction(vm.ui.value))
+    }
+
     private fun release(tag: String = "v99.0.0") = GitHubRelease(tag, tag, RELEASES_URL, "notes",
         listOf(GitHubAsset(5, "RiseDiary-$tag.apk", "https://github.com/sky-shunfengjun/RiseDiary/releases/download/$tag/RiseDiary-$tag.apk", 1024)))
 }
@@ -555,7 +612,8 @@ private class FakeUpdatePreferences(
         if (failDeveloperSave) throw java.io.IOException("save failed")
         settings.value = settings.value.copy(forceCheck = false, releaseChannel = ReleaseChannel.STABLE, developerEnabled = false)
     }
-    override suspend fun saveDownload(record: DownloadRecord?) { downloadRecord.value = record }
+    var failDownloadSave = false
+    override suspend fun saveDownload(record: DownloadRecord?) { if (failDownloadSave) throw java.io.IOException("save failed"); downloadRecord.value = record }
 }
 
 private class FakeDownloads : UpdateDownloads {

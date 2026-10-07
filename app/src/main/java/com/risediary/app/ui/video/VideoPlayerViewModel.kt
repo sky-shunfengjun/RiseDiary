@@ -25,13 +25,13 @@ import kotlinx.coroutines.launch
 
 @HiltViewModel
 class VideoPlayerViewModel @Inject constructor(
-    @ApplicationContext context: Context,
+    factory: com.risediary.app.media.VideoPlayerFactory,
     private val access: VideoFileAccess,
     private val grants: VideoGrantRegistry,
     private val flights: FlightRepository,
     private val savedState: SavedStateHandle
 ) : ViewModel() {
-    val controller = Media3VideoPlayerController(context)
+    val controller = factory.create()
     private val owner = "player:" + UUID.randomUUID()
     private var opening: Job? = null
     private var requested: LocalVideoRef? = null
@@ -43,16 +43,17 @@ class VideoPlayerViewModel @Inject constructor(
     val error = accessFailure.asStateFlow()
 
     init {
+        viewModelScope.launch { controller.interactions.collect { checkpoint(it) } }
         viewModelScope.launch {
-            controller.playback.collect { value ->
-                if (value != null) {
-                    savedState["uri"] = value.video.uriString
-                    savedState["position"] = value.positionMillis
-                    savedState["speed"] = value.speed
-                    savedState["loop"] = value.loop
-                }
-            }
+            while (true) { kotlinx.coroutines.delay(com.risediary.app.service.TIMER_CHECKPOINT_MILLIS)
+                controller.playback.value?.let(::checkpoint) }
         }
+    }
+    private fun checkpoint(value: VideoPlaybackSnapshot) {
+        savedState["uri"] = value.video.uriString
+        savedState["position"] = value.positionMillis
+        savedState["speed"] = value.speed
+        savedState["loop"] = value.loop
     }
 
     fun open(video: LocalVideoRef) {
@@ -118,7 +119,7 @@ class VideoPlayerViewModel @Inject constructor(
         if (loadingState.value && opening?.isActive == true) return
         requested?.let(::load) ?: recordId?.let(::openRecord)
     }
-    fun pause() = controller.pause()
+    fun pause() { controller.pause(); controller.playback.value?.let(::checkpoint) }
     override fun onCleared() {
         controller.release()
         grants.forget(owner)

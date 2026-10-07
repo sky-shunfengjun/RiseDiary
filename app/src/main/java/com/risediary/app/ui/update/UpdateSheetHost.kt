@@ -98,6 +98,7 @@ fun UpdateSheetHost(
     viewModel: UpdateViewModel,
     interactionsBlocked: Boolean,
     presentation: UpdateSheetPresentation? = null,
+    onRestartUpdateIntro: (() -> Unit)? = null,
 ) {
     val ui by viewModel.ui.collectAsStateWithLifecycle()
     val context = LocalContext.current
@@ -167,6 +168,8 @@ fun UpdateSheetHost(
     val windowHeight = windowInfo.containerSize.height
     // One native shell, retained through exit: an automatic update cannot replace a closing developer page.
     var nativeDismissed by remember { mutableStateOf(true) }
+    var pendingIntroRestart by remember { mutableStateOf(false) }
+    val currentRestartIntro by rememberUpdatedState(onRestartUpdateIntro)
     var retainedDeveloper by remember { mutableStateOf(false) }
     var retainedAuthorization by remember { mutableStateOf(false) }
     val developer = ui.developer.visible || retainedDeveloper
@@ -180,6 +183,12 @@ fun UpdateSheetHost(
         if (retainedDeveloper && !ui.developer.visible && nativeDismissed) {
             retainedDeveloper = false
             viewModel.onDeveloperDismissFinished()
+        }
+    }
+    LaunchedEffect(pendingIntroRestart, nativeDismissed, retainedDeveloper, active) {
+        if (pendingIntroRestart && nativeDismissed && !retainedDeveloper && active) {
+            pendingIntroRestart = false
+            currentRestartIntro?.invoke()
         }
     }
     val dismissSheet: () -> Unit = { if (developer) viewModel.dismissDeveloper() else viewModel.dismiss() }
@@ -268,7 +277,14 @@ fun UpdateSheetHost(
                     isBackEnabled = show && !developer && ui.settingsPage && !channelExpanded && !ui.confirmCancel,
                     onBackCompleted = viewModel::backToUpdate,
                 )
-                if (developer) DeveloperSheetContent(ui, viewModel, authorized, show) { channelExpanded = it }
+                if (developer) DeveloperSheetContent(ui, viewModel, authorized, show,
+                    onRestartUpdateIntro = if (onRestartUpdateIntro != null) ({
+                        if (show && authorized && !ui.developer.busy && !pendingIntroRestart) {
+                            pendingIntroRestart = true
+                            viewModel.dismissDeveloper()
+                        }
+                    }) else null,
+                ) { channelExpanded = it }
                 else UpdateSheetContent(ui, viewModel, notesScroll, settingsScroll, openLink, show, notesTextStyles, notesState) {
                     channelExpanded = it
                 }

@@ -6,7 +6,11 @@ import kotlinx.coroutines.isActive
 
 /** Sole clock. Native scene owns the only completion callback after binding its final frame. */
 @Composable
-internal fun OnboardingMotionClock(motion: OnboardingMotionState, active: Boolean, durationScale: Float) {
+internal fun OnboardingMotionClock(motion: OnboardingMotionState, active: Boolean, durationScale: Float) =
+    GuideMotionClock(motion.scene, active, durationScale)
+
+@Composable
+internal fun GuideMotionClock(motion: GuideMotionState, active: Boolean, durationScale: Float) {
     LaunchedEffect(motion, active, durationScale, motion.needsFrames, motion.transitionId) {
         if (!active || !motion.needsFrames) return@LaunchedEffect
         if (durationScale <= 0f) {

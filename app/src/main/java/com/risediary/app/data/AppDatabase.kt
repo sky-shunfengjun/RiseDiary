@@ -15,7 +15,7 @@ import com.risediary.app.data.entity.Tag
 
 @Database(
     entities = [Flight::class, LengthRecord::class, Tag::class, Achievement::class, com.risediary.app.data.draft.RecordDraftEntity::class],
-    version = 7,
+    version = 8,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -27,6 +27,25 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun achievementDao(): AchievementDao
 
     companion object {
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE length_records ADD COLUMN globalId TEXT NOT NULL DEFAULT ''")
+                var after = -1L
+                do {
+                    var count = 0
+                    db.query("SELECT id FROM length_records WHERE id > ? ORDER BY id LIMIT 500", arrayOf<Any>(after)).use { cursor ->
+                        while (cursor.moveToNext()) {
+                            after = cursor.getLong(0)
+                            db.execSQL("UPDATE length_records SET globalId = ? WHERE id = ?",
+                                arrayOf<Any>(java.util.UUID.randomUUID().toString(), after))
+                            count++
+                        }
+                    }
+                } while (count == 500)
+                db.execSQL("CREATE UNIQUE INDEX index_length_records_globalId ON length_records(globalId)")
+            }
+        }
+
         val MIGRATION_6_7 = object : Migration(6, 7) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE flights ADD COLUMN globalId TEXT NOT NULL DEFAULT ''")

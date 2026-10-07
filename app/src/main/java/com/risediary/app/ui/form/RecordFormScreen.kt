@@ -115,6 +115,7 @@ fun RecordFormScreen(
     }
     val scrollState = rememberScrollState()
     val tags by vm.tags.collectAsStateWithLifecycle()
+    val tagReadFailed by vm.tagReadFailed.collectAsStateWithLifecycle()
     var retainedFormError by remember { mutableStateOf(vm.errorMessage) }
     SideEffect { vm.errorMessage?.let { retainedFormError = it } }
     var showDatePicker by remember { mutableStateOf(false) }
@@ -424,7 +425,8 @@ fun RecordFormScreen(
                             style = MiuixTheme.textStyles.subtitle,
                             fontWeight = FontWeight.SemiBold
                         )
-                        if (tags.isEmpty()) {
+                        if (tagReadFailed) com.risediary.app.ui.components.DataReadError(vm::retryTags, "标签读取失败，已有选择已保留")
+                        if (tags.isEmpty() && !tagReadFailed) {
                             Text(
                                 stringResource(R.string.form_no_tags),
                                 style = MiuixTheme.textStyles.body2,

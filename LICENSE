@@ -1,4 +1,28 @@
- Copyright (C) 2026 github.com/sky-shunfengjun
+RiseDiary (起飞日记) — v2.0.0
+Copyright (C) 2026 github.com/sky-shunfengjun
+
+PROJECT LICENSING NOTICE
+This notice describes the project and does not modify the license text below.
+
+Unless a file states otherwise, original RiseDiary code is licensed under the
+GNU General Public License, version 3 only (SPDX: GPL-3.0-only).
+
+Copied or adapted third-party code retains its stated license and copyright.
+In particular, files adapted from HyperCeiler and marked AGPL-3.0-only remain
+under the GNU Affero General Public License, version 3 only. Its full text is
+in LICENSES/AGPL-3.0.txt; its original copyright and source notices are retained.
+
+Combination of GPLv3 and AGPLv3 code is governed by section 13 of both licenses.
+Each part retains its applicable license; the special AGPLv3 section 13
+requirements concerning remote network interaction apply to the combination
+as such. This notice does not relicense AGPLv3 code as GPLv3.
+
+Other included third-party code uses Apache-2.0, MIT, ISC or its stated license.
+See THIRD-PARTY-NOTICES, LICENSES/ and the individual source-file notices.
+Redistribution must preserve the applicable notices and provide corresponding
+source as required by those licenses.
+
+The unmodified GNU General Public License, version 3, follows.
 
                     GNU GENERAL PUBLIC LICENSE
                        Version 3, 29 June 2007

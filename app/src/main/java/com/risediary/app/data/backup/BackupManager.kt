@@ -10,7 +10,6 @@ import android.net.Uri
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
-import androidx.room.withTransaction
 import androidx.datastore.preferences.core.Preferences
 import com.risediary.app.data.HomeCardOrderPolicy
 import com.risediary.app.util.RecordValidation
@@ -27,19 +26,14 @@ import com.risediary.app.data.entity.RecordVolumeMode
 import com.risediary.app.data.entity.Tag
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
-import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
-import java.io.OutputStream
 import java.time.Clock
 import java.time.LocalDate
 import java.util.Locale
-import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
-import java.util.zip.ZipOutputStream
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.abs
@@ -115,7 +109,7 @@ class BackupManager @Inject constructor(
         try {
             val output = resolver.openOutputStream(uri, "w")
                 ?: error("无法打开备份文件")
-            output.use { writeBackup(it, snapshot()) }
+            output.use { workflow.export(it) }
             resolver.update(
                 uri,
                 ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) },
@@ -133,7 +127,7 @@ class BackupManager @Inject constructor(
         runCatching {
             val output = context.contentResolver.openOutputStream(uri, "w")
                 ?: error("无法打开所选文件")
-            output.use { writeBackup(it, snapshot()) }
+            output.use { workflow.export(it) }
             BackupResult.Success("备份已保存", uri)
         }.getOrElse { BackupResult.Failure("导出失败：${it.readableMessage()}", it) }
     }
@@ -141,65 +135,55 @@ class BackupManager @Inject constructor(
     private val recoveryJournal = preferences.maintenanceGate.recoveryJournal(context)
     val maintenanceState get() = preferences.maintenanceGate.state
 
-    suspend fun restoreFromUri(uri: Uri): BackupResult = withContext(Dispatchers.IO) {
-        val imported = runCatching {
-            val input = context.contentResolver.openInputStream(uri) ?: error("无法读取所选文件")
-            input.use(::readBackup)
-        }.getOrElse { return@withContext BackupResult.Failure("备份无效：${it.readableMessage()}", it) }
-        val result = replaceAll(imported, clearLock = false)
-        if (result !is BackupResult.Success) return@withContext result
-        // Data has already committed. An inspection failure must not report restore failure.
-        val unavailable = try {
-            videoAccess.countUnavailableVideos(imported.flights)
-        } catch (_: CancellationException) {
-            return@withContext result
-        } catch (_: Exception) {
-            return@withContext BackupResult.Success("数据恢复成功，视频可在记录详情中重新关联")
+    private val workflow by lazy { BackupRestoreWorkflow(context,database,preferences,timerStore,timerHolder,recoveryJournal,::validate) }
+
+    suspend fun prepareRestore(uri: Uri, mode: RestoreMode = RestoreMode.MERGE): RestorePreview =
+        withContext(Dispatchers.IO) { workflow.prepare(uri,mode) }
+    suspend fun changeRestoreMode(preparationId: String, mode: RestoreMode): RestorePreview =
+        withContext(Dispatchers.IO) { workflow.change(preparationId,mode) }
+    suspend fun discardRestore(preparationId: String) = withContext(Dispatchers.IO) { workflow.discard(preparationId) }
+    suspend fun confirmRestore(preparationId: String, revision: Long): RestoreConfirmation = withContext(Dispatchers.IO) {
+        when (val result = workflow.confirm(preparationId,revision)) {
+            is RestoreConfirmation.Changed -> result
+            is RestoreConfirmation.Finished -> RestoreConfirmation.Finished(reportVideos(result.result))
         }
-        if (unavailable == 0) result
-        else BackupResult.Success("数据恢复成功，${unavailable}条记录的视频需重新关联")
+    }
+    /** Compatibility entry point. UI always uses preview + explicit confirmation. */
+    suspend fun restoreFromUri(uri: Uri): BackupResult = withContext(Dispatchers.IO) {
+        try {
+            val preview = workflow.prepare(uri,RestoreMode.MERGE)
+            when (val confirmation = workflow.confirm(preview.preparationId,preview.revision)) {
+                is RestoreConfirmation.Finished -> reportVideos(confirmation.result)
+                is RestoreConfirmation.Changed -> BackupResult.Failure("数据已变化，请重新预览后恢复")
+            }
+        } catch (failure: Exception) { BackupResult.Failure("备份恢复未完成：${failure.readableMessage()}",failure) }
+    }
+    private suspend fun reportVideos(result: BackupResult): BackupResult {
+        if (result !is BackupResult.Success) return result
+        return try {
+            var after = -1L; var unavailable = 0
+            while (true) {
+                val sizes = database.flightDao().backupSizes(after)
+                if (sizes.isEmpty()) break
+                val rows = database.flightDao().backupBatch(after,backupBatchSize(sizes))
+                if (rows.isEmpty()) break
+                unavailable += videoAccess.countUnavailableVideos(rows)
+                after = rows.last().id
+            }
+            if (unavailable == 0) result else BackupResult.Success("数据恢复成功，${unavailable}条记录的视频需重新关联")
+        } catch (_: Exception) { BackupResult.Success("数据恢复成功，视频可在记录详情中重新关联") }
     }
 
     suspend fun clearAll(): BackupResult = withContext(Dispatchers.IO) {
-        replaceAll(BackupData(emptyList(), emptyList(), SeedData.defaultTags, emptyList(), defaultSettings()), true)
+        try { workflow.clearAll() } catch (failure: Exception) { BackupResult.Failure("清除未完成：${failure.readableMessage()}",failure) }
     }
-
-    private suspend fun replaceAll(replacement: BackupData, clearLock: Boolean): BackupResult = try {
-        preferences.maintenanceGate.maintenance {
-            val currentTimer = timerStore.load()
-            check(!currentTimer.isActive) { "请先处理当前计时，再恢复或清除数据" }
-            val raw = preferences.rawSnapshot()
-            val originalData = snapshotLocked(raw)
-            val original = BackupRecoverySnapshot(originalData.flights, originalData.lengthRecords,
-                originalData.tags, originalData.achievements, raw, database.recordDraftDao().getAll(), currentTimer)
-            // A failed durable write cannot reach any destructive database or settings operation.
-            recoveryJournal.persist(original)
-            try {
-                replaceDatabase(replacement)
-                preferences.applySettingsForMaintenance(replacement.settings)
-                if (clearLock) preferences.clearAppLockForMaintenance()
-                timerStore.save(com.risediary.app.service.TimerSession())
-                timerHolder.set(com.risediary.app.service.TimerSession())
-                recoveryJournal.clear()
-                BackupResult.Success(if (clearLock) "所有数据已清除" else "数据恢复成功")
-            } catch (failure: Throwable) {
-                val rollback = runCatching { restorePreimage(original); recoveryJournal.clear() }
-                if (rollback.isSuccess) {
-                    BackupResult.Failure("操作失败，已还原原数据：${failure.readableMessage()}", failure)
-                } else {
-                    preferences.maintenanceGate.requireRecovery()
-                    BackupResult.Failure("操作失败，原数据尚未完整还原。当前暂时只读，请重试还原。", rollback.exceptionOrNull())
-                }
-            }
-        }
-    } catch (failure: Throwable) { BackupResult.Failure("操作未完成：${failure.readableMessage()}", failure) }
 
     suspend fun retryRecovery(): BackupResult = withContext(Dispatchers.IO) {
         try {
             preferences.maintenanceGate.maintenance(recovery = true) {
                 try {
-                    val original = checkNotNull(recoveryJournal.load()) { "没有待还原的操作" }
-                    restorePreimage(original)
+                    check(recoveryJournal.pending()) { "没有待还原的操作" }
+                    workflow.restoreJournal()
                     recoveryJournal.clear()
                     BackupResult.Success("原数据已完整还原")
                 } catch (failure: Throwable) {
@@ -208,97 +192,6 @@ class BackupManager @Inject constructor(
                 }
             }
         } catch (failure: Throwable) { BackupResult.Failure("还原尚未完成，请稍后重试。", failure) }
-    }
-
-    private suspend fun restorePreimage(original: BackupRecoverySnapshot) {
-        replaceDatabaseRows(original.flights, original.lengthRecords, original.tags, original.achievements, original.drafts)
-        preferences.restoreRaw(original.preferences)
-        timerStore.save(original.timer)
-        timerHolder.set(original.timer)
-    }
-
-    private suspend fun snapshot(): BackupData = preferences.maintenanceGate.write {
-        snapshotLocked(preferences.rawSnapshot()).let { data ->
-            data.copy(flights = data.flights.map { flight -> flight.copy(updatedAt =
-                com.risediary.app.data.RecordTimestamps.updatedAt(flight.createdAt, flight.updatedAt, flight.updatedAt)) })
-        }
-    }
-
-    private suspend fun snapshotLocked(raw: Preferences): BackupData = database.withTransaction {
-        BackupData(
-            database.flightDao().getAll(), database.lengthRecordDao().getAll(),
-            database.tagDao().getAll(), database.achievementDao().getAll(),
-            preferences.settingsSnapshot(raw)
-        )
-    }
-    private suspend fun replaceDatabase(data: BackupData, drafts: List<com.risediary.app.data.draft.RecordDraftEntity> = emptyList()) {
-        replaceDatabaseRows(data.flights, data.lengthRecords, data.tags, data.achievements, drafts)
-    }
-
-    private suspend fun replaceDatabaseRows(flights: List<Flight>, lengths: List<LengthRecord>, tags: List<Tag>,
-        achievements: List<Achievement>, drafts: List<com.risediary.app.data.draft.RecordDraftEntity>) {
-        database.withTransaction {
-            database.recordDraftDao().nuke()
-            database.flightDao().nuke()
-            database.lengthRecordDao().nuke()
-            database.tagDao().nuke()
-            database.achievementDao().nuke()
-            flights.forEach { database.flightDao().insert(it) }
-            lengths.forEach { database.lengthRecordDao().insert(it) }
-            tags.forEach { database.tagDao().insert(it) }
-            achievements.forEach { database.achievementDao().insert(it) }
-            drafts.forEach { database.recordDraftDao().insert(it) }
-        }
-    }
-
-    private fun writeBackup(output: OutputStream, data: BackupData) {
-        var totalBytes = 0L
-        ZipOutputStream(output.buffered()).use { zip ->
-            fun writeEntry(name: String, json: String) {
-                val bytes = json.toByteArray(Charsets.UTF_8)
-                require(bytes.size <= MAX_ENTRY_BYTES) { "$name 超过 5 MB" }
-                totalBytes += bytes.size
-                require(totalBytes <= MAX_TOTAL_BYTES) { "备份内容超过 20 MB" }
-                zip.putNextEntry(ZipEntry(name))
-                zip.write(bytes)
-                zip.closeEntry()
-            }
-
-            // Streams an array entry item by item so peak memory stays bounded by
-            // the largest single record instead of the whole database dump.
-            // Entry accounting uses the uncompressed UTF-8 bytes, matching the
-            // decompressed limits enforced on import.
-            fun writeArrayEntry(name: String, items: List<JSONObject>) {
-                zip.putNextEntry(ZipEntry(name))
-                var entryBytes = 0L
-
-                fun writeChunk(bytes: ByteArray) {
-                    entryBytes += bytes.size
-                    require(entryBytes <= MAX_ENTRY_BYTES) { "$name 超过 5 MB" }
-                    zip.write(bytes)
-                }
-
-                writeChunk("[".toByteArray(Charsets.UTF_8))
-                items.forEachIndexed { index, item ->
-                    if (index > 0) writeChunk(",".toByteArray(Charsets.UTF_8))
-                    writeChunk(item.toString().toByteArray(Charsets.UTF_8))
-                }
-                writeChunk("]".toByteArray(Charsets.UTF_8))
-
-                totalBytes += entryBytes
-                require(totalBytes <= MAX_TOTAL_BYTES) { "备份内容超过 20 MB" }
-                zip.closeEntry()
-            }
-
-            writeArrayEntry(FLIGHTS, data.flights.map(BackupJsonCodec::flightToJson))
-            writeArrayEntry(LENGTHS, data.lengthRecords.map(BackupJsonCodec::lengthToJson))
-            writeArrayEntry(TAGS, data.tags.map(BackupJsonCodec::tagToJson))
-            writeArrayEntry(
-                ACHIEVEMENTS,
-                data.achievements.map(BackupJsonCodec::achievementToJson)
-            )
-            writeEntry(SETTINGS, BackupJsonCodec.settingsToJson(data.settings).toString())
-        }
     }
 
     internal fun readBackup(input: InputStream): BackupData {
@@ -318,12 +211,12 @@ class BackupManager @Inject constructor(
 
                 val bytes = readEntryLimited(zip, MAX_ENTRY_BYTES)
                 total += bytes.size
-                require(total <= MAX_TOTAL_BYTES) { "解压后的内容超过 20 MB" }
+                require(total <= MAX_TOTAL_BYTES) { "解压后的内容超过 128 MiB" }
                 entries[name] = bytes
                 zip.closeEntry()
             }
         }
-        val missing = REQUIRED_ENTRIES - entries.keys
+        val missing = REQUIRED_ENTRIES - SETTINGS - entries.keys
         require(missing.isEmpty()) { "缺少必要文件：${missing.joinToString()}" }
 
         return BackupData(
@@ -333,7 +226,7 @@ class BackupManager @Inject constructor(
             achievements = BackupJsonCodec.parseAchievements(
                 entries.getValue(ACHIEVEMENTS).toUtf8()
             ),
-            settings = BackupJsonCodec.parseSettings(entries.getValue(SETTINGS).toUtf8()).let { settings ->
+            settings = (entries[SETTINGS]?.let { BackupJsonCodec.parseSettings(it.toUtf8()) } ?: defaultBackupSettings()).let { settings ->
                 settings.copy(homeCardOrder = HomeCardOrderPolicy.normalizeStoredOrder(settings.homeCardOrder))
             }
         ).also(::validate)
@@ -389,13 +282,7 @@ class BackupManager @Inject constructor(
             require(flight.ejaculationDistanceCm?.let { it in 0f..1_000f } != false) {
                 "射精距离超出范围"
             }
-            val tags = JSONArray(flight.methodTags)
-            require(tags.length() <= 100) { "标签数据无效" }
-            repeat(tags.length()) { index ->
-                require(tags.opt(index) is String && tags.getString(index).trim().length in 1..20) {
-                    "标签数据无效"
-                }
-            }
+            com.risediary.app.data.repository.TagJson.validate(flight.methodTags)
 
             require(flight.createdAt > 0L && flight.updatedAt >= flight.createdAt) {
                 "飞行记录修改时间无效"
@@ -405,7 +292,9 @@ class BackupManager @Inject constructor(
         require(data.lengthRecords.map(LengthRecord::id).distinct().size == data.lengthRecords.size) {
             "长度记录 ID 重复"
         }
+        require(data.lengthRecords.map(LengthRecord::globalId).distinct().size == data.lengthRecords.size) { "长度记录固定编号重复" }
         data.lengthRecords.forEach {
+            require(com.risediary.app.data.sync.RecordIdentity.isValidId(it.globalId)) { "长度记录固定编号无效" }
             require(it.id >= 0L) { "长度记录 ID 无效" }
             require(it.recordDate > 0L) { "长度记录日期无效" }
             require(it.flaccidLengthCm in 0.1f..100f) { "疲软长度超出范围" }
@@ -474,33 +363,13 @@ class BackupManager @Inject constructor(
             val read = input.read(buffer)
             if (read < 0) break
             count += read
-            require(count <= limit) { "单个文件超过 5 MB" }
+            require(count <= limit) { "单个文件超过 32 MiB" }
             output.write(buffer, 0, read)
         }
         return output.toByteArray()
     }
 
-    private fun defaultSettings() = SettingsSnapshot(
-        username = "机长",
-        mlPerSpurt = 2f,
-        defaultVolumeMode = DefaultVolumeMode.MILLILITERS,
-        dailyReminderEnabled = false,
-        dailyReminderTime = "22:00",
-        inactiveReminderEnabled = false,
-        inactiveReminderDays = 7,
-        inactiveReminderTime = "22:00",
-        monthlyLengthReminderEnabled = false,
-        monthlyLengthReminderDay = 1,
-        monthlyLengthReminderTime = "22:00",
-        reminderSound = true,
-        reminderVibration = true,
-        backgroundAutoLockEnabled = false,
-        backgroundLockMode = BackgroundLockMode.ALWAYS,
-        themeMode = "system",
-        homeCardOrder = "[]",
-        homeCardVisibility = "{}",
-        onboardingCompleted = false
-    )
+    private fun defaultSettings() = defaultBackupSettings()
 
     private fun ByteArray.toUtf8(): String = toString(Charsets.UTF_8)
     private fun Throwable.readableMessage(): String =
@@ -508,8 +377,8 @@ class BackupManager @Inject constructor(
 
     private companion object {
         const val MIME_ZIP = "application/zip"
-        const val MAX_ENTRY_BYTES = 5 * 1024 * 1024
-        const val MAX_TOTAL_BYTES = 20L * 1024L * 1024L
+        const val MAX_ENTRY_BYTES = 32 * 1024 * 1024
+        const val MAX_TOTAL_BYTES = 128L * 1024L * 1024L
         const val FLIGHTS = "flights.json"
         const val LENGTHS = "length_records.json"
         const val TAGS = "tags.json"

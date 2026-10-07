@@ -24,7 +24,8 @@ import android.widget.FrameLayout
 import androidx.annotation.DoNotInline
 import androidx.annotation.RequiresApi
 import com.risediary.app.ui.onboarding.IntroBackend
-import com.risediary.app.ui.onboarding.OnboardingVisualFrame
+import com.risediary.app.ui.onboarding.GuideVisualFrame
+import com.risediary.app.ui.onboarding.toGuideFrame
 import kotlin.math.ceil
 import kotlin.math.cos
 import kotlin.math.max
@@ -32,14 +33,14 @@ import kotlin.math.pow
 import kotlin.math.sin
 
 internal interface OriginalGlowRenderer {
-    fun bind(frame: OnboardingVisualFrame, width: Int, height: Int, centerYFraction: Float): RenderEffect
+    fun bind(frame: GuideVisualFrame, width: Int, height: Int, centerYFraction: Float): RenderEffect
 }
 
 /** Original 0.2-resolution surface, inverse-scaled to fill its single scene container. */
 internal class OriginalIntroBackground(context: Context) : FrameLayout(context) {
     private val surface = GlowSurface(context)
-    private var latest: OnboardingVisualFrame? = null
-    private var presented: OnboardingVisualFrame? = null
+    private var latest: GuideVisualFrame? = null
+    private var presented: GuideVisualFrame? = null
     private var centerYFraction = 0.4f
     private var active = false
     private var released = false
@@ -61,7 +62,10 @@ internal class OriginalIntroBackground(context: Context) : FrameLayout(context) 
         addView(surface, LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT))
     }
 
-    fun bind(frame: OnboardingVisualFrame, centerInLocal: PointF) {
+    fun bind(frame: com.risediary.app.ui.onboarding.OnboardingVisualFrame, centerInLocal: PointF) =
+        bind(frame.toGuideFrame(), centerInLocal)
+
+    fun bind(frame: GuideVisualFrame, centerInLocal: PointF) {
         if (released) return
         latest = frame
         if (height > 0 && centerInLocal.y.isFinite()) {
@@ -179,7 +183,7 @@ internal class OriginalIntroBackground(context: Context) : FrameLayout(context) 
             }
         }
 
-        private fun drawCompatibleFrame(canvas: Canvas, frame: OnboardingVisualFrame) {
+        private fun drawCompatibleFrame(canvas: Canvas, frame: GuideVisualFrame) {
             val seconds = OriginalMotionCurves.glowSeconds(frame.introMillis)
             val maxDimension = max(width, height).coerceAtLeast(1).toFloat()
             val shift = sin(seconds * 0.12f) * width * 0.15f

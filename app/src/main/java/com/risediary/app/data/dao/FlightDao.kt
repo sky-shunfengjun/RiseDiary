@@ -6,6 +6,12 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface FlightDao {
+    @Query("SELECT (length(moodNote)+length(methodTags)+COALESCE(length(videoUri),0)+COALESCE(length(videoDisplayName),0))*2+1024 FROM flights WHERE id > :after ORDER BY id LIMIT 500")
+    suspend fun backupSizes(after: Long): List<Long>
+
+    @Query("SELECT * FROM flights WHERE id > :after ORDER BY id LIMIT :limit")
+    suspend fun backupBatch(after: Long, limit: Int = 500): List<Flight>
+
     @Query("SELECT * FROM flights WHERE recordDraftId = :draftId LIMIT 1")
     suspend fun getByRecordDraftId(draftId: String): Flight?
 

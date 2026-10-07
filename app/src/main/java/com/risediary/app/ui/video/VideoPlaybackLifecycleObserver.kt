@@ -7,6 +7,7 @@ import com.risediary.app.media.VideoPlayerController
 
 internal class VideoPlaybackLifecycleObserver(private val controller: VideoPlayerController) : LifecycleEventObserver {
     override fun onStateChanged(source: LifecycleOwner, event: Lifecycle.Event) {
-        if (event == Lifecycle.Event.ON_STOP) controller.pause()
+        if (event == Lifecycle.Event.ON_STOP) { controller.pause(); controller.setPresentationActive(false) }
+        if (event == Lifecycle.Event.ON_START) controller.setPresentationActive(true)
     }
 }

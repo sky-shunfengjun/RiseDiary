@@ -31,7 +31,7 @@ class VideoTimerViewModel internal constructor(
     private val savedState: SavedStateHandle
 ) : ViewModel() {
     @Inject constructor(
-        @ApplicationContext context: Context,
+        factory: VideoPlayerFactory,
         access: VideoFileAccess,
         grants: VideoGrantRegistry,
         timer: TimerController,
@@ -40,7 +40,7 @@ class VideoTimerViewModel internal constructor(
         wallClock: Clock,
         elapsedClock: ElapsedRealtimeClock,
         savedState: SavedStateHandle
-    ) : this(Media3VideoPlayerController(context), access, grants, timer,
+    ) : this(factory.create(), access, grants, timer,
         timerStore::load, holder, wallClock, elapsedClock, savedState)
     val session = timer.state
     private val loadingState = MutableStateFlow(true)
@@ -70,6 +70,7 @@ class VideoTimerViewModel internal constructor(
         viewModelScope.launch {
             controller.interactions.collect { snapshot ->
                 lastSnapshot = snapshot
+                checkpoint(snapshot)
                 if (ready && startedState.value) savePlayback(true)
             }
         }
@@ -77,10 +78,11 @@ class VideoTimerViewModel internal constructor(
             controller.playback.collect { snapshot ->
                 if (snapshot != null) {
                     lastSnapshot = snapshot
-                    savedState["prepared_playback"] = json.encodeToString(snapshot)
                     val now = elapsedClock.millis()
-                    if (ready && startedState.value && now - lastCheckpoint >= TIMER_CHECKPOINT_MILLIS)
-                        savePlayback(false)
+                    if (now - lastCheckpoint >= TIMER_CHECKPOINT_MILLIS) {
+                        checkpoint(snapshot)
+                        if (ready && startedState.value) savePlayback(false)
+                    }
                 }
             }
         }
@@ -202,8 +204,8 @@ class VideoTimerViewModel internal constructor(
         check(access.check(snapshot.video) == VideoAccessState.READABLE) { "无法访问原视频" }
         controller.load(snapshot)
         lastSnapshot = snapshot
-        lastSent = snapshot
-        lastCheckpoint = elapsedClock.millis()
+        lastSent = null
+        checkpoint(snapshot)
     }
 
     private fun requestStart() {
@@ -235,10 +237,20 @@ class VideoTimerViewModel internal constructor(
         }
     }
 
+    private var encodedSnapshot: VideoPlaybackSnapshot? = null
+    private fun checkpoint(snapshot: VideoPlaybackSnapshot) {
+        if (encodedSnapshot != snapshot) {
+            savedState["prepared_playback"] = json.encodeToString(snapshot)
+            encodedSnapshot = snapshot
+        }
+        lastCheckpoint = elapsedClock.millis()
+    }
+
     private fun savePlayback(immediate: Boolean) {
         val id = sessionId ?: return
         val snapshot = controller.playback.value ?: lastSnapshot ?: return
         if (!startedState.value || timer.state.value.sessionId != id || !timer.state.value.isActive) return
+        if (lastSent == snapshot) return
         lastSent = snapshot
         lastCheckpoint = elapsedClock.millis()
         timer.updatePlayback(id, snapshot, immediate)
@@ -246,11 +258,13 @@ class VideoTimerViewModel internal constructor(
 
     fun pause() {
         controller.pause()
+        (controller.playback.value ?: lastSnapshot)?.let(::checkpoint)
         savePlayback(true)
     }
 
     fun retry() {
         if (loadingState.value) return
+        lastSent = null
         if (!ready) {
             initialize(sessionId ?: return)
             return

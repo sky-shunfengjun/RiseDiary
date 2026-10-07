@@ -9,6 +9,7 @@ import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.CompositingStrategy
@@ -104,7 +105,7 @@ internal fun VideoGlassButton(
 @Composable
 internal fun VideoTransportControls(
     controller: VideoPlayerController,
-    snapshot: VideoPlaybackSnapshot?,
+    initialSnapshot: VideoPlaybackSnapshot?,
     durationMillis: Long,
     wantsPlay: Boolean,
     ended: Boolean,
@@ -115,6 +116,8 @@ internal fun VideoTransportControls(
     onTouch: (Boolean) -> Unit = {},
     enabled: Boolean = true
 ) {
+    val snapshot by controller.playback.collectAsStateWithLifecycle()
+
     var scrubFraction by remember(snapshot?.video?.uriString, durationMillis) { mutableStateOf<Float?>(null) }
     LaunchedEffect(enabled) {
         // Disabling cancels slider input without committing a seek; discard its held preview too.

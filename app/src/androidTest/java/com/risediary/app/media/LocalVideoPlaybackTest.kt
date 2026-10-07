@@ -121,6 +121,32 @@ class LocalVideoPlaybackTest {
         assertTrue(access.acquire(TestVideoProvider.READABLE.toString(), 0).isFailure)
     }
 
+    @Test fun secondPreparedPageStopsFirstAndReturnPreservesSettingsWithoutAutoplay() = runBlocking {
+        val context = context()
+        val coordinator = VideoResourceCoordinator()
+        val diagnostics = VideoDiagnostics()
+        var first: Media3VideoPlayerController? = null
+        var second: Media3VideoPlayerController? = null
+        try {
+            withContext(Dispatchers.Main) {
+                first = Media3VideoPlayerController(context, coordinator, diagnostics)
+                second = Media3VideoPlayerController(context, coordinator, diagnostics)
+                val ref = LocalVideoRef(TestVideoProvider.READABLE.toString(), "black.mp4", "video/mp4")
+                first!!.load(VideoPlaybackSnapshot(ref, 321, 1.5f, true))
+                second!!.load(VideoPlaybackSnapshot(ref))
+                assertEquals(androidx.media3.common.Player.STATE_IDLE, first!!.player.playbackState)
+                assertEquals(VideoPlaybackSnapshot(ref, 321, 1.5f, true), first!!.playback.value)
+                first!!.setPresentationActive(true)
+                assertEquals(androidx.media3.common.Player.STATE_IDLE, second!!.player.playbackState)
+                assertFalse(first!!.player.playWhenReady)
+                assertEquals(1.5f, first!!.playback.value!!.speed)
+                assertTrue(first!!.playback.value!!.loop)
+                first!!.setPresentationActive(false)
+                assertEquals(androidx.media3.common.Player.STATE_IDLE, first!!.player.playbackState)
+            }
+        } finally { withContext(Dispatchers.Main) { first?.release(); second?.release() } }
+    }
+
     private suspend fun awaitPlaying(controller: Media3VideoPlayerController, expected: Boolean) =
         withTimeout(15_000) { while (controller.isPlaying.value != expected) delay(10) }
 }

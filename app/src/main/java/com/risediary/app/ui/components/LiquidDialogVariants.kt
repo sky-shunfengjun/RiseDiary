@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import com.kyant.capsule.ContinuousCapsule
 import com.kyant.capsule.ContinuousRoundedRectangle
 import com.risediary.app.ui.theme.LocalRiseDarkTheme
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
 fun LiquidAlertDialog(
@@ -38,7 +39,8 @@ fun LiquidAlertDialog(
     text: (@Composable () -> Unit)? = null,
     containerColor: Color = Color.Unspecified,
     neutralButton: (@Composable () -> Unit)? = null,
-    adaptiveActions: Boolean = false
+    adaptiveActions: Boolean = false,
+    destructiveConfirm: Boolean = false
 ) {
     LiquidDialog(
         onDismissRequest = onDismissRequest,
@@ -78,7 +80,8 @@ fun LiquidAlertDialog(
             dismissButton = dismissButton,
             modifier = Modifier.padding(start = 24.dp, top = 12.dp, end = 24.dp, bottom = 24.dp),
             neutralButton = neutralButton,
-            adaptiveActions = adaptiveActions
+            adaptiveActions = adaptiveActions,
+            destructiveConfirm = destructiveConfirm
         )
     }
 }
@@ -114,11 +117,12 @@ private fun LiquidDialogActions(
     dismissButton: (@Composable () -> Unit)?,
     modifier: Modifier = Modifier,
     neutralButton: (@Composable () -> Unit)? = null,
-    adaptiveActions: Boolean = false
+    adaptiveActions: Boolean = false,
+    destructiveConfirm: Boolean = false
 ) {
     val dark = LocalRiseDarkTheme.current
     val contentColor = if (dark) Color.White else Color.Black
-    val accentColor = if (dark) Color(0xFF0091FF) else Color(0xFF0088FF)
+    val accentColor = if (destructiveConfirm) MiuixTheme.colorScheme.error else if (dark) Color(0xFF0091FF) else Color(0xFF0088FF)
     val containerColor = if (dark) Color(0xFF121212).copy(alpha = 0.20f)
         else Color(0xFFFAFAFA).copy(alpha = 0.20f)
     if (adaptiveActions) {

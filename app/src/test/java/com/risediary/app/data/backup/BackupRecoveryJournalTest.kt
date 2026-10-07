@@ -125,7 +125,12 @@ class BackupRecoveryJournalTest {
     @Test fun storageThatSilentlyCommitsIncompleteBytesCannotStartDestructiveWork() {
         val disk = Disk(File(temporary.root, "recovery.bin"))
         val incomplete = object : BackupRecoveryStorage by disk {
-            override fun write(bytes: ByteArray) = disk.write(bytes.copyOf(bytes.size - 1))
+            override fun writeStream(block: (java.io.OutputStream) -> Unit) {
+                val output = java.io.ByteArrayOutputStream()
+                block(output)
+                val bytes = output.toByteArray()
+                disk.write(bytes.copyOf(bytes.size - 1))
+            }
         }
         var destructiveWork = false
         val journal = BackupRecoveryJournal(incomplete)

@@ -6,9 +6,18 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface LengthRecordDao {
+    @Query("SELECT length(note)*2+256 FROM length_records WHERE id > :after ORDER BY id LIMIT 500")
+    suspend fun backupSizes(after: Long): List<Long>
+
+    @Query("SELECT * FROM length_records WHERE id > :after ORDER BY id LIMIT :limit")
+    suspend fun backupBatch(after: Long, limit: Int = 500): List<LengthRecord>
+
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(record: LengthRecord): Long
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertNew(record: LengthRecord): Long
 
     @Update
     suspend fun update(record: LengthRecord)

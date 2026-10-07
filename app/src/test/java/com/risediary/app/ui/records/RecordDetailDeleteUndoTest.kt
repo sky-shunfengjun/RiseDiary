@@ -47,7 +47,11 @@ class RecordDetailDeleteUndoTest {
                 if (failDelete) throw IOException("full")
                 record = null
             }
-            override suspend fun insert(flight: Flight): Long { insertCalls++; record = flight; return flight.id }
+            override suspend fun insert(flight: Flight): Long = error("Undo must not use replacing insert")
+            override suspend fun restoreDeleted(flight: Flight) {
+                check(record == null)
+                insertCalls++; record = flight
+            }
         }
         val tags = proxy(TagRepository::class.java) { method -> if (method == "getAllTags") MutableStateFlow(emptyList<com.risediary.app.data.entity.Tag>()) else null }
         val grants = VideoGrantRegistry({ setOfNotNull(record?.videoUri) }, files, gate, scope.backgroundScope)
@@ -81,6 +85,19 @@ class RecordDetailDeleteUndoTest {
             assertTrue(f.records.pendingDeletions.value.isEmpty())
             f.records.undoDelete(original); runCurrent()
             assertEquals(1, f.insertCalls)
+        }
+    }
+
+    @Test fun confirmedListDeletionCanRestoreLegacyRecordWithoutSubmissionId() = runTest {
+        fixture { f ->
+            val legacy = original.copy(recordDraftId = null, legacySpurtCount = 3, legacyVolumeMl = 1.5f)
+            f.record = legacy
+            f.records.delete(legacy); runCurrent()
+            assertNull(f.record)
+            f.records.undoDelete(legacy); runCurrent()
+            assertEquals(legacy, f.record)
+            assertEquals(1, f.insertCalls)
+            assertNull(f.records.writeError.value)
         }
     }
 

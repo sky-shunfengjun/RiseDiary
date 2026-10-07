@@ -27,7 +27,7 @@ internal class FormRecordSaveWorkflow(
 
     suspend fun save(
         flight: Flight,
-        afterInsert: suspend (Flight) -> List<String> = { emptyList() },
+        afterSave: suspend (Flight) -> List<String> = { emptyList() },
         followUps: List<suspend () -> Unit> = emptyList()
     ): FormRecordSaveResult {
         val existing = persistedFlight
@@ -46,9 +46,9 @@ internal class FormRecordSaveWorkflow(
         }
         persistedFlight = stored
         val failures = mutableListOf<Exception>()
-        val keys = if (existing == null) {
+        val keys = run {
             try {
-                afterInsert(stored)
+                afterSave(stored)
             } catch (error: DataMaintenanceBusyException) {
                 failures += error
                 emptyList()
@@ -58,7 +58,7 @@ internal class FormRecordSaveWorkflow(
                 failures += error
                 emptyList()
             }
-        } else emptyList()
+        }
         followUps.forEach { work ->
             try {
                 work()

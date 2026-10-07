@@ -79,6 +79,7 @@ fun TagManagerScreen(
     val tags by viewModel.tags.collectAsStateWithLifecycle()
     val error by viewModel.error.collectAsStateWithLifecycle()
     val isSaving by viewModel.isSaving.collectAsStateWithLifecycle()
+    val readFailed by viewModel.readFailed.collectAsStateWithLifecycle()
     var editingTag by remember { mutableStateOf<Tag?>(null) }
     var showEditor by remember { mutableStateOf(false) }
     var deleteTarget by remember { mutableStateOf<Tag?>(null) }
@@ -138,8 +139,7 @@ fun TagManagerScreen(
         floatingActionButton = { backdrop ->
             LiquidAddButton(
                 onClick = {
-                    editingTag = null
-                    showEditor = true
+                    if (!readFailed && !isSaving) { viewModel.clearError(); editingTag = null; showEditor = true }
                 },
                 backdrop = backdrop,
                 contentDescription = stringResource(R.string.tag_manager_add_tag)
@@ -153,6 +153,11 @@ fun TagManagerScreen(
             contentPadding = padding,
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            if (readFailed) item(key = "read-failure") { com.risediary.app.ui.components.DataReadError(viewModel::retryRead, "标签读取失败，已有标签已保留") }
+            if (error != null && !showEditor) item(key = "write-failure") {
+                Column { Text(error.orEmpty(), color = MiuixTheme.colorScheme.error)
+                    TextButton("重试", enabled = !isSaving && !readFailed, onClick = viewModel::retryWrite) }
+            }
             item(key = "instructions") {
                 Column {
                     Text(
@@ -197,7 +202,8 @@ fun TagManagerScreen(
                                 MiuixTheme.colorScheme.primary.copy(alpha = 0.09f),
                                 CircleShape
                             )
-                            .pointerInput(tag.id) {
+                            .pointerInput(tag.id, readFailed, isSaving) {
+                                if (readFailed || isSaving) return@pointerInput
                                 detectDragGesturesAfterLongPress(
                                     onDragStart = {
                                         settleJob?.cancel()
@@ -245,14 +251,17 @@ fun TagManagerScreen(
                         )
                     }
                     IconButton(
+                        enabled = !readFailed && !isSaving,
                         onClick = {
-                            editingTag = tag
+                            if (readFailed || isSaving) return@IconButton
+                        viewModel.clearError()
+                        editingTag = tag
                             showEditor = true
                         }
                     ) {
                         Icon(AppIcons.Edit, contentDescription = stringResource(R.string.action_edit))
                     }
-                    IconButton(onClick = { deleteTarget = tag }) {
+                    IconButton(enabled = !readFailed && !isSaving, onClick = { viewModel.clearError(); deleteTarget = tag }) {
                         Icon(
                             AppIcons.Delete,
                             contentDescription = stringResource(R.string.action_delete),
@@ -269,8 +278,8 @@ fun TagManagerScreen(
     if (showEditor) {
         TagEditorDialog(
             tag = editingTag,
-            error = error,
-            isSaving = isSaving,
+            error = if (readFailed) "标签读取失败，已有内容已保留，请关闭后重试" else error,
+            isSaving = isSaving || readFailed,
             onDismiss = { showEditor = false },
             onSave = { name, color ->
                 viewModel.save(editingTag, name, color) {
@@ -283,23 +292,27 @@ fun TagManagerScreen(
 
     deleteTarget?.let { target ->
         LiquidAlertDialog(
-            onDismissRequest = { deleteTarget = null },
+            onDismissRequest = { if (!isSaving) deleteTarget = null },
             title = { Text(stringResource(R.string.tag_manager_delete_dialog_title)) },
             text = {
+                Column {
+                if (error != null) Text(error.orEmpty(), color = MiuixTheme.colorScheme.error)
                 Text(
                     stringResource(
                         R.string.tag_manager_delete_dialog_message,
                         target.name
                     )
                 )
+                }
             },
             confirmButton = {
                 TextButton(
                     text = stringResource(R.string.action_delete),
+                    enabled = !isSaving && !readFailed,
                     onClick = {
                         pendingOrderIds = null
-                        viewModel.delete(target)
-                        deleteTarget = null
+                        if (error != null) viewModel.retryWrite()
+                        else viewModel.delete(target) { deleteTarget = null }
                     },
                     colors = ButtonDefaults.textButtonColors(
                         color = Color.Transparent,
@@ -312,6 +325,7 @@ fun TagManagerScreen(
             dismissButton = {
                 TextButton(
                     text = stringResource(R.string.action_cancel),
+                    enabled = !isSaving,
                     onClick = { deleteTarget = null },
                     colors = liquidDialogCancelButtonColors()
                 )

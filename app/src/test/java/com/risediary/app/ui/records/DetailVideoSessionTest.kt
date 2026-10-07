@@ -225,6 +225,40 @@ class DetailVideoSessionTest {
         assertEquals(VideoPlaybackSnapshot(video), player.playback.value)
     }
 
+    @Test fun hiddenAndBackgroundPagesRelinquishPresentationThenReturnWithoutPlaying() = runTest {
+        val player = FakeController()
+        val session = session(player)
+        runCurrent()
+        player.seekTo(900); player.setSpeed(1.5f); player.setLoop(true)
+        session.hide()
+        assertFalse(player.isPresented)
+        session.show(); runCurrent()
+        assertTrue(player.isPresented)
+        session.onBackground()
+        assertFalse(player.isPresented)
+        session.setPresentationActive(true)
+        assertTrue(player.isPresented)
+        assertEquals(VideoPlaybackSnapshot(video, 900, 1.5f, true), player.playback.value)
+        assertFalse(player.isPlaying.value)
+    }
+
+    @Test fun lateAccessCheckCannotReprepareThePreviousRecord() = runTest {
+        val player = FakeController()
+        val ready = kotlinx.coroutines.CompletableDeferred<Unit>()
+        val another = video.copy(uriString = "content://video/new", displayName = "new")
+        val session = DetailVideoSession(backgroundScope, flowOf(false), { ref ->
+            if (ref == another) ready.await()
+            VideoAccessState.READABLE
+        }, player)
+        session.bind(1, video); runCurrent()
+        session.bind(2, another); runCurrent()
+        session.setPresentationActive(true)
+        assertFalse(player.isPresented)
+        ready.complete(Unit); runCurrent()
+        assertTrue(player.isPresented)
+        assertEquals(another, player.playback.value!!.video)
+    }
+
     private fun TestScope.session(player: FakeController, hidden: Boolean = false) =
         DetailVideoSession(backgroundScope, flowOf(hidden), { VideoAccessState.READABLE }, player)
             .also { it.bind(1, video) }
@@ -232,6 +266,8 @@ class DetailVideoSessionTest {
     /** Media boundary only; session, cancellation and visibility rules are real. */
     private class FakeController : VideoPlayerController {
         val loads = mutableListOf<VideoPlaybackSnapshot>()
+        var isPresented = false
+        override fun setPresentationActive(active: Boolean) { isPresented = active; if (!active) pause() }
         override val player: Player = Proxy.newProxyInstance(Player::class.java.classLoader,
             arrayOf(Player::class.java)) { _, _, _ -> error("Native player is not used by session logic") } as Player
         override val playback = MutableStateFlow<VideoPlaybackSnapshot?>(null)

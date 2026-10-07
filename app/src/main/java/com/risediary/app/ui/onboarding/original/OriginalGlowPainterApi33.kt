@@ -11,7 +11,7 @@ import android.graphics.RenderEffect
 import android.graphics.RuntimeShader
 import androidx.annotation.RequiresApi
 import com.risediary.app.R
-import com.risediary.app.ui.onboarding.OnboardingVisualFrame
+import com.risediary.app.ui.onboarding.GuideVisualFrame
 
 /** All API33-only types stay in this class. Never constructed below the SDK guard. */
 @RequiresApi(33)
@@ -65,7 +65,7 @@ internal class OriginalGlowPainterApi33(context: Context) : OriginalGlowRenderer
     }
 
     override fun bind(
-        frame: OnboardingVisualFrame, width: Int, height: Int, centerYFraction: Float,
+        frame: GuideVisualFrame, width: Int, height: Int, centerYFraction: Float,
     ): RenderEffect {
         shader.setFloatUniform("uTime", OriginalMotionCurves.glowSeconds(frame.introMillis))
         shader.setFloatUniform("uResolution", width.coerceAtLeast(1).toFloat(), height.coerceAtLeast(1).toFloat())

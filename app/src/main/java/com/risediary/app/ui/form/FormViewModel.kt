@@ -55,9 +55,10 @@ class FormViewModel @Inject constructor(
 ) : ViewModel() {
     private val newRecordGlobalId = com.risediary.app.data.sync.RecordIdentity.newId()
 
-    val tags: StateFlow<List<Tag>> = tagRepository.allTags.stateIn(
-        viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList()
-    )
+    private val tagReads = com.risediary.app.ui.RetainedReadFlow(viewModelScope, tagRepository.allTags, emptyList())
+    val tags = tagReads.data
+    val tagReadFailed = tagReads.failed
+    fun retryTags() = tagReads.retry()
 
     var startTime by mutableStateOf(clock.millis())
         private set
@@ -530,7 +531,7 @@ class FormViewModel @Inject constructor(
                 val followUps = mutableListOf<suspend () -> Unit>({ reminderScheduler.onFlightDataChanged() })
                 val result = recordSaver.save(
                     flight,
-                    afterInsert = { achievementDetector.checkAndUnlock(it).map { achievement -> achievement.key } },
+                    afterSave = { achievementDetector.checkAndUnlock(it).map { achievement -> achievement.key } },
                     followUps = followUps
                 )
                 newAchievementKeys = result.achievementKeys

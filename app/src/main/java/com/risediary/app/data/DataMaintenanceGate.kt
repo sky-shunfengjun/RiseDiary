@@ -130,6 +130,26 @@ class DataMaintenanceGate() {
             }
         } finally { operation.unlock() }
     }
+    /** Preview invalidation is a read-only outcome: it must not invalidate forms or undo entries. */
+    internal suspend fun <T> preparedMaintenance(precheck: suspend () -> T?, block: suspend () -> T): T {
+        if (!operation.tryLock()) throw DataMaintenanceBusyException()
+        try {
+            synchronized(guard) { if (mutableState.value != State.IDLE) throw DataMaintenanceBusyException() }
+            return withContext(NonCancellable) {
+                writes.withLock {
+                    precheck()?.let { return@withLock it }
+                    synchronized(guard) { generation++; mutableState.value = State.WORKING }
+                    try { block() } finally {
+                        synchronized(guard) {
+                            if (mutableState.value == State.WORKING) mutableState.value =
+                                if (recoveryJournal?.pending() == true) State.RECOVERY_REQUIRED else State.IDLE
+                        }
+                    }
+                }
+            }
+        } finally { operation.unlock() }
+    }
+
     internal fun requireRecovery() { mutableState.value = State.RECOVERY_REQUIRED }
 }
 

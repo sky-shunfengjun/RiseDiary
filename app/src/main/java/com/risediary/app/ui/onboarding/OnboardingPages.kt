@@ -34,21 +34,27 @@ internal fun OnboardingPage(
     scrollState: ScrollState,
     modifier: Modifier = Modifier,
     icon: ImageVector = AppIcons.Info,
+    showIcon: Boolean = true,
+    compactLayout: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     BoxWithConstraints(modifier.fillMaxSize()) {
         Column(
             Modifier.align(Alignment.TopCenter).widthIn(max = 528.dp).fillMaxWidth()
                 .verticalScroll(scrollState).heightIn(min = maxHeight)
-                .padding(horizontal = 24.dp, vertical = 24.dp)
+                .padding(LocalGuideContentPadding.current)
+                .padding(horizontal = 24.dp, vertical = if (compactLayout) 16.dp else 24.dp)
                 .testTag("oobe_original_body"),
         ) {
             Column(
-                Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 30.dp),
+                Modifier.fillMaxWidth().padding(top = if (compactLayout) 8.dp else 12.dp,
+                    bottom = if (compactLayout) 20.dp else 30.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Icon(icon, null, Modifier.size(70.dp).testTag("oobe_step_icon"), tint = OriginalOnboardingAccent)
-                Spacer(Modifier.height(8.dp))
+                if (showIcon) {
+                    Icon(icon, null, Modifier.size(if (compactLayout) 56.dp else 70.dp).testTag("oobe_step_icon"), tint = OriginalOnboardingAccent)
+                    Spacer(Modifier.height(8.dp))
+                }
                 Text(
                     title, Modifier.fillMaxWidth().testTag("oobe_step_title"),
                     fontSize = 32.sp, fontWeight = FontWeight.SemiBold, textAlign = TextAlign.Center,
@@ -63,7 +69,7 @@ internal fun OnboardingPage(
                 }
             }
             Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(16.dp), content = content)
-            Spacer(Modifier.height(24.dp))
+            Spacer(Modifier.height(if (compactLayout) 16.dp else 24.dp))
         }
     }
 }

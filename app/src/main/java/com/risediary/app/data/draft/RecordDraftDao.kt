@@ -4,6 +4,12 @@ import androidx.room.*
 
 @Dao
 interface RecordDraftDao {
+    @Query("SELECT length(payload)*2+512 FROM record_drafts WHERE draftId > :after ORDER BY draftId LIMIT 500")
+    suspend fun backupSizes(after: String): List<Long>
+
+    @Query("SELECT * FROM record_drafts WHERE draftId > :after ORDER BY draftId LIMIT :limit")
+    suspend fun backupBatch(after: String, limit: Int = 500): List<RecordDraftEntity>
+
     @Query("SELECT * FROM record_drafts WHERE draftId = :draftId")
     suspend fun getById(draftId: String): RecordDraftEntity?
     @Query("SELECT * FROM record_drafts WHERE activeSlot = 1 LIMIT 1")

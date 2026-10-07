@@ -1,5 +1,9 @@
 package com.risediary.app.ui.timer
 
+import com.risediary.app.ui.projectState
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.animation.*
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
@@ -36,11 +40,15 @@ internal fun TimerInstrument(
     modifier: Modifier = Modifier,
     compact: Boolean = false,
     fullScreen: Boolean = false,
-    dense: Boolean = false
+    dense: Boolean = false,
+    sessionFlow: kotlinx.coroutines.flow.StateFlow<TimerSession>? = null
 ) {
+    val clockFlow = remember(sessionFlow) { sessionFlow?.projectState { it.copy(elapsedMillis = it.elapsedMillis / 1000L * 1000L, video = null) } }
+    val observed = if (clockFlow != null) clockFlow.collectAsStateWithLifecycle().value else session
+    val displayed = if (observed.sessionId == session.sessionId) observed else session
     val colors = MiuixTheme.colorScheme
     val clockShadow = if (fullScreen) Shadow(Color.Black.copy(alpha = 0.8f), Offset(0f, 1f), 4f) else null
-    val statusText = stringResource(when (session.status) {
+    val statusText = stringResource(when (displayed.status) {
         TimerStatus.IDLE -> R.string.timer_status_idle
         TimerStatus.RUNNING -> R.string.timer_status_running
         TimerStatus.PAUSED -> R.string.notification_timer_paused_title
@@ -49,8 +57,8 @@ internal fun TimerInstrument(
     })
     val statusColor = when {
         fullScreen -> Color.White.copy(alpha = 0.78f)
-        session.status == TimerStatus.RUNNING -> colors.primary
-        session.status == TimerStatus.LIMIT_REACHED -> colors.error
+        displayed.status == TimerStatus.RUNNING -> colors.primary
+        displayed.status == TimerStatus.LIMIT_REACHED -> colors.error
         else -> colors.onSurfaceVariantSummary
     }
     BoxWithConstraints(modifier.padding(horizontal = if (compact) 0.dp else 8.dp)) {
@@ -66,11 +74,11 @@ internal fun TimerInstrument(
                 color = statusColor, fontSize = if (compact || dense) 12.sp else MiuixTheme.textStyles.headline2.fontSize,
                 fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Spacer(Modifier.height(if (compact) 3.dp else if (dense) 10.dp else 26.dp))
-            RollingTimerDigits(formatTimerClock(session.elapsedMillis), digitSize,
+            RollingTimerDigits(formatTimerClock(displayed.elapsedMillis), digitSize,
                 if (fullScreen) Color.White else colors.onSurface, statusColor, clockShadow)
             if (!compact) {
                 Spacer(Modifier.height(if (dense) 10.dp else 28.dp))
-                MinuteSecondTrack(((session.elapsedMillis / 1_000L) % 60L).toInt(),
+                MinuteSecondTrack(((displayed.elapsedMillis / 1_000L) % 60L).toInt(),
                     Modifier.fillMaxWidth(), if (dense) 24.dp else 48.dp)
                 if (!dense) {
                     Spacer(Modifier.height(10.dp))

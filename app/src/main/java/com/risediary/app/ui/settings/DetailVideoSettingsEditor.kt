@@ -1,5 +1,6 @@
 package com.risediary.app.ui.settings
 
+import com.risediary.app.data.DataMaintenanceBusyException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -38,8 +39,11 @@ internal class DetailVideoSettingsEditor(
                 pending = null
                 mutableState.value = state.value.copy(saving = false, error = null)
                 if (!state.value.ready) read()
+            } catch (_: DataMaintenanceBusyException) {
+                mutableState.value = state.value.copy(error = writeError)
             } catch (cancelled: CancellationException) { throw cancelled }
-            catch (_: Exception) { mutableState.value = state.value.copy(saving = false, error = writeError) }
+            catch (_: Exception) { mutableState.value = state.value.copy(error = writeError) }
+            finally { mutableState.update { it.copy(saving = false) } }
         }
     }
 

@@ -10,6 +10,8 @@ object RecordIdentity {
     private val canonicalUuid = Regex("[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
     private const val NIL_UUID = "00000000-0000-0000-0000-000000000000"
 
+    fun isValidId(value: String): Boolean = canonicalUuid.matches(value) && value != NIL_UUID
+
     fun newId(): String = UUID.randomUUID().toString()
 
     fun requireValidRecords(records: List<Flight>) {

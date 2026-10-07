@@ -122,6 +122,19 @@ class VideoTimerViewModelRetryTest {
         assertTrue(fixture.timer.starts.isEmpty())
     }
 
+    @Test fun playbackPollingDoesNotRewriteRecoveryJsonAndDuplicatePauseOnlySavesOnce() = runTest(dispatcher) {
+        val fixture = fixture { TimerSession() }
+        fixture.vm.open("new"); runCurrent()
+        fixture.player.play(); runCurrent()
+        val initial = fixture.saved.get<String>("prepared_playback")
+        fixture.player.seekTo(1000); runCurrent()
+        fixture.player.seekTo(1500); runCurrent()
+        assertEquals(initial, fixture.saved.get<String>("prepared_playback"))
+        fixture.vm.pause(); fixture.vm.pause(); runCurrent()
+        assertEquals(1500L, Json.decodeFromString<VideoPlaybackSnapshot>(fixture.saved.get<String>("prepared_playback")!!).positionMillis)
+        assertEquals(1, fixture.timer.playbackUpdates)
+    }
+
     private fun TestScope.fixture(readTimer: suspend () -> TimerSession): Fixture {
         val holder = TimerStateHolder()
         val files = Files()
@@ -133,11 +146,11 @@ class VideoTimerViewModelRetryTest {
         val owned = ViewModelProvider(store, object : ViewModelProvider.Factory {
             override fun <T : ViewModel> create(modelClass: Class<T>): T = requireNotNull(modelClass.cast(vm))
         })["video", VideoTimerViewModel::class.java]
-        return Fixture(owned, holder, files, player, timer)
+        return Fixture(owned, holder, files, player, timer, saved)
     }
 
     private data class Fixture(val vm: VideoTimerViewModel, val holder: TimerStateHolder,
-        val files: Files, val player: Controller, val timer: TimerBoundary)
+        val files: Files, val player: Controller, val timer: TimerBoundary, val saved: SavedStateHandle)
 
     private class Files : VideoFileAccess {
         var readable = true
@@ -170,6 +183,7 @@ class VideoTimerViewModelRetryTest {
     private class TimerBoundary(private val holder: TimerStateHolder, private val wall: Clock,
         private val elapsed: ElapsedRealtimeClock) : TimerController {
         val starts = mutableListOf<TimerStartRequest>()
+        var playbackUpdates = 0
         override val state = holder.state
         override fun restore() = Unit
         override fun start(request: TimerStartRequest) {
@@ -183,6 +197,7 @@ class VideoTimerViewModelRetryTest {
         override fun confirmFinish(sessionId: String) = error("Not part of playback initialization")
         override fun cancelFinish(sessionId: String) = error("Not part of playback initialization")
         override fun updatePlayback(sessionId: String, snapshot: VideoPlaybackSnapshot, immediate: Boolean) {
+            playbackUpdates++
             if (state.value.sessionId == sessionId) holder.set(state.value.copy(video = snapshot))
         }
         override fun reset(sessionId: String) { holder.set(TimerSession()) }

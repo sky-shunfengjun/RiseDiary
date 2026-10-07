@@ -71,7 +71,7 @@ class BackupValidationTest {
 
     @Test
     fun oversizedEntryIsRejectedBeforeParsing() {
-        val archive = zipOf("flights.json" to "x".repeat(5 * 1024 * 1024 + 1))
+        val archive = zipOf("flights.json" to "x".repeat(32 * 1024 * 1024 + 1))
 
         assertThrows(IllegalArgumentException::class.java) {
             manager.readBackup(ByteArrayInputStream(archive))

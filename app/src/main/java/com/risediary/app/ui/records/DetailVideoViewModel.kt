@@ -14,13 +14,13 @@ import javax.inject.Inject
 
 @HiltViewModel
 class DetailVideoViewModel @Inject constructor(
-    @ApplicationContext context: Context,
+    factory: com.risediary.app.media.VideoPlayerFactory,
     preferences: UserPreferences,
     files: VideoFileAccess,
     private val grants: VideoGrantRegistry
 ) : ViewModel() {
     private val owner = "detail-player:" + UUID.randomUUID()
-    val controller = Media3VideoPlayerController(context)
+    val controller = factory.create()
     internal val session = DetailVideoSession(viewModelScope, preferences.detailVideoHiddenByDefault, { video ->
         grants.retain(owner, setOf(video.uriString))
         files.check(video)

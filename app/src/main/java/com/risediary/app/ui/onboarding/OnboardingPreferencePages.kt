@@ -10,6 +10,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -38,18 +39,38 @@ import top.yukonga.miuix.kmp.basic.RadioButton
 internal fun StatementOnboardingPage(
     accepted: Boolean, enabled: Boolean, scrollState: ScrollState, backdrop: Backdrop,
     onAccepted: (Boolean) -> Unit, onRead: (PolicyDocument) -> Unit,
+    compact: Boolean = false,
 ) {
-    OnboardingPage(stringResource(R.string.oobe_statement_title), "", scrollState, icon = AppIcons.Notes) {
+    OnboardingPage(stringResource(R.string.oobe_statement_title), "", scrollState, icon = AppIcons.Notes, compactLayout = compact) {
         OnboardingCard(Modifier.fillMaxWidth()) {
             Text(
-                stringResource(R.string.oobe_statement_subtitle), Modifier.padding(20.dp),
-                fontSize = 16.sp, color = originalOnboardingSummary(),
+                stringResource(R.string.oobe_statement_subtitle), Modifier.padding(if (compact) 16.dp else 20.dp),
+                fontSize = if (compact) 14.sp else 16.sp, color = originalOnboardingSummary(),
             )
         }
-        OnboardingAction(stringResource(R.string.policy_terms_title), AppIcons.Notes, backdrop,
-            { if (enabled) onRead(PolicyDocument.TERMS) }, enabled = enabled, centered = true)
-        OnboardingAction(stringResource(R.string.policy_privacy_title), AppIcons.Lock, backdrop,
-            { if (enabled) onRead(PolicyDocument.PRIVACY) }, enabled = enabled, centered = true)
+        if (compact) {
+            val fontScale = LocalDensity.current.fontScale
+            BoxWithConstraints(Modifier.fillMaxWidth()) {
+                if (maxWidth >= 300.dp && fontScale <= 1.15f) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OnboardingAction(stringResource(R.string.policy_terms_title), AppIcons.Notes, backdrop,
+                            { if (enabled) onRead(PolicyDocument.TERMS) }, Modifier.weight(1f), enabled, centered = true)
+                        OnboardingAction(stringResource(R.string.policy_privacy_title), AppIcons.Lock, backdrop,
+                            { if (enabled) onRead(PolicyDocument.PRIVACY) }, Modifier.weight(1f), enabled, centered = true)
+                    }
+                } else Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                    OnboardingAction(stringResource(R.string.policy_terms_title), AppIcons.Notes, backdrop,
+                        { if (enabled) onRead(PolicyDocument.TERMS) }, enabled = enabled, centered = true)
+                    OnboardingAction(stringResource(R.string.policy_privacy_title), AppIcons.Lock, backdrop,
+                        { if (enabled) onRead(PolicyDocument.PRIVACY) }, enabled = enabled, centered = true)
+                }
+            }
+        } else {
+            OnboardingAction(stringResource(R.string.policy_terms_title), AppIcons.Notes, backdrop,
+                { if (enabled) onRead(PolicyDocument.TERMS) }, enabled = enabled, centered = true)
+            OnboardingAction(stringResource(R.string.policy_privacy_title), AppIcons.Lock, backdrop,
+                { if (enabled) onRead(PolicyDocument.PRIVACY) }, enabled = enabled, centered = true)
+        }
         Row(
             Modifier.fillMaxWidth().heightIn(min = 56.dp).testTag("oobe_agreement")
                 .toggleable(accepted, enabled = enabled, role = Role.Checkbox,
@@ -122,47 +143,51 @@ internal fun RecordingOnboardingPage(
     predictionMaxTicks: Int?, scrollState: ScrollState, onPredictionMaximumChange: (Int) -> Unit,
     enabled: Boolean = true,
 ) {
+    OnboardingPage(stringResource(R.string.oobe_prediction_title), stringResource(R.string.oobe_prediction_subtitle), scrollState, icon = AppIcons.WaterDrop) {
+        if (predictionMaxTicks != null) OnboardingCard(Modifier.fillMaxWidth()) {
+            GuidePredictionMaximumControl(predictionMaxTicks, enabled, onPredictionMaximumChange)
+        }
+    }
+}
+
+@Composable
+internal fun GuidePredictionMaximumControl(
+    predictionMaxTicks: Int, enabled: Boolean, onPredictionMaximumChange: (Int) -> Unit,
+    title: String? = null,
+) {
     val currentEnabled by rememberUpdatedState(enabled)
     val currentChange by rememberUpdatedState(onPredictionMaximumChange)
-    OnboardingPage(stringResource(R.string.oobe_prediction_title), stringResource(R.string.oobe_prediction_subtitle), scrollState, icon = AppIcons.WaterDrop) {
-        if (predictionMaxTicks != null) {
-            var previewTicks by remember { mutableIntStateOf(predictionMaxTicks) }
-            var adjusting by remember { mutableStateOf(false) }
-            LaunchedEffect(predictionMaxTicks) { if (!adjusting) previewTicks = predictionMaxTicks }
-            LaunchedEffect(enabled) { if (!enabled) adjusting = false }
-            val surface by rememberUpdatedState(originalOnboardingSurface())
-            val localBackdrop = rememberLayerBackdrop { drawRect(surface); drawContent() }
-            OnboardingCard(Modifier.fillMaxWidth()) {
-                Box(Modifier.fillMaxWidth()) {
-                    Column(
-                        Modifier.fillMaxWidth().layerBackdrop(localBackdrop)
-                            .padding(horizontal = 20.dp, vertical = 20.dp),
-                    ) {
-                        Text(
-                            stringResource(R.string.settings_prediction_summary, PredictionQuantitySettings.formatTicks(previewTicks)),
-                            fontSize = 18.sp, fontWeight = FontWeight.Medium, color = originalOnboardingText(),
-                        )
-                        Spacer(Modifier.height(60.dp))
-                    }
-                    LiquidSlider(
-                        value = { previewTicks / 10f },
-                        onValueChange = {
-                            if (currentEnabled) {
-                                adjusting = true
-                                previewTicks = (it * 10).roundToInt().coerceIn(1, PredictionQuantitySettings.MAX_SETTING_TICKS)
-                            }
-                        },
-                        valueRange = 0.1f..15f, steps = 148, backdrop = localBackdrop,
-                        modifier = Modifier.align(Alignment.BottomCenter).padding(horizontal = 18.dp, vertical = 10.dp)
-                            .testTag("oobe_prediction_slider"),
-                        onValueChangeFinished = {
-                            adjusting = false
-                            if (currentEnabled) currentChange(previewTicks)
-                        },
-                        enabled = enabled,
-                    )
-                }
-            }
+    var previewTicks by remember { mutableIntStateOf(predictionMaxTicks) }
+    var adjusting by remember { mutableStateOf(false) }
+    LaunchedEffect(predictionMaxTicks) { if (!adjusting) previewTicks = predictionMaxTicks }
+    LaunchedEffect(enabled) { if (!enabled) adjusting = false }
+    val surface by rememberUpdatedState(originalOnboardingSurface())
+    val localBackdrop = rememberLayerBackdrop { drawRect(surface); drawContent() }
+    Box(Modifier.fillMaxWidth()) {
+        Column(Modifier.fillMaxWidth().layerBackdrop(localBackdrop)
+            .padding(horizontal = 20.dp, vertical = if (title != null) 12.dp else 20.dp)) {
+            if (title != null) FlowRow(Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(title, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = originalOnboardingText())
+                Text(stringResource(R.string.settings_prediction_summary, PredictionQuantitySettings.formatTicks(previewTicks)),
+                    fontSize = 18.sp, fontWeight = FontWeight.Medium, color = originalOnboardingText())
+            } else Text(stringResource(R.string.settings_prediction_summary, PredictionQuantitySettings.formatTicks(previewTicks)),
+                fontSize = 18.sp, fontWeight = FontWeight.Medium, color = originalOnboardingText())
+            Spacer(Modifier.height(if (title != null) 54.dp else 60.dp))
         }
+        LiquidSlider(
+            value = { previewTicks / 10f },
+            onValueChange = {
+                if (currentEnabled) {
+                    adjusting = true
+                    previewTicks = (it * 10).roundToInt().coerceIn(1, PredictionQuantitySettings.MAX_SETTING_TICKS)
+                }
+            },
+            valueRange = 0.1f..15f, steps = 148, backdrop = localBackdrop,
+            modifier = Modifier.align(Alignment.BottomCenter).padding(horizontal = 18.dp, vertical = 10.dp)
+                .testTag("oobe_prediction_slider"),
+            onValueChangeFinished = { adjusting = false; if (currentEnabled) currentChange(previewTicks) },
+            enabled = enabled,
+        )
     }
 }

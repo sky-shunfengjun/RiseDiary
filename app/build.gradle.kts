@@ -27,8 +27,8 @@ android {
         applicationId = "com.risediary.app"
         minSdk = 31
         targetSdk = 36
-        versionCode = 125
-        versionName = "v2.0.0 Dev37"
+        versionCode = 133
+        versionName = "v2.0.0 Dev45"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables { useSupportLibrary = true }
     }
@@ -65,6 +65,11 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+    }
+
+    sourceSets {
+        getByName("test").resources.srcDir("src/sharedTest/resources")
+        getByName("androidTest").assets.srcDir("src/sharedTest/resources")
     }
 
     testOptions {
@@ -129,6 +134,8 @@ dependencies {
     ksp(libs.hilt.compiler.androidx)
     implementation(libs.work.runtime.ktx)
 
+    // Real JSON implementation for desktop legacy-backup fixtures; not packaged in the App.
+    testImplementation("org.json:json:20240303")
     testImplementation(libs.junit)
     testImplementation(libs.coroutines.test)
     testImplementation(libs.room.testing)

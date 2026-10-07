@@ -12,6 +12,11 @@ import java.io.ByteArrayOutputStream
 import java.io.DataInputStream
 import java.io.DataOutputStream
 import java.io.IOException
+import java.io.InputStream
+import java.io.OutputStream
+import java.io.FilterInputStream
+import java.security.DigestOutputStream
+import kotlinx.coroutines.runBlocking
 import java.security.MessageDigest
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -33,26 +38,141 @@ internal interface BackupRecoveryStorage {
     fun read(): ByteArray
     fun write(bytes: ByteArray)
     fun delete()
+    fun openRead(): InputStream = ByteArrayInputStream(read())
+    fun writeStream(block: (OutputStream) -> Unit) {
+        val output = ByteArrayOutputStream()
+        block(output)
+        write(output.toByteArray())
+    }
 }
+
+internal interface RecoverySource {
+    val preferences: Preferences
+    val timer: TimerSession
+    fun flights(emit: (Flight) -> Unit)
+    fun lengths(emit: (LengthRecord) -> Unit)
+    fun tags(emit: (Tag) -> Unit)
+    fun achievements(emit: (Achievement) -> Unit)
+    fun drafts(emit: (RecordDraftEntity) -> Unit)
+}
+internal interface RecoverySink {
+    suspend fun flight(row: Flight)
+    suspend fun length(row: LengthRecord)
+    suspend fun tag(row: Tag)
+    suspend fun achievement(row: Achievement)
+    suspend fun draft(row: RecordDraftEntity)
+    suspend fun settings(preferences: Preferences, timer: TimerSession)
+}
+
 
 internal class BackupRecoveryJournal(private val storage: BackupRecoveryStorage) {
     /** An unreadable directory is not evidence that the original data is safe to overwrite. */
     fun pending(): Boolean = try { storage.exists() } catch (_: Exception) { true }
 
-    fun persist(snapshot: BackupRecoverySnapshot) {
+    fun persist(snapshot: BackupRecoverySnapshot) = persist(object : RecoverySource {
+        override val preferences = snapshot.preferences
+        override val timer = snapshot.timer
+        override fun flights(emit: (Flight) -> Unit) = snapshot.flights.forEach(emit)
+        override fun lengths(emit: (LengthRecord) -> Unit) = snapshot.lengthRecords.forEach(emit)
+        override fun tags(emit: (Tag) -> Unit) = snapshot.tags.forEach(emit)
+        override fun achievements(emit: (Achievement) -> Unit) = snapshot.achievements.forEach(emit)
+        override fun drafts(emit: (RecordDraftEntity) -> Unit) = snapshot.drafts.forEach(emit)
+    })
+
+    fun fingerprint(source: RecoverySource): ByteArray {
+        val digest = MessageDigest.getInstance("SHA-256")
+        writePayload(DataOutputStream(CountingOutput(DigestOutputStream(DiscardOutput, digest)).buffered()), source)
+        return digest.digest()
+    }
+    fun estimatedBytes(source: RecoverySource): Long {
+        val counter = CountingOutput(DiscardOutput)
+        writePayload(DataOutputStream(counter.buffered()), source)
+        return counter.size.toLong() + HEADER_BYTES
+    }
+
+    fun persist(source: RecoverySource) {
         check(!pending()) { "原数据尚待还原，请先重试还原" }
-        val encoded = encode(snapshot)
-        storage.write(encoded)
-        // AtomicFile.finishWrite does not expose every rename failure. Verify the committed bytes.
-        if (!storage.exists() || !MessageDigest.isEqual(encoded, storage.read())) {
-            throw IOException("本地还原副本未完整保存")
+        // Two bounded passes: measure/hash, then atomically write exactly that payload.
+        val digest = MessageDigest.getInstance("SHA-256")
+        val counter = CountingOutput(DigestOutputStream(DiscardOutput, digest))
+        writePayload(DataOutputStream(counter.buffered()), source)
+        val expected = digest.digest()
+        storage.writeStream { stream ->
+            val out = DataOutputStream(stream.buffered())
+            out.writeInt(MAGIC); out.writeInt(VERSION); out.writeInt(counter.size)
+            out.write(expected)
+            writePayload(out, source)
+            out.flush()
         }
+        verify(expected,counter.size)
     }
 
     fun load(): BackupRecoverySnapshot? {
         if (!pending()) return null
-        return try { decode(storage.read()) }
-        catch (failure: Exception) { throw IOException("本地还原副本无法读取", failure) }
+        val flights = mutableListOf<Flight>(); val lengths = mutableListOf<LengthRecord>()
+        val tags = mutableListOf<Tag>(); val achievements = mutableListOf<Achievement>()
+        val drafts = mutableListOf<RecordDraftEntity>()
+        var restoredPreferences: Preferences = emptyPreferences(); var restoredTimer = TimerSession()
+        runBlocking { replay(object : RecoverySink {
+            override suspend fun flight(row: Flight) { flights.add(row) }
+            override suspend fun length(row: LengthRecord) { lengths.add(row) }
+            override suspend fun tag(row: Tag) { tags.add(row) }
+            override suspend fun achievement(row: Achievement) { achievements.add(row) }
+            override suspend fun draft(row: RecordDraftEntity) { drafts.add(row) }
+            override suspend fun settings(preferences: Preferences, timer: TimerSession) { restoredPreferences = preferences; restoredTimer = timer }
+        }) }
+        return BackupRecoverySnapshot(flights, lengths, tags, achievements, restoredPreferences, drafts, restoredTimer)
+    }
+
+    private fun verify(expectedHash: ByteArray? = null, expectedLength: Int? = null) {
+        try { verifyInternal(expectedHash,expectedLength) } catch (failure: Exception) { throw IOException("本地还原副本未完整保存或校验失败",failure) }
+    }
+    private fun verifyInternal(expectedHash: ByteArray?, expectedLength: Int?) {
+        storage.openRead().buffered().use { stream ->
+            val input = DataInputStream(stream)
+            require(input.readInt() == MAGIC) { "还原副本版本无效" }
+            require(input.readInt() in 1..VERSION) { "还原副本版本无效" }
+            val length = input.readInt()
+            require(length in 0..MAX_PAYLOAD_BYTES) { "还原副本大小无效" }
+            val expected = ByteArray(32).also(input::readFully)
+            require(expectedLength == null || expectedLength == length) { "保护副本与原数据大小不一致" }
+            require(expectedHash == null || MessageDigest.isEqual(expectedHash,expected)) { "保护副本与原数据不一致" }
+            val digest = MessageDigest.getInstance("SHA-256")
+            var remaining = length
+            val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+            while (remaining > 0) {
+                val count = input.read(buffer, 0, minOf(buffer.size, remaining))
+                require(count > 0) { "还原副本内容不完整" }
+                digest.update(buffer, 0, count); remaining -= count
+            }
+            require(input.read() == -1 && MessageDigest.isEqual(expected, digest.digest())) { "还原副本校验失败" }
+        }
+    }
+
+    suspend fun replay(sink: RecoverySink) {
+        verify() // Complete checksum verification precedes every live mutation.
+        storage.openRead().buffered().use { stream ->
+            val envelope = DataInputStream(stream)
+            envelope.readInt(); val version = envelope.readInt(); val size = envelope.readInt()
+            envelope.skipBytes(32)
+            val input = DataInputStream(RemainingInput(envelope, size))
+            suspend fun rows(consume: suspend () -> Unit) { repeat(input.readCount()) { consume() } }
+            rows { sink.flight(input.readFlight()) }
+            rows {
+                val id = input.readLong(); val date = input.readLong()
+                val flaccid = input.readFloat(); val erect = input.readFloat(); val note = input.readText()
+                val global = if (version >= 2) input.readText() else java.util.UUID.nameUUIDFromBytes(
+                    "legacy-recovery:$id:$date".toByteArray()).toString()
+                sink.length(LengthRecord(id, date, flaccid, erect, note, global))
+            }
+            rows { sink.tag(Tag(input.readLong(), input.readText(), input.readText(), input.readInt())) }
+            rows { sink.achievement(Achievement(input.readLong(), input.readText(), input.readLong(), input.readBoolean())) }
+            val preferences = input.readPreferences()
+            rows { sink.draft(RecordDraftEntity(input.readText(), input.readOptionalInt(), input.readLong(), input.readText(), input.readOptionalLong())) }
+            val timer = json.decodeFromString<TimerSession>(input.readText())
+            require(input.available() == 0) { "还原副本含额外内容" }
+            sink.settings(preferences, timer)
+        }
     }
 
     fun clear() {
@@ -60,56 +180,44 @@ internal class BackupRecoveryJournal(private val storage: BackupRecoveryStorage)
         if (storage.exists()) throw IOException("本地还原保护尚未移除")
     }
 
-    private fun encode(snapshot: BackupRecoverySnapshot): ByteArray {
-        val output = LimitedOutput()
-        DataOutputStream(output).use { data ->
-            data.writeList(snapshot.flights) { writeFlight(it) }
-            data.writeList(snapshot.lengthRecords) {
-                writeLong(it.id); writeLong(it.recordDate); writeFloat(it.flaccidLengthCm)
-                writeFloat(it.erectLengthCm); writeText(it.note)
-            }
-            data.writeList(snapshot.tags) { writeLong(it.id); writeText(it.name); writeText(it.color); writeInt(it.sortOrder) }
-            data.writeList(snapshot.achievements) { writeLong(it.id); writeText(it.achievementKey); writeLong(it.unlockedAt); writeBoolean(it.notified) }
-            data.writePreferences(snapshot.preferences)
-            data.writeList(snapshot.drafts) {
-                writeText(it.draftId); writeOptionalInt(it.activeSlot); writeLong(it.revision)
-                writeText(it.payload); writeOptionalLong(it.completedFlightId)
-            }
-            data.writeText(json.encodeToString(snapshot.timer))
+    private fun writePayload(data: DataOutputStream, source: RecoverySource) {
+        // Counts are bounded scans, never a materialized record list.
+        fun <T> rows(read: ((T) -> Unit) -> Unit, write: (T) -> Unit) {
+            var count = 0; read { count = Math.addExact(count, 1) }
+            data.writeInt(count); var emitted = 0
+            read { write(it); emitted++ }
+            check(count == emitted) { "保护副本写入期间数据发生变化" }
         }
-        val payload = output.toByteArray()
-        return ByteArrayOutputStream(payload.size + HEADER_BYTES).also { bytes ->
-            DataOutputStream(bytes).use { envelope ->
-                envelope.writeInt(MAGIC)
-                envelope.writeInt(VERSION)
-                envelope.writeInt(payload.size)
-                envelope.write(MessageDigest.getInstance("SHA-256").digest(payload))
-                envelope.write(payload)
-            }
-        }.toByteArray()
+        rows(source::flights) { data.writeFlight(it) }
+        rows(source::lengths) {
+            data.writeLong(it.id); data.writeLong(it.recordDate); data.writeFloat(it.flaccidLengthCm)
+            data.writeFloat(it.erectLengthCm); data.writeText(it.note); data.writeText(it.globalId)
+        }
+        rows(source::tags) { data.writeLong(it.id); data.writeText(it.name); data.writeText(it.color); data.writeInt(it.sortOrder) }
+        rows(source::achievements) { data.writeLong(it.id); data.writeText(it.achievementKey); data.writeLong(it.unlockedAt); data.writeBoolean(it.notified) }
+        data.writePreferences(source.preferences)
+        rows(source::drafts) {
+            data.writeText(it.draftId); data.writeOptionalInt(it.activeSlot); data.writeLong(it.revision)
+            data.writeText(it.payload); data.writeOptionalLong(it.completedFlightId)
+        }
+        data.writeText(json.encodeToString(source.timer))
+        data.flush()
     }
 
-    private fun decode(bytes: ByteArray): BackupRecoverySnapshot {
-        require(bytes.size in HEADER_BYTES..MAX_FILE_BYTES) { "还原副本大小无效" }
-        return DataInputStream(ByteArrayInputStream(bytes)).use { envelope ->
-            require(envelope.readInt() == MAGIC && envelope.readInt() == VERSION) { "还原副本版本无效" }
-            val length = envelope.readInt()
-            require(length >= 0 && length == bytes.size - HEADER_BYTES) { "还原副本内容不完整" }
-            val expected = ByteArray(32).also(envelope::readFully)
-            val payload = ByteArray(length).also(envelope::readFully)
-            require(MessageDigest.isEqual(expected, MessageDigest.getInstance("SHA-256").digest(payload))) { "还原副本校验失败" }
-            DataInputStream(ByteArrayInputStream(payload)).use { input ->
-                val flights = input.readList { readFlight() }
-                val lengths = input.readList { LengthRecord(readLong(), readLong(), readFloat(), readFloat(), readText()) }
-                val tags = input.readList { Tag(readLong(), readText(), readText(), readInt()) }
-                val achievements = input.readList { Achievement(readLong(), readText(), readLong(), readBoolean()) }
-                val preferences = input.readPreferences()
-                val drafts = input.readList { RecordDraftEntity(readText(), readOptionalInt(), readLong(), readText(), readOptionalLong()) }
-                val timer = json.decodeFromString<TimerSession>(input.readText())
-                require(input.available() == 0) { "还原副本含额外内容" }
-                // Do not validate through user-ZIP rules: imperfect old rows must be recoverable exactly.
-                BackupRecoverySnapshot(flights, lengths, tags, achievements, preferences, drafts, timer)
-            }
+    private class CountingOutput(private val output: OutputStream) : OutputStream() {
+        var size = 0; private set
+        override fun write(value: Int) { require(size < MAX_PAYLOAD_BYTES) { "本地还原副本超过512 MiB" }; output.write(value); size++ }
+        override fun write(bytes: ByteArray, offset: Int, length: Int) {
+            require(length <= MAX_PAYLOAD_BYTES - size) { "本地还原副本超过512 MiB" }
+            output.write(bytes, offset, length); size += length
+        }
+    }
+    private class RemainingInput(input: InputStream, private var remaining: Int) : FilterInputStream(input) {
+        override fun available() = remaining
+        override fun read(): Int { if (remaining == 0) return -1; return super.read().also { if (it >= 0) remaining-- } }
+        override fun read(bytes: ByteArray, offset: Int, length: Int): Int {
+            if (remaining == 0) return -1
+            return super.read(bytes, offset, minOf(length, remaining)).also { if (it > 0) remaining -= it }
         }
     }
 
@@ -207,22 +315,11 @@ internal class BackupRecoveryJournal(private val storage: BackupRecoveryStorage)
     }
     private fun <T> DataInputStream.readList(readItem: DataInputStream.() -> T): List<T> = List(readCount()) { readItem() }
 
-    private class LimitedOutput : ByteArrayOutputStream() {
-        override fun write(value: Int) {
-            if (count >= MAX_PAYLOAD_BYTES) throw IOException("本地还原副本过大，未替换数据")
-            super.write(value)
-        }
-        override fun write(bytes: ByteArray, offset: Int, length: Int) {
-            if (length > MAX_PAYLOAD_BYTES - count) throw IOException("本地还原副本过大，未替换数据")
-            super.write(bytes, offset, length)
-        }
-    }
-
     companion object {
         private const val MAGIC = 0x52444331
-        private const val VERSION = 1
+        private const val VERSION = 2
         private const val HEADER_BYTES = 44
-        private const val MAX_PAYLOAD_BYTES = 64 * 1024 * 1024
+        private const val MAX_PAYLOAD_BYTES = 512 * 1024 * 1024 - HEADER_BYTES
         const val MAX_FILE_BYTES = MAX_PAYLOAD_BYTES + HEADER_BYTES
         private val json = Json { encodeDefaults = true }
     }

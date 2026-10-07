@@ -56,8 +56,12 @@ internal fun FloatingTimerCapsule(
     notice: String?,
     persistenceError: Boolean,
     onRetryPersistence: () -> Unit,
+    sessionFlow: kotlinx.coroutines.flow.StateFlow<TimerSession>? = null,
+    panelVisibility: androidx.compose.animation.core.MutableTransitionState<Boolean>? = null,
     actions: @Composable () -> Unit
 ) {
+    val visibility = panelVisibility ?: remember { androidx.compose.animation.core.MutableTransitionState(expanded) }
+    visibility.targetState = expanded
     val density = LocalDensity.current
     val expandedDescription = stringResource(if (expanded) R.string.video_timer_collapse else R.string.video_timer_expand)
     Box(Modifier.fillMaxSize()) {
@@ -94,7 +98,7 @@ internal fun FloatingTimerCapsule(
                 if (above) 1f else 0f
             )
             AnimatedVisibility(
-                visible = expanded,
+                visibleState = visibility,
                 modifier = Modifier.offset { IntOffset(panelOffset.x.roundToInt(), panelOffset.y.roundToInt()) },
                 enter = fadeIn(tween(140)) + scaleIn(spring(dampingRatio = 0.85f, stiffness = 500f),
                     initialScale = 0.88f, transformOrigin = origin),
@@ -150,7 +154,7 @@ internal fun FloatingTimerCapsule(
                 contentAlignment = Alignment.Center
             ) {
                 TimerInstrument(session, Modifier.fillMaxWidth().padding(horizontal = 8.dp),
-                    compact = true, fullScreen = true)
+                    compact = true, fullScreen = true, sessionFlow = sessionFlow)
             }
         }
     }
