@@ -24,7 +24,6 @@ import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.risediary.app.R
 import com.risediary.app.data.BackgroundLockMode
-import com.risediary.app.data.DefaultVolumeMode
 import com.risediary.app.ui.components.LiquidSegmentOption
 import com.risediary.app.ui.components.LiquidSegmentedControl
 import com.risediary.app.ui.theme.LocalRiseDarkTheme
@@ -84,47 +83,6 @@ internal fun SettingsThemeItem(
             options = options,
             selectedIndex = optionKeys.indexOf(value).coerceAtLeast(0),
             onSelected = { optionKeys.getOrNull(it)?.let(onSelect) },
-            backdrop = rowBackdrop,
-            modifier = it,
-            containerHeight = 40.dp,
-            contentPadding = 3.dp,
-            showIcons = false,
-            labelFontSize = 12.sp
-        )
-    }
-}
-
-@Composable
-internal fun SettingsVolumeModeItem(
-    value: DefaultVolumeMode,
-    onSelect: (DefaultVolumeMode) -> Unit
-) {
-    val millilitersLabel = stringResource(R.string.settings_volume_mode_milliliters)
-    val spurtsLabel = stringResource(R.string.settings_volume_mode_spurts)
-    val modes = remember { listOf(DefaultVolumeMode.MILLILITERS, DefaultVolumeMode.SPURTS) }
-    val options = remember(millilitersLabel, spurtsLabel) {
-        listOf(
-            LiquidSegmentOption(millilitersLabel, AppIcons.WaterDrop),
-            LiquidSegmentOption(spurtsLabel, AppIcons.Numbers)
-        )
-    }
-    val rowSurface by rememberUpdatedState(
-        if (LocalRiseDarkTheme.current) Color(0xFF20242B) else Color(0xF7FFFFFF)
-    )
-    val rowBackdrop = rememberLayerBackdrop {
-        drawRect(rowSurface)
-        drawContent()
-    }
-    SettingsChoiceLayout(
-        icon = AppIcons.WaterDrop,
-        title = stringResource(R.string.settings_default_volume_mode),
-        captureModifier = Modifier.layerBackdrop(rowBackdrop),
-        summary = stringResource(R.string.settings_default_volume_mode_summary)
-    ) {
-        LiquidSegmentedControl(
-            options = options,
-            selectedIndex = modes.indexOf(value).coerceAtLeast(0),
-            onSelected = { modes.getOrNull(it)?.let(onSelect) },
             backdrop = rowBackdrop,
             modifier = it,
             containerHeight = 40.dp,

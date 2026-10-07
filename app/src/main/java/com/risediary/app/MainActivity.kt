@@ -20,6 +20,11 @@ import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.risediary.app.data.UserPreferences
 import com.risediary.app.reminder.NotificationDestination
+import com.risediary.app.service.TimerNotificationEntry
+import com.risediary.app.service.TimerNotificationIntents
+import com.risediary.app.service.TimerController
+import com.risediary.app.service.ElapsedRealtimeClock
+import java.time.Clock
 import com.risediary.app.ui.AppGateViewModel
 import com.risediary.app.ui.RiseDiaryApp
 import com.risediary.app.ui.theme.RiseDiaryTheme
@@ -36,15 +41,21 @@ class MainActivity : FragmentActivity() {
     lateinit var preferences: UserPreferences
 
     @Inject lateinit var calendar: LocalCalendarContext
+    @Inject lateinit var timerController: TimerController
+    @Inject lateinit var wallClock: Clock
+    @Inject lateinit var elapsedClock: ElapsedRealtimeClock
 
     private val appGateViewModel: AppGateViewModel by viewModels()
     private val _notificationDestination =
         MutableStateFlow<NotificationDestination?>(null)
     private val notificationDestination = _notificationDestination.asStateFlow()
+    private val _timerNotificationEntry = MutableStateFlow<TimerNotificationEntry?>(null)
+    private val timerNotificationEntry = _timerNotificationEntry.asStateFlow()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         receiveNotificationDestination(intent)
+        receiveTimerNotification(intent)
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.auto(
                 AndroidColor.TRANSPARENT,
@@ -90,6 +101,10 @@ class MainActivity : FragmentActivity() {
                     RiseDiaryApp(
                         viewModel = appGateViewModel,
                         notificationDestination = notificationDestination,
+                        timerNotificationEntry = timerNotificationEntry,
+                        onTimerNotificationConsumed = { entry ->
+                            if (_timerNotificationEntry.compareAndSet(entry, null)) TimerNotificationIntents.consume(intent)
+                        },
                         onNotificationDestinationConsumed = { destination ->
                             if (_notificationDestination.compareAndSet(destination, null)) {
                                 intent?.removeExtra(NotificationDestination.EXTRA_DESTINATION)
@@ -107,12 +122,15 @@ class MainActivity : FragmentActivity() {
         super.onStart()
         calendar.setForeground(true)
         appGateViewModel.onAppReturnedToForeground()
+        // Paused timers have no ticker to notice changes made in system notification settings.
+        if (timerController.state.value.isActive) timerController.restore()
     }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         receiveNotificationDestination(intent)
+        receiveTimerNotification(intent)
     }
 
     override fun onStop() {
@@ -121,6 +139,19 @@ class MainActivity : FragmentActivity() {
             calendar.setForeground(false)
         }
         super.onStop()
+    }
+
+    private fun receiveTimerNotification(intent: Intent?) {
+        val entry = TimerNotificationIntents.read(intent, packageName) ?: return
+        // The system unlocks before this entry; capture before app unlock, storage load, or navigation.
+        val wall = wallClock.millis()
+        val monotonic = elapsedClock.millis()
+        if (intent?.action == TimerNotificationIntents.ACTION_FINISH) {
+            timerController.requestFinish(entry.sessionId, wall, monotonic)
+            // A configuration recreation may return to this request, but cannot capture a later finish.
+            TimerNotificationIntents.markFinishDispatched(intent, packageName)
+        }
+        _timerNotificationEntry.value = entry
     }
 
     private fun receiveNotificationDestination(intent: Intent?) {

@@ -52,3 +52,10 @@ internal fun resolveUpdateDownloadTarget(ui: UpdateUiState): UpdateDownloadTarge
         UpdateCheckState.Idle, UpdateCheckState.UpToDate -> UpdateDownloadTarget.Blocked()
     }
 }
+/** A public APK is retained; only a stale task binding is discarded. */
+internal fun cachedPackageIsApplicable(ui: UpdateUiState, cached: DownloadRecord): Boolean {
+    if (!runCatching { isReleaseAvailable(ui.currentVersion, cached.release, ui.settings.checkPolicy()) }.getOrDefault(false)) return false
+    if (ui.settings.releaseChannel == ReleaseChannel.STABLE && cached.release.prerelease) return false
+    val target = resolveUpdateDownloadTarget(ui) as? UpdateDownloadTarget.Authorized ?: return true
+    return target.release.tagName == cached.release.tagName && target.asset == cached.asset
+}

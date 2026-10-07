@@ -305,6 +305,47 @@ object LucideIcons {
         )
     }
 
+    // Official Lucide SVG paths; same ISC license and 2px outline as existing icons.
+    // https://github.com/lucide-icons/lucide/tree/main/icons
+    val Maximize: ImageVector by lazy {
+        icon("Maximize",
+            PathSpec("M8 3H5a2 2 0 0 0-2 2v3", filled = false),
+            PathSpec("M21 8V5a2 2 0 0 0-2-2h-3", filled = false),
+            PathSpec("M3 16v3a2 2 0 0 0 2 2h3", filled = false),
+            PathSpec("M16 21h3a2 2 0 0 0 2-2v-3", filled = false),
+        )
+    }
+
+    val Minimize: ImageVector by lazy {
+        icon("Minimize",
+            PathSpec("M8 3v3a2 2 0 0 1-2 2H3", filled = false),
+            PathSpec("M21 8h-3a2 2 0 0 1-2-2V3", filled = false),
+            PathSpec("M3 16h3a2 2 0 0 1 2 2v3", filled = false),
+            PathSpec("M16 21v-3a2 2 0 0 1 2-2h3", filled = false),
+        )
+    }
+
+    val Video: ImageVector by lazy {
+        icon("Video",
+            PathSpec("m16 13 5.223 3.482a.5.5 0 0 0 .777-.416V7.87a.5.5 0 0 0-.752-.432L16 10.5", filled = false),
+            PathSpec("M4 6h10a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Z", filled = false),
+        )
+    }
+
+    val Rewind: ImageVector by lazy {
+        icon("Rewind",
+            PathSpec("M12 6a2 2 0 0 0-3.414-1.414l-6 6a2 2 0 0 0 0 2.828l6 6A2 2 0 0 0 12 18z", filled = false),
+            PathSpec("M22 6a2 2 0 0 0-3.414-1.414l-6 6a2 2 0 0 0 0 2.828l6 6A2 2 0 0 0 22 18z", filled = false),
+        )
+    }
+
+    val FastForward: ImageVector by lazy {
+        icon("FastForward",
+            PathSpec("M12 6a2 2 0 0 1 3.414-1.414l6 6a2 2 0 0 1 0 2.828l-6 6A2 2 0 0 1 12 18z", filled = false),
+            PathSpec("M2 6a2 2 0 0 1 3.414-1.414l6 6a2 2 0 0 1 0 2.828l-6 6A2 2 0 0 1 2 18z", filled = false),
+        )
+    }
+
     val Play: ImageVector by lazy {
         icon("Play",
                 PathSpec("M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z", filled = false),

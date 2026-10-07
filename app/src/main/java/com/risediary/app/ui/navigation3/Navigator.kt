@@ -57,6 +57,14 @@ class Navigator(
         backStack.addAll(uniqueKeys)
     }
 
+    fun discardExpiredForms(isLive: (String) -> Boolean) {
+        val expired = backStack.indexOfFirst {
+            it is Route.RecordForm && (it.formSessionId == null || !isLive(it.formSessionId))
+        }
+        if (expired < 0) return
+        while (backStack.size > expired && backStack.size > 1) backStack.removeAt(backStack.lastIndex)
+    }
+
     fun pop() {
         if (backStack.size > 1) backStack.removeAt(backStack.lastIndex)
     }

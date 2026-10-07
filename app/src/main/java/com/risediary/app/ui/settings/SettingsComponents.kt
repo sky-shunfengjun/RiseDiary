@@ -41,6 +41,8 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -293,6 +295,7 @@ internal fun SettingsToggleItem(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
                 .padding(end = 14.dp)
+                .semantics { contentDescription = title }
         )
     }
 }
@@ -305,7 +308,8 @@ internal fun SettingsSliderItem(
     value: Float,
     valueRange: ClosedFloatingPointRange<Float>,
     steps: Int,
-    onValueChange: (Float) -> Unit
+    onValueChange: (Float) -> Unit,
+    onValueChangeFinished: (() -> Unit)? = null
 ) {
     val rowSurface by rememberUpdatedState(
         if (LocalRiseDarkTheme.current) Color(0xFF20242B) else Color(0xF7FFFFFF)
@@ -346,10 +350,11 @@ internal fun SettingsSliderItem(
             onValueChange = onValueChange,
             valueRange = valueRange,
             steps = steps,
+            onValueChangeFinished = onValueChangeFinished,
             backdrop = rowBackdrop,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(start = 64.dp, end = 18.dp, bottom = 6.dp)
+                .padding(start = 18.dp, end = 18.dp, bottom = 6.dp)
         )
     }
 }

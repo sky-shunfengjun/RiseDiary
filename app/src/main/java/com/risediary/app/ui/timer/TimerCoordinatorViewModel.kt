@@ -8,6 +8,8 @@ import com.risediary.app.service.TimerSessionStore
 import com.risediary.app.service.TimerStateHolder
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -19,9 +21,15 @@ import javax.inject.Inject
 class TimerCoordinatorViewModel @Inject constructor(
     private val controller: TimerController,
     private val store: TimerSessionStore,
-    private val stateHolder: TimerStateHolder
+    private val stateHolder: TimerStateHolder,
+    private val forms: com.risediary.app.ui.form.RecordFormSessionStore = com.risediary.app.ui.form.RecordFormSessionStore()
 ) : ViewModel() {
     val session: StateFlow<TimerSession> = stateHolder.state
+    val persistenceError = stateHolder.persistenceError
+    private val mutableRestorationReady = MutableStateFlow(false)
+    val restorationReady = mutableRestorationReady.asStateFlow()
+
+    fun isFormLive(id: String): Boolean = forms.get(id) != null
 
     init {
         viewModelScope.launch {
@@ -30,6 +38,7 @@ class TimerCoordinatorViewModel @Inject constructor(
                 if (effective.isActive) controller.restore()
             } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
             catch (_: Exception) { stateHolder.setPersistenceError(true) }
+            finally { mutableRestorationReady.value = true }
         }
     }
 }

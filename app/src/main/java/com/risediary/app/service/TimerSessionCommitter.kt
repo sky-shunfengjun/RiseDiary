@@ -6,7 +6,7 @@ internal data class TimerTransition(val session: TimerSession, val milestone: Ti
 
 internal fun prepareTimerTransition(session: TimerSession): TimerTransition {
     val elapsed = session.elapsedMillis.coerceIn(0L, TimerMath.MAX_DURATION_MILLIS)
-    val reachedLimit = elapsed >= TimerMath.MAX_DURATION_MILLIS
+    val reachedLimit = elapsed >= TimerMath.MAX_DURATION_MILLIS && session.finishCandidate == null
     return TimerTransition(
         session.copy(
             status = if (reachedLimit) TimerStatus.LIMIT_REACHED else session.status,
@@ -29,13 +29,14 @@ internal class TimerSessionCommitter(
     private val save: suspend (TimerSession) -> Unit,
     private val publish: (TimerSession) -> Unit,
     private val notify: (TimerMilestone) -> Unit,
-    private val stop: () -> Unit
+    private val stop: (Int) -> Unit,
+    private val commandStartId: Int = 0
 ) {
     suspend fun commit(transition: TimerTransition, persist: Boolean) {
         val terminal = transition.session.status in setOf(TimerStatus.IDLE, TimerStatus.FINISHED, TimerStatus.LIMIT_REACHED)
         if (persist || terminal) save(transition.session)
         publish(transition.session)
         transition.milestone?.let(notify)
-        if (terminal) stop()
+        if (terminal) stop(commandStartId)
     }
 }

@@ -59,8 +59,15 @@ import com.risediary.app.ui.navigation3.Route
 import com.risediary.app.ui.navigation3.rememberNavigator
 import com.risediary.app.ui.onboarding.OnboardingScreen
 import com.risediary.app.ui.onboarding.OnboardingMode
+import com.risediary.app.ui.updateintro.UpdateIntroScreen
+import com.risediary.app.ui.updateintro.UpdateIntroMode
+import com.risediary.app.ui.updateintro.UpdateIntroViewModel
 import com.risediary.app.ui.records.RecordsScreen
 import com.risediary.app.ui.records.RecordDetailScreen
+import com.risediary.app.ui.records.RecordsViewModel
+import com.risediary.app.ui.components.showLiquidSnackbar
+import com.risediary.app.ui.components.LiquidSnackbarTone
+import androidx.compose.material3.SnackbarResult
 import com.risediary.app.ui.settings.CardOrderScreen
 import com.risediary.app.ui.settings.AppLockSettingsScreen
 import com.risediary.app.ui.settings.SettingsScreen
@@ -72,7 +79,10 @@ import com.risediary.app.ui.update.UpdateSheetHost
 import com.risediary.app.ui.update.UpdateSheetBackdrop
 import com.risediary.app.ui.update.UpdateSheetPresentation
 import com.risediary.app.update.UpdateViewModel
+import com.risediary.app.service.forControls
 import com.risediary.app.service.TimerStatus
+import com.risediary.app.service.TimerNotificationEntry
+import com.risediary.app.service.resolveTimerNotificationRoute
 import com.risediary.app.reminder.NotificationDestination
 import com.risediary.app.ui.theme.RiseCard
 import com.risediary.app.ui.theme.backgroundBrush
@@ -81,6 +91,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.job
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.utils.MiuixPopupUtils
@@ -140,6 +152,8 @@ fun RiseDiaryApp(
     viewModel: AppGateViewModel = hiltViewModel(),
     updateViewModel: UpdateViewModel = hiltViewModel(),
     notificationDestination: StateFlow<NotificationDestination?>,
+    timerNotificationEntry: StateFlow<TimerNotificationEntry?>,
+    onTimerNotificationConsumed: (TimerNotificationEntry) -> Unit,
     onNotificationDestinationConsumed: (NotificationDestination) -> Unit
 ) {
     val noticeContext = androidx.compose.ui.platform.LocalContext.current
@@ -150,19 +164,46 @@ fun RiseDiaryApp(
     }
     val appState by viewModel.state.collectAsStateWithLifecycle()
     val retainMain by viewModel.retainMainContent.collectAsStateWithLifecycle()
+    val retainIntro by viewModel.retainUpdateIntroContent.collectAsStateWithLifecycle()
+    // Restore live timing even when the update presentation defers mounting its destination.
+    hiltViewModel<TimerCoordinatorViewModel>()
     val maintenanceState by viewModel.maintenanceState.collectAsStateWithLifecycle()
     val requestedDestination by
         notificationDestination.collectAsStateWithLifecycle()
+    val requestedTimerEntry by timerNotificationEntry.collectAsStateWithLifecycle()
 
     when {
+        appState == AppGateState.UPDATE_INTRO || (retainIntro &&
+            (appState == AppGateState.LOCKED || appState == AppGateState.ERROR)) -> {
+            val active = appState == AppGateState.UPDATE_INTRO
+            Box(Modifier.fillMaxSize()) {
+                CompositionLocalProvider(LocalPageEffectsActive provides active) {
+                    PageBackScope(active) {
+                        UpdateIntroScreen(UpdateIntroMode.AUTO, viewModel::onUpdateIntroFinished,
+                            viewModel = hiltViewModel<UpdateIntroViewModel>(key = "update-intro-auto"))
+                    }
+                }
+                if (appState == AppGateState.ERROR) AppGateReadError(viewModel::retryRead)
+                else if (appState == AppGateState.LOCKED) AppLockScreen(
+                    mode = LockMode.VERIFY, onDone = {}, onCredentialVerified = viewModel::onCredentialVerified)
+            }
+        }
         keepsMainContentMounted(appState) || (retainMain && appState == AppGateState.ERROR) -> {
             val locked = appState != AppGateState.MAIN
             Box(modifier = Modifier.fillMaxSize()) {
                 MainAppContent(
                     interactionsBlocked = locked,
                     notificationDestination = requestedDestination,
+                    timerNotificationEntry = requestedTimerEntry,
+                    onTimerNotificationConsumed = onTimerNotificationConsumed,
                     onNotificationDestinationConsumed = onNotificationDestinationConsumed,
-                    updateViewModel = updateViewModel
+                    updateViewModel = updateViewModel,
+                    onRestartUpdateIntro = {
+                        viewModel.restartUpdateIntro {
+                            android.widget.Toast.makeText(noticeContext, R.string.developer_save_error,
+                                android.widget.Toast.LENGTH_LONG).show()
+                        }
+                    },
                 )
                 if (!locked && maintenanceState != com.risediary.app.data.DataMaintenanceGate.State.IDLE) {
                     Box(Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(12.dp)
@@ -261,15 +302,46 @@ private inline fun <reified T : Route> NavEntryBuilder.pageEntry(
 private fun MainAppContent(
     interactionsBlocked: Boolean,
     notificationDestination: NotificationDestination?,
+    timerNotificationEntry: TimerNotificationEntry?,
+    onTimerNotificationConsumed: (TimerNotificationEntry) -> Unit,
     onNotificationDestinationConsumed: (NotificationDestination) -> Unit,
     timerCoordinator: TimerCoordinatorViewModel = hiltViewModel(),
-    updateViewModel: UpdateViewModel
+    updateViewModel: UpdateViewModel,
+    onRestartUpdateIntro: () -> Unit,
 ) {
     val navigator = rememberNavigator(Route.Main)
-    val timerSession by timerCoordinator.session.collectAsStateWithLifecycle()
+    remember(navigator) { navigator.discardExpiredForms(timerCoordinator::isFormLive); true }
+    val timerControls = remember(timerCoordinator) { timerCoordinator.session.projectState { it.forControls() } }
+    val timerSession by timerControls.collectAsStateWithLifecycle()
+    val timerRestorationReady by timerCoordinator.restorationReady.collectAsStateWithLifecycle()
+    val timerPersistenceError by timerCoordinator.persistenceError.collectAsStateWithLifecycle()
+    val timerNoticeContext = androidx.compose.ui.platform.LocalContext.current
     val snackbarHostState = remember { androidx.compose.material3.SnackbarHostState() }
     val pagerState = rememberPagerState(pageCount = { 3 })
     val pagerCoroutineScope = rememberCoroutineScope()
+    val recordsViewModel: RecordsViewModel = hiltViewModel()
+    val writeError by recordsViewModel.writeError.collectAsStateWithLifecycle()
+    val canRetryRecordWrite by recordsViewModel.canRetryWrite.collectAsStateWithLifecycle()
+    val recordsWriting by recordsViewModel.isWriting.collectAsStateWithLifecycle()
+    if (writeError != null) com.risediary.app.ui.components.LiquidAlertDialog(
+        onDismissRequest = { if (!recordsWriting) recordsViewModel.clearWriteError() },
+        title = { top.yukonga.miuix.kmp.basic.Text("操作未完成") },
+        text = { top.yukonga.miuix.kmp.basic.Text(writeError.orEmpty()) },
+        confirmButton = { top.yukonga.miuix.kmp.basic.TextButton("重试", enabled = !recordsWriting && canRetryRecordWrite,
+            onClick = recordsViewModel::retryWrite) },
+        dismissButton = { top.yukonga.miuix.kmp.basic.TextButton("关闭", enabled = !recordsWriting,
+            onClick = recordsViewModel::clearWriteError) }
+    )
+    val deletedMessage = stringResource(R.string.records_deleted)
+    val undoAction = stringResource(R.string.action_undo)
+    fun showDetailDeletionUndo(target: com.risediary.app.data.entity.Flight) {
+        val token = recordsViewModel.pendingDeletions.value.firstOrNull { it.flight == target }?.token ?: return
+        pagerCoroutineScope.launch {
+            val result = snackbarHostState.showLiquidSnackbar(deletedMessage, undoAction, LiquidSnackbarTone.UNDO)
+            if (result == SnackbarResult.ActionPerformed) recordsViewModel.undoDelete(target, token)
+            else recordsViewModel.finalizeDeletion(target.id, token)
+        }
+    }
     val mainPagerState = remember(pagerState) {
         MainPagerState(pagerState, pagerCoroutineScope)
     }
@@ -291,6 +363,8 @@ private fun MainAppContent(
     val currentKey = navigator.current()
     val isMain = currentKey is Route.Main
     val navigationKeys = navigator.backStack.map { it as Route }
+    // Manual review, including its reading panel, has the same priority as the automatic intro.
+    val updateIntroReviewOpen = navigationKeys.any { it is Route.UpdateIntroReview }
     val navigationMotion = remember { HyperIslandNavigationMotion(navigationKeys) }
     val navigationTransition = remember(navigationMotion, navigationKeys) {
         navigationMotion.updateStack(navigationKeys)
@@ -302,21 +376,25 @@ private fun MainAppContent(
         derivedStateOf { isMain && !navigationMotion.rootPageReady }
     }
 
-    LaunchedEffect(timerSession.status) {
-        if (timerSession.status == TimerStatus.LIMIT_REACHED) {
-            navigator.push(
-                Route.RecordForm(
-                    isTimer = true,
-                    duration = timerSession.elapsedMillis,
-                    startTime = timerSession.startedAtEpochMillis
-                )
-            )
+    LaunchedEffect(timerNotificationEntry, interactionsBlocked, updateIntroReviewOpen, timerRestorationReady,
+        timerSession.sessionId, timerSession.status, timerPersistenceError) {
+        val entry = timerNotificationEntry ?: return@LaunchedEffect
+        if (interactionsBlocked || updateIntroReviewOpen || !timerRestorationReady) return@LaunchedEffect
+        if (timerPersistenceError && timerSession.sessionId != entry.sessionId) {
+            // Keep the request while the existing timer page offers recovery retry.
+            navigator.push(Route.Timer)
+            return@LaunchedEffect
         }
+        val route = resolveTimerNotificationRoute(entry, timerSession, locked = false)
+        if (route != null) navigator.push(route)
+        else android.widget.Toast.makeText(timerNoticeContext, R.string.notification_timer_expired,
+            android.widget.Toast.LENGTH_SHORT).show()
+        onTimerNotificationConsumed(entry)
     }
 
-    LaunchedEffect(notificationDestination, interactionsBlocked) {
+    LaunchedEffect(notificationDestination, interactionsBlocked, updateIntroReviewOpen) {
         val destination = notificationDestination ?: return@LaunchedEffect
-        if (interactionsBlocked) return@LaunchedEffect
+        if (interactionsBlocked || updateIntroReviewOpen) return@LaunchedEffect
         when (destination) {
             NotificationDestination.RECORDS -> {
                 navigator.popUntil { it is Route.Main }
@@ -394,21 +472,34 @@ private fun MainAppContent(
                                                 mainPagerState = mainPagerState,
                                                 sceneBackdrop = mainSceneBackdrop,
                                                 snackbarHostState = snackbarHostState,
-                                                snackbarScope = pagerCoroutineScope
+                                                snackbarScope = pagerCoroutineScope,
+                                                recordsViewModel = recordsViewModel
                                             )
                                         }
                                         pageEntry<Route.ModeSelect>(navigationMotion) { ModeSelectScreen() }
                                         pageEntry<Route.Timer>(navigationMotion) { TimerScreen() }
+                                        pageEntry<Route.VideoTimer>(navigationMotion) { route ->
+                                            com.risediary.app.ui.video.VideoTimerScreen(route)
+                                        }
                                         pageEntry<Route.RecordForm>(navigationMotion) { route ->
                                             RecordFormScreen(
                                                 isTimer = route.isTimer,
                                                 durationMillis = route.duration,
                                                 timerStartTimeMillis = route.startTime,
+                                                formSessionId = route.formSessionId,
                                                 flightId = null
                                             )
                                         }
+                                        pageEntry<Route.RecordVideo>(navigationMotion) { route ->
+                                            com.risediary.app.ui.video.VideoPlayerScreen(route)
+                                        }
+                                        pageEntry<Route.VideoPreview>(navigationMotion) { route ->
+                                            com.risediary.app.ui.video.VideoPlayerScreen(route)
+                                        }
                                         pageEntry<Route.RecordDetail>(navigationMotion) { route ->
-                                            RecordDetailScreen(flightId = route.flightId)
+                                            RecordDetailScreen(flightId = route.flightId,
+                                                deleteForUndo = recordsViewModel::deleteForUndo,
+                                                onRecordDeleted = ::showDetailDeletionUndo)
                                         }
                                         pageEntry<Route.RecordEdit>(navigationMotion) { route ->
                                             RecordFormScreen(
@@ -450,6 +541,10 @@ private fun MainAppContent(
                                                 onCancel = { navigator.pop() }
                                             )
                                         }
+                                        pageEntry<Route.UpdateIntroReview>(navigationMotion) {
+                                            UpdateIntroScreen(UpdateIntroMode.REVIEW, { navigator.pop() },
+                                                viewModel = hiltViewModel<UpdateIntroViewModel>(key = "update-intro-review"))
+                                        }
                                         pageEntry<Route.OnboardingReview>(navigationMotion) {
                                             OnboardingScreen(
                                                 mode = OnboardingMode.REVIEW,
@@ -487,7 +582,7 @@ private fun MainAppContent(
                     // their state into the popup host; without it the popup never renders
                     // and the triggering row stays stuck in its pressed state.
                     MiuixPopupUtils.MiuixPopupHost()
-                    UpdateSheetHost(updateViewModel, interactionsBlocked, updateSheetPresentation)
+                    UpdateSheetHost(updateViewModel, interactionsBlocked, updateSheetPresentation, onRestartUpdateIntro)
                 }
             }
         }
@@ -503,7 +598,8 @@ private fun MainScene(
     mainPagerState: MainPagerState,
     sceneBackdrop: LayerBackdrop,
     snackbarHostState: androidx.compose.material3.SnackbarHostState,
-    snackbarScope: CoroutineScope
+    snackbarScope: CoroutineScope,
+    recordsViewModel: RecordsViewModel
 ) {
     val navigator = LocalNavigator.current
     val currentPage = pagerState.currentPage
@@ -530,6 +626,7 @@ private fun MainScene(
                         when (page) {
                             0 -> HomeScreen()
                             1 -> RecordsScreen(
+                                viewModel = recordsViewModel,
                                 snackbarHostState = snackbarHostState,
                                 snackbarScope = snackbarScope
                             )
@@ -568,84 +665,4 @@ private fun Modifier.blockInteractionsAndAccessibility(blocked: Boolean): Modifi
             }
         }
     }.clearAndSetSemantics { }
-}
-
-@Composable
-fun ModeSelectScreen() {
-    val navigator = LocalNavigator.current
-    SecondaryPageScaffold(
-        title = stringResource(R.string.mode_select_title),
-        onBack = { navigator.pop() }
-    ) { innerPadding ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(innerPadding),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            RiseCard(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = {
-                    navigator.push(Route.Timer)
-                }
-            ) {
-                Row(
-                    modifier = Modifier.padding(20.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        AppIcons.Schedule, null,
-                        modifier = Modifier.size(40.dp),
-                        tint = MiuixTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(stringResource(R.string.mode_select_timer),
-                            fontSize = MiuixTheme.textStyles.title4.fontSize,
-                            color = MiuixTheme.colorScheme.onSurface)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(stringResource(R.string.mode_select_timer_summary),
-                            fontSize = MiuixTheme.textStyles.body2.fontSize,
-                            color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.5f))
-                    }
-                    Icon(
-                        AppIcons.ChevronRight, contentDescription = null,
-                        tint = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-                    )
-                }
-            }
-
-            RiseCard(
-                modifier = Modifier.fillMaxWidth(),
-                onClick = {
-                    navigator.push(Route.RecordForm(isTimer = false, duration = 0L, startTime = 0L))
-                }
-            ) {
-                Row(
-                    modifier = Modifier.padding(20.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        AppIcons.Edit, null,
-                        modifier = Modifier.size(40.dp),
-                        tint = MiuixTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(stringResource(R.string.mode_select_manual),
-                            fontSize = MiuixTheme.textStyles.title4.fontSize,
-                            color = MiuixTheme.colorScheme.onSurface)
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(stringResource(R.string.mode_select_manual_summary),
-                            fontSize = MiuixTheme.textStyles.body2.fontSize,
-                            color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.5f))
-                    }
-                    Icon(
-                        AppIcons.ChevronRight, contentDescription = null,
-                        tint = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-                    )
-                }
-            }
-        }
-    }
 }

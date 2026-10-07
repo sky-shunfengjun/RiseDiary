@@ -10,6 +10,29 @@ import org.junit.Test
 
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class TimerSessionCommitterTest {
+    @Test fun finishingOldCommandDoesNotStopTheNewFormHandoffRequest() = runTest {
+        var latestDeliveredStart = 1
+        var serviceStopped = false
+        val stopIds = mutableListOf<Int>()
+        // Replace the platform boundary: Android only stops for the newest delivered start ID.
+        val stopCompleted: (Int) -> Unit = { id ->
+            stopIds += id
+            if (id == latestDeliveredStart) serviceStopped = true
+        }
+        TimerSessionCommitter(
+            save = {}, publish = { latestDeliveredStart = 2 }, notify = {},
+            stop = stopCompleted, commandStartId = 1
+        ).commit(prepareTimerTransition(TimerSession(status = TimerStatus.FINISHED,
+            sessionId = "session", elapsedMillis = 8_000L)), true)
+        assertEquals(listOf(1), stopIds)
+        assertFalse("The just-enqueued form cleanup must still be delivered", serviceStopped)
+        TimerSessionCommitter(
+            save = {}, publish = {}, notify = {}, stop = stopCompleted, commandStartId = 2
+        ).commit(prepareTimerTransition(TimerSession()), true)
+        assertEquals(listOf(1, 2), stopIds)
+        assertTrue(serviceStopped)
+    }
+
     @Test fun limitWaitsForDurableSaveBeforePublishNotifyAndStop() = runTest {
         val saveBarrier = CompletableDeferred<Unit>()
         val events = mutableListOf<String>()
@@ -55,6 +78,27 @@ class TimerSessionCommitterTest {
         assertEquals(1, saves)
         assertEquals(0, notifications)
         assertEquals(1, stops)
+    }
+
+    @Test fun runningAtTwoHoursKeepsServiceActiveAndAtTwentyFourHoursStopsOnce() = runTest {
+        val events = mutableListOf<String>()
+        val committer = TimerSessionCommitter(
+            save = { events.add("save:${it.elapsedMillis}") },
+            publish = { events.add("publish:${it.status}") },
+            notify = { events.add("notify:${it.name}") },
+            stop = { events.add("stop") }
+        )
+        val beforeLimit = prepareTimerTransition(TimerSession(TimerStatus.RUNNING,
+            elapsedMillis = 7_200_000L, notifiedMilestonesMask = 7))
+        committer.commit(beforeLimit, persist = true)
+        assertEquals(listOf("save:7200000", "publish:RUNNING"), events)
+        events.clear()
+        val atLimit = prepareTimerTransition(beforeLimit.session.copy(elapsedMillis = 86_400_000L))
+        committer.commit(atLimit, persist = true)
+        assertEquals(listOf("save:86400000", "publish:LIMIT_REACHED", "notify:LIMIT", "stop"), events)
+        events.clear()
+        committer.commit(prepareTimerTransition(atLimit.session), persist = true)
+        assertEquals(listOf("save:86400000", "publish:LIMIT_REACHED", "stop"), events)
     }
 
     @Test fun checkpointsRespectFifteenSecondsAndMilestonesPersistImmediately() {

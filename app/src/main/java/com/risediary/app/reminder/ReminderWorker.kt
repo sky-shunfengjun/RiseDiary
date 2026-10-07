@@ -21,13 +21,17 @@ class ReminderWorker @AssistedInject constructor(
     override suspend fun doWork(): Result {
         val type = ReminderType.fromStoredValue(inputData.getString(KEY_REMINDER_TYPE))
             ?: return Result.failure()
+        val payload = inputData.getString(KEY_PLAN)
+        val plan = payload?.let { runCatching { ReminderPlanCodec.decode(it) }.getOrNull() }
+        if (payload != null && (plan == null || plan.type != type)) return Result.failure()
         return runReminderWork(
-            deliver = { deliveryCoordinator.deliver(type) },
-            reschedule = { scheduler.rescheduleAfterFallback(type) }
+            deliver = { deliveryCoordinator.deliver(type, plan) },
+            reschedule = { scheduler.rescheduleAfterFallback(type, plan?.id) }
         )
     }
     companion object {
         const val KEY_REMINDER_TYPE = "reminder_type"
+        const val KEY_PLAN = "reminder_plan"
     }
 }
 

@@ -5,7 +5,7 @@ import com.risediary.app.ui.components.PageTopBlurLayout
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
-import com.risediary.app.util.formatNaturalDuration
+import com.risediary.app.util.formatRecordDuration
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -47,7 +47,6 @@ import com.risediary.app.R
 import com.risediary.app.ui.navigation3.LocalNavigator
 import com.risediary.app.ui.navigation3.Route
 import com.risediary.app.data.entity.Flight
-import com.risediary.app.data.entity.RecordVolumeMode
 import com.risediary.app.data.repository.TagJson
 import com.risediary.app.ui.components.LiquidAlertDialog
 import com.risediary.app.ui.components.LiquidDateRangePickerDialog
@@ -81,6 +80,7 @@ fun RecordsScreen(
 ) {
     val navigator = LocalNavigator.current
     val currentTags by viewModel.tags.collectAsStateWithLifecycle()
+    val readFailed by viewModel.readFailed.collectAsStateWithLifecycle()
     val allFlights by viewModel.allFlights.collectAsStateWithLifecycle()
     val calendar by viewModel.calendarState.collectAsStateWithLifecycle()
     val flights = remember(
@@ -98,6 +98,8 @@ fun RecordsScreen(
     }
     var showDatePicker by remember { mutableStateOf(false) }
     var showFilterMenu by remember { mutableStateOf(false) }
+    val writeError by viewModel.writeError.collectAsStateWithLifecycle()
+    val writing by viewModel.isWriting.collectAsStateWithLifecycle()
     var deleteTarget by remember { mutableStateOf<Flight?>(null) }
 
     val hasActiveFilter = viewModel.selectedTag != null || viewModel.startDate != null
@@ -220,7 +222,11 @@ fun RecordsScreen(
             }
         }
     ) {
-        if (grouped.isEmpty()) {
+        if (grouped.isEmpty() && readFailed) {
+            Column(Modifier.fillMaxSize().padding(top=headerHeight).padding(horizontal=20.dp)) {
+                com.risediary.app.ui.components.DataReadError(viewModel::retryRead)
+            }
+        } else if (grouped.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize().padding(top = headerHeight), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Icon(
@@ -243,6 +249,7 @@ fun RecordsScreen(
                 contentPadding = PaddingValues(start = 20.dp, top = headerHeight, end = 20.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+                if (readFailed) item(key="read-error") { com.risediary.app.ui.components.DataReadError(viewModel::retryRead) }
                 grouped.forEach { group ->
                     item(key = group.header) {
                         Text(
@@ -281,17 +288,20 @@ fun RecordsScreen(
         )
     }
 
+    androidx.compose.runtime.LaunchedEffect(writeError) { if (writeError != null) deleteTarget = null }
     deleteTarget?.let { target ->
         LiquidAlertDialog(
-            onDismissRequest = { deleteTarget = null },
+            onDismissRequest = { if (!writing) deleteTarget = null },
             title = { Text(stringResource(R.string.record_detail_delete_dialog_title)) },
             text = { Text(stringResource(R.string.record_detail_delete_dialog_message)) },
             confirmButton = {
                 TextButton(
                     text = stringResource(R.string.action_delete),
+                    enabled = !writing,
                     onClick = {
+                        viewModel.delete(target) {
                         deleteTarget = null
-                        if (!viewModel.delete(target)) return@TextButton
+                        val token = viewModel.pendingDeletions.value.firstOrNull { it.flight == target }?.token ?: return@delete
                         // Launched on the stable MainAppContent scope so the
                         // undo Snackbar survives navigation to detail/edit.
                         snackbarScope.launch {
@@ -301,10 +311,11 @@ fun RecordsScreen(
                                 tone = LiquidSnackbarTone.UNDO
                             )
                             if (result == SnackbarResult.ActionPerformed) {
-                                viewModel.undoDelete(target)
+                                viewModel.undoDelete(target, token)
                             } else {
-                                viewModel.finalizeDeletion(target.id)
+                                viewModel.finalizeDeletion(target.id, token)
                             }
+                        }
                         }
                     },
                     colors = ButtonDefaults.textButtonColors(
@@ -318,6 +329,7 @@ fun RecordsScreen(
             dismissButton = {
                 TextButton(
                     text = stringResource(R.string.action_cancel),
+                    enabled = !writing,
                     onClick = { deleteTarget = null },
                     colors = liquidDialogCancelButtonColors()
                 )
@@ -400,15 +412,8 @@ private fun FlightCard(
                     StatItem(AppIcons.Timer, formatDuration(flight.durationSeconds))
                     StatItem(
                         AppIcons.WaterDrop,
-                        if (
-                            RecordVolumeMode.fromStoredValue(flight.volumeInputMode) ==
-                            RecordVolumeMode.SPURTS
-                        ) {
-                            stringResource(R.string.records_spurts_format, flight.spurtCount ?: 0)
-                        } else {
-                                "${flight.semenVolumeMl ?: 0f}ml"
-                            }
-                        )
+                        com.risediary.app.util.RecordQuantityDisplay.current(flight)
+                    )
                         flight.ejaculationDistanceCm?.let {
                             StatItem(AppIcons.Straighten, "${it}cm")
                         }
@@ -446,7 +451,7 @@ private fun StatItem(icon: ImageVector, text: String) {
 }
 
 private fun formatDuration(seconds: Int): String =
-    formatNaturalDuration(seconds)
+    formatRecordDuration(seconds)
 
 internal data class DateGroup(val header: String, val items: List<Flight>)
 

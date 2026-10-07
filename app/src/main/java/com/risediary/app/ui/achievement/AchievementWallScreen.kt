@@ -59,6 +59,7 @@ fun AchievementWallScreen(
     val navigator = LocalNavigator.current
     val unlocked by vm.unlockedAchievements.collectAsStateWithLifecycle()
     val progress by vm.progressMap.collectAsStateWithLifecycle()
+    val readFailed by vm.readFailed.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) { vm.refresh() }
 
@@ -84,6 +85,9 @@ fun AchievementWallScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp),
             overscrollEffect = null
         ) {
+            if (readFailed) item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+                com.risediary.app.ui.components.DataReadError(vm::retryRead, "成就读取失败，已显示的状态已保留")
+            }
             items(vm.allDefinitions) { def ->
                 val isUnlocked = def.key in unlockedKeys
                 val achievement = unlockedMap[def.key]

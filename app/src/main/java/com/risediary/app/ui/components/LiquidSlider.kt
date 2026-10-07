@@ -31,6 +31,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -41,6 +42,7 @@ import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.ProgressBarRangeInfo
 import androidx.compose.ui.semantics.progressBarRangeInfo
 import androidx.compose.ui.semantics.semantics
@@ -73,8 +75,13 @@ fun LiquidSlider(
     valueRange: ClosedFloatingPointRange<Float>,
     steps: Int,
     backdrop: Backdrop,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onValueChangeFinished: (() -> Unit)? = null,
+    enabled: Boolean = true
 ) {
+    val currentEnabled by rememberUpdatedState(enabled)
+    val changeValue by rememberUpdatedState(onValueChange)
+    val finishChange by rememberUpdatedState(onValueChangeFinished)
     val isLightTheme = !LocalRiseDarkTheme.current
     val accentColor = if (isLightTheme) Color(0xFF0088FF) else Color(0xFF0091FF)
     val trackColor = if (isLightTheme) {
@@ -100,9 +107,13 @@ fun LiquidSlider(
             .height(48.dp)
             .semantics {
                 progressBarRangeInfo = ProgressBarRangeInfo(value(), valueRange, steps)
-                setProgress { requested ->
-                    onValueChange(snap(requested))
-                    true
+                if (!enabled) disabled()
+                if (enabled) setProgress { requested ->
+                    if (currentEnabled) {
+                        changeValue(snap(requested))
+                        finishChange?.invoke()
+                        true
+                    } else false
                 }
             },
         contentAlignment = Alignment.CenterStart
@@ -119,7 +130,8 @@ fun LiquidSlider(
                 animationScope = animationScope,
                 initialValue = currentValue,
                 valueRange = valueRange,
-                visibilityThreshold = interval.coerceAtLeast(0.001f),
+                // Continuous progress uses the demo's 0.001 threshold; discrete forms keep one step.
+                visibilityThreshold = if (steps > 0) interval.coerceAtLeast(0.001f) else 0.001f,
                 initialScale = 1f,
                 pressedScale = 1.5f,
                 onDragStarted = {},
@@ -128,7 +140,7 @@ fun LiquidSlider(
             )
         }
         val dragState = rememberDraggableState { delta ->
-            if (trackWidth > 0) {
+            if (currentEnabled && trackWidth > 0) {
                 val valueDelta =
                     (valueRange.endInclusive - valueRange.start) * (delta / trackWidth)
                 rawDragValue =
@@ -137,9 +149,18 @@ fun LiquidSlider(
                 val snapped = snap(rawDragValue)
                 if (snapped != emittedValue) {
                     emittedValue = snapped
-                    onValueChange(snapped)
+                    changeValue(snapped)
                 }
                 dampedDragAnimation.updateValue(rawDragValue)
+            }
+        }
+        LaunchedEffect(enabled) {
+            if (!enabled) {
+                didDrag = false
+                rawDragValue = currentValue
+                emittedValue = currentValue
+                dampedDragAnimation.updateValue(currentValue)
+                dampedDragAnimation.release()
             }
         }
         LaunchedEffect(currentValue) {
@@ -159,26 +180,33 @@ fun LiquidSlider(
                 .draggable(
                     state = dragState,
                     orientation = Orientation.Horizontal,
+                    enabled = enabled,
                     onDragStarted = {
-                        didDrag = true
-                        rawDragValue = currentValue
-                        emittedValue = currentValue
-                        dampedDragAnimation.press()
+                        if (currentEnabled) {
+                            didDrag = true
+                            rawDragValue = currentValue
+                            emittedValue = currentValue
+                            dampedDragAnimation.press()
+                        }
                     },
                     onDragStopped = {
-                        val snapped = snap(rawDragValue)
-                        if (snapped != emittedValue) {
-                            emittedValue = snapped
-                            onValueChange(snapped)
+                        if (currentEnabled) {
+                            val snapped = snap(rawDragValue)
+                            if (snapped != emittedValue) {
+                                emittedValue = snapped
+                                changeValue(snapped)
+                            }
+                            dampedDragAnimation.updateValue(snapped)
+                            finishChange?.invoke()
                         }
-                        dampedDragAnimation.updateValue(snapped)
                         didDrag = false
                         dampedDragAnimation.release()
                     }
                 )
-                .pointerInput(animationScope) {
+                .pointerInput(animationScope, trackWidth, valueRange, isLtr, enabled) {
+                    if (!enabled) return@pointerInput
                     detectTapGestures { position ->
-                        if (trackWidth <= 0) return@detectTapGestures
+                        if (!currentEnabled || trackWidth <= 0) return@detectTapGestures
                         val delta = (valueRange.endInclusive - valueRange.start) *
                             (position.x / trackWidth)
                         val target = if (isLtr) {
@@ -189,7 +217,8 @@ fun LiquidSlider(
                         val snapped = snap(target)
                         emittedValue = snapped
                         dampedDragAnimation.animateToValue(snapped)
-                        onValueChange(snapped)
+                        changeValue(snapped)
+                        finishChange?.invoke()
                     }
                 },
             contentAlignment = Alignment.Center

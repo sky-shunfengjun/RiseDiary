@@ -13,13 +13,26 @@ import kotlin.math.abs
 
 internal object BackupJsonCodec {
     fun flightToJson(value: Flight) = JSONObject().apply {
+        com.risediary.app.data.repository.TagJson.validate(value.methodTags)
         put("id", value.id)
+        put("globalId", value.globalId)
+        put("recordSource", value.recordSource)
+        put("sourceDeviceId", value.sourceDeviceId ?: JSONObject.NULL)
         put("startTime", value.startTime)
         put("endTime", value.endTime)
         put("durationSeconds", value.durationSeconds)
         put("spurtCount", value.spurtCount ?: JSONObject.NULL)
         put("semenVolumeMl", value.semenVolumeMl ?: JSONObject.NULL)
         put("volumeInputMode", value.volumeInputMode)
+        put("legacySpurtCount", value.legacySpurtCount ?: JSONObject.NULL)
+        put("legacyVolumeMl", value.legacyVolumeMl ?: JSONObject.NULL)
+        put("legacyVolumeInputMode", value.legacyVolumeInputMode ?: JSONObject.NULL)
+        put("predictionMaxTicks", value.predictionMaxTicks ?: JSONObject.NULL)
+        put("videoUri", value.videoUri ?: JSONObject.NULL)
+        put("videoDisplayName", value.videoDisplayName ?: JSONObject.NULL)
+        put("videoMimeType", value.videoMimeType ?: JSONObject.NULL)
+        put("recordDraftId", value.recordDraftId ?: JSONObject.NULL)
+        put("timingSource", value.timingSource)
         put("ejaculationDistanceCm", value.ejaculationDistanceCm ?: JSONObject.NULL)
         put("methodTags", value.methodTags)
         put("moodNote", value.moodNote)
@@ -29,6 +42,7 @@ internal object BackupJsonCodec {
 
     fun lengthToJson(value: LengthRecord) = JSONObject().apply {
         put("id", value.id)
+        put("globalId", value.globalId)
         put("recordDate", value.recordDate)
         put("flaccidLengthCm", value.flaccidLengthCm)
         put("erectLengthCm", value.erectLengthCm)
@@ -67,6 +81,9 @@ internal object BackupJsonCodec {
 
     fun settingsToJson(value: SettingsSnapshot) = JSONObject().apply {
         put("username", value.username)
+        put("live_updates_enabled", value.liveUpdatesEnabled)
+        put("detail_video_hidden_by_default", value.detailVideoHiddenByDefault)
+        put("prediction_max_ticks", value.predictionMaxTicks)
         put("ml_per_spurt", value.mlPerSpurt)
         put("default_volume_mode", value.defaultVolumeMode.storedValue)
         put("daily_reminder_enabled", value.dailyReminderEnabled)
@@ -91,21 +108,53 @@ internal object BackupJsonCodec {
         val array = JSONArray(json)
         return List(array.length()) { index ->
             array.getJSONObject(index).run {
+                requireStrictFields(this,"飞行记录")
                 val spurtCount = if (isNull("spurtCount")) null else getInt("spurtCount")
                 val semenVolumeMl = if (isNull("semenVolumeMl")) null
                     else getDouble("semenVolumeMl").toFloat()
+                val mode = if (has("volumeInputMode")) {
+                    val stored = getString("volumeInputMode")
+                    require(stored in RecordVolumeMode.entries.map { it.storedValue }) { "飞行记录录入模式无效" }
+                    stored
+                } else RecordVolumeMode.inferLegacy(spurtCount, semenVolumeMl).storedValue
+                val videoUri = videoText("videoUri")
+                val videoName = videoText("videoDisplayName")
+                val videoMime = videoText("videoMimeType")
+                require(com.risediary.app.media.validateLocalVideoFields(videoUri, videoName, videoMime) == null) {
+                    "视频关联信息无效"
+                }
+                val historyKeys = listOf("legacySpurtCount", "legacyVolumeMl", "legacyVolumeInputMode")
+                val hasHistoryFields = historyKeys.any { has(it) }
+                require(!hasHistoryFields || historyKeys.all { has(it) }) { "原数量信息不完整" }
+                require(hasHistoryFields || mode != RecordVolumeMode.ESTIMATED.storedValue) { "预测记录信息不完整" }
+                val identityKeys = listOf("globalId", "recordSource", "sourceDeviceId")
+                val hasIdentity = identityKeys.any { has(it) }
+                require(!hasIdentity || identityKeys.all { has(it) }) { "记录身份信息不完整" }
                 Flight(
                     id = getLong("id"),
+                    globalId = if (hasIdentity) requireNotNull(identityText("globalId")) { "记录固定编号不能为空" }
+                        else com.risediary.app.data.sync.RecordIdentity.newId(),
+                    recordSource = if (hasIdentity) requireNotNull(identityText("recordSource")) { "记录来源不能为空" }
+                        else com.risediary.app.data.sync.RecordIdentity.PHONE,
+                    sourceDeviceId = if (hasIdentity) identityText("sourceDeviceId") else null,
                     startTime = getLong("startTime"),
                     endTime = getLong("endTime"),
                     durationSeconds = getInt("durationSeconds"),
                     spurtCount = spurtCount,
                     semenVolumeMl = semenVolumeMl,
-                    volumeInputMode = if (has("volumeInputMode")) {
-                        RecordVolumeMode.fromStoredValue(optString("volumeInputMode")).storedValue
-                    } else {
-                        RecordVolumeMode.inferLegacy(spurtCount, semenVolumeMl).storedValue
-                    },
+                    volumeInputMode = mode,
+                    legacySpurtCount = if (!hasHistoryFields) spurtCount else
+                        if (isNull("legacySpurtCount")) null else getInt("legacySpurtCount"),
+                    legacyVolumeMl = if (!hasHistoryFields) semenVolumeMl else
+                        if (isNull("legacyVolumeMl")) null else getDouble("legacyVolumeMl").toFloat(),
+                    legacyVolumeInputMode = if (!hasHistoryFields) mode else
+                        if (isNull("legacyVolumeInputMode")) null else getString("legacyVolumeInputMode"),
+                    predictionMaxTicks = if (isNull("predictionMaxTicks")) null else strictTicks("predictionMaxTicks"),
+                    videoUri = videoUri,
+                    videoDisplayName = videoName,
+                    videoMimeType = videoMime,
+                    recordDraftId = videoText("recordDraftId")?.also { require(it.isNotBlank() && it.length <= 128) },
+                    timingSource = if (has("timingSource")) requireNotNull(videoText("timingSource")) else "manual",
                     ejaculationDistanceCm = if (isNull("ejaculationDistanceCm")) null
                         else getDouble("ejaculationDistanceCm").toFloat(),
                     methodTags = getString("methodTags"),
@@ -114,19 +163,22 @@ internal object BackupJsonCodec {
                     updatedAt = getLong("updatedAt")
                 )
             }
-        }
+        }.also(com.risediary.app.data.sync.RecordIdentity::requireValidRecords)
     }
 
     fun parseLengths(json: String): List<LengthRecord> {
         val array = JSONArray(json)
         return List(array.length()) { index ->
             array.getJSONObject(index).run {
+                requireStrictFields(this,"长度记录")
                 LengthRecord(
                     id = getLong("id"),
                     recordDate = getLong("recordDate"),
                     flaccidLengthCm = getDouble("flaccidLengthCm").toFloat(),
                     erectLengthCm = getDouble("erectLengthCm").toFloat(),
-                    note = getString("note")
+                    note = getString("note"),
+                    globalId = if (has("globalId")) requireNotNull(identityText("globalId"))
+                        else com.risediary.app.data.sync.RecordIdentity.newId()
                 )
             }
         }
@@ -136,6 +188,7 @@ internal object BackupJsonCodec {
         val array = JSONArray(json)
         return List(array.length()) { index ->
             array.getJSONObject(index).run {
+                requireStrictFields(this,"标签")
                 Tag(
                     id = getLong("id"),
                     name = getString("name"),
@@ -150,6 +203,7 @@ internal object BackupJsonCodec {
         val array = JSONArray(json)
         return List(array.length()) { index ->
             array.getJSONObject(index).run {
+                requireStrictFields(this,"成就")
                 Achievement(
                     id = getLong("id"),
                     achievementKey = getString("achievementKey"),
@@ -160,9 +214,17 @@ internal object BackupJsonCodec {
         }
     }
 
-    fun parseSettings(json: String): SettingsSnapshot = JSONObject(json).run {
+    fun parseSettings(json: String): SettingsSnapshot = normalizedSettings(JSONObject(json)).run {
         SettingsSnapshot(
-            username = getString("username"),
+            predictionMaxTicks = com.risediary.app.util.PredictionQuantitySettings.normalizeStoredMaximum(
+                if (has("prediction_max_ticks")) strictTicks("prediction_max_ticks") else 80),
+            username = com.risediary.app.data.UsernamePolicy.normalize(getString("username")),
+            liveUpdatesEnabled = if (has("live_updates_enabled")) getBoolean("live_updates_enabled") else true,
+            detailVideoHiddenByDefault = if (has("detail_video_hidden_by_default")) {
+                val hidden = get("detail_video_hidden_by_default")
+                require(hidden is Boolean) { "视频隐藏设置格式无效" }
+                hidden
+            } else false,
             mlPerSpurt = getDouble("ml_per_spurt").toFloat(),
             defaultVolumeMode = parseBackupDefaultVolumeMode(
                 optString("default_volume_mode", DefaultVolumeMode.MILLILITERS.storedValue)
@@ -182,10 +244,72 @@ internal object BackupJsonCodec {
                 optString("background_lock_mode", BackgroundLockMode.ALWAYS.storedValue)
             ),
             themeMode = getString("theme_mode"),
-            homeCardOrder = getString("home_card_order"),
+            homeCardOrder = com.risediary.app.data.HomeCardOrderPolicy.normalizeStoredOrder(getString("home_card_order")),
             homeCardVisibility = getString("home_card_visibility"),
             onboardingCompleted = getBoolean("onboarding_completed")
         )
+    }
+
+    private fun normalizedSettings(input: JSONObject): JSONObject {
+        val defaults = settingsToJson(defaultBackupSettings())
+        defaults.keys().forEach { key ->
+            // Local completion is not a user setting, and is ignored even in legacy ZIPs.
+            if (key == "onboarding_completed") return@forEach
+            val value = input.opt(key)
+            if (value == null || value === JSONObject.NULL || value == "") return@forEach
+            val example = defaults.get(key)
+            require(when (example) {
+                is Boolean -> value is Boolean
+                is Int -> value is Number && runCatching { requireBackupInt(value) }.isSuccess
+                is Long -> value is Int || value is Long
+                is Number -> value is Number && value.toDouble().isFinite()
+                else -> value is String
+            }) { "设置 $key 格式无效" }
+            defaults.put(key, value)
+        }
+        val lockMode = defaults.getString("background_lock_mode")
+        require(lockMode in BackgroundLockMode.entries.map { it.storedValue }) { "后台锁定设置无效" }
+        return defaults
+    }
+
+    fun requireStrictFields(row: JSONObject, kind: String) {
+        val integers = setOf("id", "startTime", "endTime", "durationSeconds", "spurtCount", "createdAt", "updatedAt",
+            "legacySpurtCount", "predictionMaxTicks", "recordDate", "sortOrder", "unlockedAt", "notified")
+        val int32 = setOf("durationSeconds", "spurtCount", "legacySpurtCount", "predictionMaxTicks", "sortOrder", "notified")
+        val numbers = setOf("semenVolumeMl", "ejaculationDistanceCm", "legacyVolumeMl", "flaccidLengthCm", "erectLengthCm")
+        row.keys().forEach { key ->
+            val value = row.get(key)
+            if (value === JSONObject.NULL) return@forEach
+            require(when {
+                key in int32 -> value is Number && runCatching { requireBackupInt(value) }.isSuccess
+                key in integers -> value is Int || value is Long
+                key in numbers -> value is Number && value.toDouble().isFinite()
+                else -> value is String
+            }) { "$kind 字段 $key 格式无效" }
+        }
+        if (row.has("notified")) require(row.getInt("notified") in 0..1) { "成就提示状态无效" }
+    }
+
+    private fun JSONObject.identityText(key: String): String? {
+        if (isNull(key)) return null
+        val raw = get(key)
+        require(raw is String) { "记录编号或来源格式无效" }
+        return raw
+    }
+
+    private fun JSONObject.videoText(key: String): String? {
+        if (isNull(key)) return null
+        val raw = get(key)
+        require(raw is String) { "视频信息格式无效" }
+        return raw
+    }
+
+    private fun JSONObject.strictTicks(key: String): Int {
+        val raw = get(key)
+        require(raw is Int || raw is Long) { "预测最大值格式无效" }
+        val ticks = (raw as Number).toLong()
+        require(ticks in 1L..10_000L) { "预测最大值超出范围" }
+        return ticks.toInt()
     }
 
     private fun normalizeBackupInactiveDays(value: Int): Int {

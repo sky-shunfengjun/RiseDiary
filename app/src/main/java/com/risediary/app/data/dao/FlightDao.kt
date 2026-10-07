@@ -6,9 +6,25 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface FlightDao {
+    @Query("SELECT (length(moodNote)+length(methodTags)+COALESCE(length(videoUri),0)+COALESCE(length(videoDisplayName),0))*2+1024 FROM flights WHERE id > :after ORDER BY id LIMIT 500")
+    suspend fun backupSizes(after: Long): List<Long>
+
+    @Query("SELECT * FROM flights WHERE id > :after ORDER BY id LIMIT :limit")
+    suspend fun backupBatch(after: Long, limit: Int = 500): List<Flight>
+
+    @Query("SELECT * FROM flights WHERE recordDraftId = :draftId LIMIT 1")
+    suspend fun getByRecordDraftId(draftId: String): Flight?
+
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(flight: Flight): Long
+
+    @Insert(onConflict = OnConflictStrategy.ABORT)
+    suspend fun insertNew(flight: Flight): Long
+
+    @Transaction
+    suspend fun insertOnce(flight: Flight): Flight =
+        com.risediary.app.data.repository.commitNewFlightOnce(flight, ::getByRecordDraftId, ::insertNew)
 
     @Update
     suspend fun update(flight: Flight)
@@ -24,6 +40,12 @@ interface FlightDao {
 
     @Query("SELECT * FROM flights ORDER BY startTime DESC")
     suspend fun getAll(): List<Flight>
+
+    @Query("SELECT DISTINCT videoUri FROM flights WHERE videoUri IS NOT NULL")
+    suspend fun getVideoUris(): List<String>
+
+    @Query("SELECT methodTags FROM flights")
+    suspend fun getAllMethodTags(): List<String>
 
     // --- Statistics queries ---
 

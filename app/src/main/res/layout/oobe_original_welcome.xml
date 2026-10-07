@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Copyright (C) 2023-2026 HyperCeiler Contributions
+  Copyright (C) 2026 sky-shunfengjun
+  SPDX-License-Identifier: AGPL-3.0-only
+  Adapted from fixed HyperCeiler 5e4686069dd7ab1f3697e256d5fc7d68fb73e317.
+  See LICENSES/AGPL-3.0.txt and THIRD-PARTY-NOTICES.
+-->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent" android:layout_height="match_parent"
+    android:clipChildren="false" android:clipToPadding="false"
+    android:fillViewport="true" android:scrollbars="none" android:overScrollMode="never">
+        <com.risediary.app.ui.onboarding.original.OriginalWelcomeColumn
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="vertical" android:clipChildren="false" android:clipToPadding="false">
+            <Space android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="30" />
+            <ImageView
+                android:id="@+id/oobe_original_logo"
+                android:layout_width="@dimen/oobe_original_logo_size" android:layout_height="@dimen/oobe_original_logo_size"
+                android:layout_gravity="center_horizontal" android:src="@drawable/app_icon"
+                android:contentDescription="@null" android:importantForAccessibility="no" />
+            <RelativeLayout
+                android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="40"
+                android:clipChildren="false" android:clipToPadding="false">
+                <LinearLayout
+                    android:id="@+id/oobe_original_logo_wrapper"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:layout_alignParentTop="true" android:layout_marginTop="@dimen/oobe_original_logo_text_gap"
+                    android:paddingHorizontal="24dp" android:gravity="center_horizontal" android:orientation="vertical">
+                    <TextView
+                        android:id="@+id/oobe_original_title"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:fontFamily="sans-serif-medium" android:text="@string/app_name"
+                        android:textColor="@android:color/white" android:textSize="@dimen/oobe_original_title_size"
+                        android:gravity="center" android:includeFontPadding="false" />
+                    <TextView
+                        android:id="@+id/oobe_original_subtitle"
+                        android:layout_width="match_parent" android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp" android:text="@string/oobe_welcome_subtitle"
+                        android:textColor="#B3FFFFFF" android:textSize="@dimen/oobe_original_subtitle_size"
+                        android:gravity="center" android:includeFontPadding="false" />
+                </LinearLayout>
+                <FrameLayout
+                    android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:layout_alignParentBottom="true" android:layout_centerHorizontal="true"
+                    android:padding="@dimen/oobe_original_next_padding" android:clipChildren="false">
+                    <FrameLayout
+                        android:id="@+id/oobe_original_next"
+                        android:layout_width="@dimen/oobe_original_next_size" android:layout_height="@dimen/oobe_original_next_size"
+                        android:background="@drawable/oobe_original_welcome_button"
+                        android:clickable="false" android:focusable="false"
+                        android:contentDescription="@string/oobe_next" />
+                </FrameLayout>
+            </RelativeLayout>
+            <Space android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="20" />
+        </com.risediary.app.ui.onboarding.original.OriginalWelcomeColumn>
+</ScrollView>

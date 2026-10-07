@@ -1,0 +1,96 @@
+/*
+ * Copyright (C) 2026 sky-shunfengjun
+ *
+ * SPDX-License-Identifier: GPL-3.0-only
+ *
+ * Adapted from KernelSU Manager (https://github.com/tiann/KernelSU),
+ * GPL-3.0-only. Portions mirrored from the compose-miuix-ui example.
+ */
+package com.risediary.app.ui.components.effect
+
+import androidx.compose.animation.core.Animatable
+import android.os.Build
+import androidx.compose.animation.core.spring
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalConfiguration
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import com.risediary.app.ui.theme.LocalRiseDarkTheme
+import top.yukonga.miuix.kmp.shader.isRuntimeShaderSupported
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import kotlin.math.floor
+import kotlin.time.Duration.Companion.milliseconds
+
+@Composable
+fun BgEffectBackground(
+    dynamicBackground: Boolean,
+    modifier: Modifier = Modifier,
+    bgModifier: Modifier = Modifier,
+    isFullSize: Boolean = false,
+    effectBackground: Boolean = true,
+    isOs3Effect: Boolean = true,
+    alpha: () -> Float = { 1f },
+    content: @Composable BoxScope.() -> Unit,
+) {
+    if (Build.VERSION.SDK_INT < 33 || !isRuntimeShaderSupported()) {
+        Box(modifier = modifier, content = content)
+        return
+    }
+    Box(
+        modifier = modifier,
+    ) {
+        val surface = MiuixTheme.colorScheme.surface
+        val isTablet = LocalConfiguration.current.smallestScreenWidthDp >= 600
+        val deviceType = if (isTablet) DeviceType.PAD else DeviceType.PHONE
+        val isDarkTheme = LocalRiseDarkTheme.current
+        val painter = remember(isOs3Effect) { BgEffectPainter(isOs3Effect) }
+
+        val preset = remember(deviceType, isDarkTheme, isOs3Effect) {
+            BgEffectConfig.get(deviceType, isDarkTheme, isOs3Effect)
+        }
+
+        val colorStage = remember { Animatable(0f) }
+
+        LaunchedEffect(dynamicBackground, preset) {
+            if (!dynamicBackground) return@LaunchedEffect
+            val animatesColors = preset.colors1 !== preset.colors2 || preset.colors2 !== preset.colors3
+            if (!animatesColors) return@LaunchedEffect
+
+            var targetStage = floor(colorStage.value) + 1f
+            while (isActive) {
+                delay((preset.colorInterpPeriod * 500).toLong().milliseconds)
+                colorStage.animateTo(
+                    targetValue = targetStage,
+                    animationSpec = spring(dampingRatio = 0.9f, stiffness = 35f),
+                )
+                targetStage += 1f
+            }
+        }
+
+        Spacer(
+            modifier = Modifier
+                .fillMaxSize()
+                .then(bgModifier)
+                .bgEffectDraw(
+                    painter = painter,
+                    preset = preset,
+                    deviceType = deviceType,
+                    isDarkTheme = isDarkTheme,
+                    surface = surface,
+                    effectBackground = effectBackground,
+                    isFullSize = isFullSize,
+                    playing = dynamicBackground,
+                    colorStage = { colorStage.value },
+                    alpha = alpha,
+                ),
+        )
+        content()
+    }
+}

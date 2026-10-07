@@ -1,8 +1,8 @@
 package com.risediary.app.util
 
 object RecordValidation {
-    const val MAX_DURATION_SECONDS = 120 * 60
-    const val LEGACY_MAX_DURATION_SECONDS = 24 * 60 * 60
+    const val MAX_DURATION_SECONDS = DurationPolicy.MAX_SECONDS
+    const val LEGACY_MAX_DURATION_SECONDS = DurationPolicy.MAX_SECONDS
     const val MAX_DIRECT_SPURTS = 1_000
     const val MAX_DIRECT_VOLUME_ML = 1_000f
     const val MAX_STORED_SPURTS = 10_000
@@ -37,7 +37,7 @@ object RecordValidation {
     ): String? {
         val durationLimit = if (allowLegacyDuration) LEGACY_MAX_DURATION_SECONDS else MAX_DURATION_SECONDS
         if (durationSeconds !in 1..durationLimit) {
-            return "起飞用时需要在 1 秒到 120 分钟之间"
+            return "起飞用时需要在 1 秒到 24 小时之间"
         }
         validateStoredQuantity(spurtCount, volumeMl)?.let { return it }
         if (distanceWasEntered && (distanceCm == null || !distanceCm.isFinite() || distanceCm !in 0f..1_000f)) {

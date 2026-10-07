@@ -11,10 +11,35 @@ import org.junit.Test
 import java.io.IOException
 
 class FormRecordSaveWorkflowTest {
+    @Test fun editedRecordSurvivesFailedAchievementCheckWithoutDuplicateInsert() = runTest {
+        var stored = flight().copy(id = 7)
+        var inserts = 0
+        val workflow = FormRecordSaveWorkflow(insert = { inserts++; it.copy(id = 8) }, update = { stored = it }, readCurrent = { stored })
+        workflow.loadOriginal(stored)
+        val result = workflow.save(stored.copy(durationSeconds = 3600), afterSave = { throw IOException("check failed") })
+        assertEquals(1, result.followUpFailures.size)
+        assertEquals(3600, stored.durationSeconds)
+        workflow.save(stored, afterSave = { emptyList() })
+        assertEquals(0, inserts)
+        assertEquals(7L, workflow.persistedFlight!!.id)
+    }
+
+    @Test fun editingRunsAchievementsAfterSuccessfulWrite() = runTest {
+        var stored = flight().copy(id = 7)
+        val workflow = FormRecordSaveWorkflow(insert = { error("must update") },
+            update = { stored = it }, readCurrent = { stored })
+        workflow.loadOriginal(stored)
+        val result = workflow.save(stored.copy(durationSeconds = 3600), afterSave = {
+            assertEquals(3600, stored.durationSeconds)
+            listOf("duration_60")
+        })
+        assertEquals(listOf("duration_60"), result.achievementKeys)
+    }
+
     @Test
     fun maintenanceBusyAfterPrimaryCommitIsAWarningNotLostIdentity() = runTest {
-        val workflow = FormRecordSaveWorkflow(insert = { 7 }, update = {}, readCurrent = { null })
-        val result = workflow.save(flight(), afterInsert = { throw DataMaintenanceBusyException() })
+        val workflow = FormRecordSaveWorkflow(insert = { it.copy(id = 7) }, update = {}, readCurrent = { null })
+        val result = workflow.save(flight(), afterSave = { throw DataMaintenanceBusyException() })
         assertEquals(7L, result.flight.id)
         assertEquals(7L, workflow.persistedFlight!!.id)
         assertEquals(1, result.followUpFailures.size)
@@ -24,11 +49,11 @@ class FormRecordSaveWorkflowTest {
         val stored = linkedMapOf<Long, Flight>()
         var nextId = 1L
         val workflow = FormRecordSaveWorkflow(
-            insert = { flight -> val id = nextId++; stored[id] = flight.copy(id = id); id },
+            insert = { flight -> val id = nextId++; flight.copy(id = id).also { stored[id] = it } },
             update = { stored[it.id] = it },
             readCurrent = { stored[it] }
         )
-        val first = workflow.save(flight(), afterInsert = { throw IOException("achievement failed") })
+        val first = workflow.save(flight(), afterSave = { throw IOException("achievement failed") })
         assertEquals(1L, first.flight.id)
         assertEquals(1L, workflow.persistedFlight!!.id)
         assertEquals(1, first.followUpFailures.size)
@@ -45,7 +70,7 @@ class FormRecordSaveWorkflowTest {
             insert = { value ->
                 if (fail) throw IOException("primary write failed")
                 stored += value.copy(id = 1)
-                1
+                value.copy(id = 1)
             },
             update = { throw AssertionError("new record must insert") },
             readCurrent = { null }
@@ -64,9 +89,9 @@ class FormRecordSaveWorkflowTest {
 
     @Test
     fun cancelledPostSaveWorkDoesNotEraseCommittedIdentity() = runTest {
-        val workflow = FormRecordSaveWorkflow(insert = { 42 }, update = {}, readCurrent = { null })
+        val workflow = FormRecordSaveWorkflow(insert = { it.copy(id = 42) }, update = {}, readCurrent = { null })
         try {
-            workflow.save(flight(), afterInsert = { throw CancellationException("page disposed") })
+            workflow.save(flight(), afterSave = { throw CancellationException("page disposed") })
             throw AssertionError("Cancellation must propagate")
         } catch (_: CancellationException) {
             assertEquals(42L, workflow.persistedFlight!!.id)
@@ -76,10 +101,10 @@ class FormRecordSaveWorkflowTest {
     @Test
     fun reminderFailureStillRunsTimerCleanupAndPreservesAchievementResult() = runTest {
         var timerWasReset = false
-        val workflow = FormRecordSaveWorkflow(insert = { 1 }, update = {}, readCurrent = { null })
+        val workflow = FormRecordSaveWorkflow(insert = { it.copy(id = 1) }, update = {}, readCurrent = { null })
         val result = workflow.save(
             flight(),
-            afterInsert = { listOf("milestone_1") },
+            afterSave = { listOf("milestone_1") },
             followUps = listOf(
                 { throw IOException("reminder failed") },
                 { timerWasReset = true }
@@ -89,6 +114,30 @@ class FormRecordSaveWorkflowTest {
         assertEquals(1, result.followUpFailures.size)
         assertEquals(true, timerWasReset)
     }
+
+    @Test fun editingKeepsTheOriginalGlobalIdentityAndWearableOrigin() = runTest {
+        val original = flight().copy(id = 9L, recordSource = "wearable", sourceDeviceId = "band-app-1")
+        var current = original
+        val workflow = FormRecordSaveWorkflow(insert = { throw AssertionError("edit must not insert") },
+            update = { current = it }, readCurrent = { current })
+        workflow.loadOriginal(original)
+        val result = workflow.save(flight().copy(moodNote = "edited"))
+        assertEquals(original.globalId, result.flight.globalId)
+        assertEquals(original.recordSource, result.flight.recordSource)
+        assertEquals(original.sourceDeviceId, result.flight.sourceDeviceId)
+        assertEquals("edited", current.moodNote)
+    }
+
+    @Test fun retryAfterPostSaveFailureCannotReplaceTheCommittedIdentity() = runTest {
+        var current: Flight? = null
+        val workflow = FormRecordSaveWorkflow(insert = { it.copy(id = 4L).also { current = it } },
+            update = { current = it }, readCurrent = { current })
+        val first = workflow.save(flight(), afterSave = { throw IOException("follow-up failed") })
+        val retried = workflow.save(flight().copy(moodNote = "retry"))
+        assertEquals(first.flight.globalId, retried.flight.globalId)
+        assertEquals(first.flight.recordSource, retried.flight.recordSource)
+    }
+
 
     private fun flight() = Flight(
         startTime = 1_000, endTime = 61_000, durationSeconds = 60,

@@ -5,6 +5,11 @@ fun formatFormDuration(totalSeconds: Int): String {
     return "${safeSeconds / 60}分%02d秒".format(safeSeconds % 60)
 }
 
+fun formatRecordDuration(totalSeconds: Int): String {
+    val safeSeconds = totalSeconds.coerceAtLeast(0)
+    return "${safeSeconds / 60}分${safeSeconds % 60}秒"
+}
+
 fun formatNaturalDuration(totalSeconds: Int, includeSeconds: Boolean = true): String {
     val safeSeconds = totalSeconds.coerceAtLeast(0)
     val hours = safeSeconds / 3_600

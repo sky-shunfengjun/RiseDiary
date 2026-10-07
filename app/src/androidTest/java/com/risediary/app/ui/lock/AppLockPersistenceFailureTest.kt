@@ -1,5 +1,6 @@
 package com.risediary.app.ui.lock
 
+import com.risediary.app.testing.retainForTest
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
@@ -43,7 +44,7 @@ class AppLockPersistenceFailureTest {
         try {
             val vm = withContext(Dispatchers.Main) {
                 AppLockViewModel(preferences, security, BiometricAuthenticator(context), Clock.systemUTC(), context)
-                    .also { owner.put("lock", it); it.init(LockMode.CHANGE_OLD) }
+                    .also { owner.retainForTest("lock", it); it.init(LockMode.CHANGE_OLD) }
             }
             await { vm.ready.value }
             withContext(Dispatchers.Main) { listOf(1, 2, 3, 4).forEach(vm::onDigit) }
@@ -80,7 +81,7 @@ class AppLockPersistenceFailureTest {
         try {
             val vm = withContext(Dispatchers.Main) {
                 AppLockViewModel(preferences, security, BiometricAuthenticator(context), Clock.systemUTC(), context)
-                    .also { owner.put("lock", it); it.init(LockMode.VERIFY) }
+                    .also { owner.retainForTest("lock", it); it.init(LockMode.VERIFY) }
             }
             await { vm.ready.value }
             persistence.failWrites = true
@@ -114,7 +115,7 @@ class AppLockPersistenceFailureTest {
         try {
             val vm = withContext(Dispatchers.Main) {
                 AppLockViewModel(preferences, security, BiometricAuthenticator(context), Clock.systemUTC(), context)
-                    .also { owner.put("lock", it); it.init(LockMode.VERIFY) }
+                    .also { owner.retainForTest("lock", it); it.init(LockMode.VERIFY) }
             }
             await { vm.ready.value }
             persistence.failWrites = true

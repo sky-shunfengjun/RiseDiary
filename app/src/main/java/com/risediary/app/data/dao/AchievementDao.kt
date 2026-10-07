@@ -6,6 +6,12 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface AchievementDao {
+    @Query("SELECT length(achievementKey)*2+256 FROM achievements WHERE id > :after ORDER BY id LIMIT 500")
+    suspend fun backupSizes(after: Long): List<Long>
+
+    @Query("SELECT * FROM achievements WHERE id > :after ORDER BY id LIMIT :limit")
+    suspend fun backupBatch(after: Long, limit: Int = 500): List<Achievement>
+
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insert(achievement: Achievement): Long

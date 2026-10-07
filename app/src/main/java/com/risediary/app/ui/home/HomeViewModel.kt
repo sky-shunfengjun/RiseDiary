@@ -40,7 +40,10 @@ class HomeViewModel @Inject constructor(
     val username = preferences.username.stateIn(viewModelScope, sharing, "机长")
     val homeCardOrder = preferences.homeCardOrder.stateIn(viewModelScope, sharing, "[]")
     val homeCardVisibility = preferences.homeCardVisibility.stateIn(viewModelScope, sharing, "{}")
-    val recentAchievements: StateFlow<List<Achievement>> = achievementRepository.allAchievements
+    private val flightReads = com.risediary.app.ui.RetainedReadFlow(viewModelScope,flightRepository.allFlights,emptyList())
+    private val lengthReads = com.risediary.app.ui.RetainedReadFlow(viewModelScope,lengthRepository.allRecords,emptyList())
+    private val achievementReads = com.risediary.app.ui.RetainedReadFlow(viewModelScope,achievementRepository.allAchievements,emptyList())
+    val recentAchievements: StateFlow<List<Achievement>> = achievementReads.data
         .map { it.take(3) }.stateIn(viewModelScope, sharing, emptyList())
     private val _statistics = MutableStateFlow(HomeStatistics(calendar.current()))
     internal val statistics = _statistics.asStateFlow()
@@ -74,12 +77,17 @@ class HomeViewModel @Inject constructor(
         }
     )
     val isRefreshing = refreshCoordinator.isRefreshing
+    val readFailed = combine(flightReads.failed,lengthReads.failed,achievementReads.failed,refreshCoordinator.readFailed) {
+        flight, length, achievement, query -> flight || length || achievement || query
+    }.stateIn(viewModelScope,SharingStarted.Eagerly,false)
+    fun retryRead() { flightReads.retry(); lengthReads.retry(); achievementReads.retry(); refresh() }
+
 
     init {
         // Room emits after insert/update/delete/undo/restore/clear. No main-route
         // pop or pager tab switch is needed to invalidate the home statistics.
         viewModelScope.launch {
-            combine(flightRepository.allFlights, lengthRepository.allRecords, calendar.state) {
+            combine(flightReads.data, lengthReads.data, calendar.state) {
                     flights, lengths, date -> Triple(flights, lengths, date)
             }.distinctUntilChanged().collect { refresh(silent = hasLoaded) }
         }

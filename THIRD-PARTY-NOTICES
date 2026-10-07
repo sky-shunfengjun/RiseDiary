@@ -1,38 +1,56 @@
-# 第三方资源说明（THIRD-PARTY NOTICES）
+# 第三方资源说明（v2.0.0）
 
-本仓库（起飞日记 RiseDiary）的软件采用 GNU General Public License v3.0（GPL-3.0）发布，许可证全文见根目录 `LICENSE`。以下第三方资源与依赖按各自许可证使用。
+起飞日记原创代码按 [GPL-3.0-only](LICENSE) 发布。第三方代码保留各自许可证与版权；改编文件的具体来源以源码声明为准。
 
-## 代码改编
+HyperCeiler 改编代码保留 AGPL-3.0-only；GPL／AGPL 代码的组合按各自第 13 节处理。
 
-### AndroidLiquidGlass（含 backdrop、capsule）
+## 项目清单
 
-- 项目地址：https://github.com/Kyant0/AndroidLiquidGlass
-- 许可证：Apache License 2.0
-- 用途：
-  - 运行依赖 `io.github.kyant0:backdrop` 与 `io.github.kyant0:capsule`；
-  - 液态玻璃组件（开关、滑杆、底部导航栏）以及拖拽动画、手势检测、交互高光工具改编自该项目示例代码，并进行了本地化修改；对应源码文件头部使用 `SPDX-License-Identifier: GPL-3.0-only AND Apache-2.0` 双声明，改编部分在 GPL-3.0 项目中继续适用 Apache License 2.0。
-  - Apache License 2.0 完整正文见 `LICENSES/Apache-2.0.txt`（与上游许可证文本一致）。
+| 项目 | 许可证 |
+| --- | --- |
+| [miuix](https://github.com/compose-miuix-ui/miuix) | Apache-2.0 |
+| [AndroidLiquidGlass / Backdrop](https://github.com/Kyant0/AndroidLiquidGlass) | Apache-2.0 |
+| [Capsule](https://github.com/Kyant0/Capsule) | Apache-2.0 |
+| [HyperCeiler](https://github.com/ReChronoRain/HyperCeiler) | AGPL-3.0-only |
+| [KernelSU](https://github.com/tiann/KernelSU) | GPL-3.0-only（引用部分） |
+| [KernelSU-Style-UI-Kit](https://github.com/chenaizhang/KernelSU-Style-UI-Kit) | GPL-3.0-only |
+| [HyperIsland](https://github.com/1812z/HyperIsland) | MIT |
+| [Lucide](https://github.com/lucide-icons/lucide) | ISC；相关 Feather 图标为 MIT |
+| [Feather](https://github.com/feathericons/feather) | MIT |
+| [Simple Icons](https://github.com/simple-icons/simple-icons) | CC0-1.0 |
+| [Jetpack Compose / Material 3](https://developer.android.com/compose) | Apache-2.0 |
+| [AndroidX Media3](https://developer.android.com/media/media3) | Apache-2.0 |
+| [AndroidX Room](https://developer.android.com/jetpack/androidx/releases/room) | Apache-2.0 |
+| [AndroidX DataStore](https://developer.android.com/jetpack/androidx/releases/datastore) | Apache-2.0 |
+| [AndroidX Activity](https://developer.android.com/jetpack/androidx/releases/activity) | Apache-2.0 |
+| [AndroidX Lifecycle](https://developer.android.com/jetpack/androidx/releases/lifecycle) | Apache-2.0 |
+| [AndroidX Navigation](https://developer.android.com/jetpack/androidx/releases/navigation) | Apache-2.0 |
+| [AndroidX Navigation Event](https://developer.android.com/jetpack/androidx/releases/navigationevent) | Apache-2.0 |
+| [AndroidX WorkManager](https://developer.android.com/jetpack/androidx/releases/work) | Apache-2.0 |
+| [AndroidX Biometric](https://developer.android.com/jetpack/androidx/releases/biometric) | Apache-2.0 |
+| [Dagger / Hilt](https://dagger.dev/hilt/) | Apache-2.0 |
+| [AndroidX Hilt](https://developer.android.com/jetpack/androidx/releases/hilt) | Apache-2.0 |
+| [Kotlin](https://github.com/JetBrains/kotlin) | Apache-2.0 |
+| [kotlinx.coroutines](https://github.com/Kotlin/kotlinx.coroutines) | Apache-2.0 |
+| [kotlinx.serialization](https://github.com/Kotlin/kotlinx.serialization) | Apache-2.0 |
+| [Vico](https://github.com/patrykandpatrick/vico) | Apache-2.0 |
+| [Multiplatform Markdown Renderer](https://github.com/mikepenz/multiplatform-markdown-renderer) | Apache-2.0 |
+| [Gradle Wrapper](https://github.com/gradle/gradle) | Apache-2.0 |
+| [luleme](https://github.com/sky22333/luleme) | GPL-3.0（设计灵感，未复制代码） |
 
-## 设计灵感
+## 来源与版权
 
-### luleme
+- HyperCeiler：提交 5e4686069dd7ab1f3697e256d5fc7d68fb73e317；Copyright (C) 2023–2026 HyperCeiler Contributions。
+- miuix 示例：v0.9.4，提交 39c40f99844227b853f0049a0933b1f3ae6c00ba；Copyright 2026, compose-miuix-ui contributors。
+- Lucide：提交 1fae58d0a9c661a338036838caf3399b5507bab6；Lucide 与 Feather 的完整版权声明见下列许可文件。
+- 其余原始版权、来源及本地修改说明保留在相应源码中；再分发须保留适用声明。
 
-- 项目地址：https://github.com/sky22333/luleme
-- 许可证：GNU General Public License v3.0
-- 说明：本项目的功能构思曾参考该项目，但未复制其代码；在此致谢其设计启发。两个仓库现均使用 GPL-3.0。
+## 许可全文
 
-## 构建工具
+- [GNU GPL v3](LICENSE)
+- [GNU AGPL v3](LICENSES/AGPL-3.0.txt)
+- [Apache License 2.0](LICENSES/Apache-2.0.txt)
+- [HyperIsland MIT](LICENSES/HyperIsland-MIT.txt)
+- [Lucide ISC / Feather MIT](LICENSES/Lucide-LICENSE.txt)
 
-- Gradle Wrapper（`gradlew` / `gradlew.bat`）：Apache License 2.0，保留原始文件头。
-
-## 运行依赖
-
-以下组件以 Apache License 2.0 发布，作为 GPL-3.0 项目的常规依赖使用（许可证彼此兼容）：
-
-- Jetpack Compose / Material 3 / Material Icons（AndroidX）
-- Room、DataStore、Navigation、Lifecycle、Activity、WorkManager、Biometric（AndroidX）
-- Hilt / Dagger（Google）
-- kotlinx.coroutines（JetBrains）
-- Vico（com.patrykandpatrick.vico，图表）
-
-如本说明遗漏了其他来源资源，请通过仓库 Issues 告知维护者补充。
+其他直接或间接依赖的许可见各项目原始声明及随组件提供的许可文件。Simple Icons 涉及的品牌标识仍遵守相应商标规范。

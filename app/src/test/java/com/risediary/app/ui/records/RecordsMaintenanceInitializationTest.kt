@@ -34,7 +34,7 @@ class RecordsMaintenanceInitializationTest {
         try {
             runCurrent()
             assertEquals(DataMaintenanceGate.State.WORKING, gate.state.value)
-            owner = records(gate)
+            owner = records(gate, backgroundScope)
             assertEquals(emptyList<Any>(), owner.pendingDeletions.value)
             assertEquals(emptyList<Any>(), owner.filter(emptyList()))
         } finally {
@@ -50,7 +50,7 @@ class RecordsMaintenanceInitializationTest {
         val gate = DataMaintenanceGate().apply { requireRecovery() }
         var owner: RecordsViewModel? = null
         try {
-            owner = records(gate)
+            owner = records(gate, backgroundScope)
             assertEquals(DataMaintenanceGate.State.RECOVERY_REQUIRED, gate.state.value)
             assertEquals(emptyList<Any>(), owner.pendingDeletions.value)
             assertEquals(emptyList<Any>(), owner.filter(emptyList()))
@@ -60,12 +60,24 @@ class RecordsMaintenanceInitializationTest {
         }
     }
 
-    private fun records(gate: DataMaintenanceGate): RecordsViewModel = RecordsViewModel(
+    private fun records(gate: DataMaintenanceGate, scope: kotlinx.coroutines.CoroutineScope): RecordsViewModel = RecordsViewModel(
         repository(FlightRepository::class.java, "getAllFlights"),
         repository(TagRepository::class.java, "getAllTags"),
         LocalCalendarContext(Clock.systemUTC()),
         unusedScheduler(),
-        gate
+        gate,
+        com.risediary.app.media.VideoGrantRegistry(
+            { emptySet() },
+            object : com.risediary.app.media.VideoFileAccess {
+                override suspend fun acquire(uriString: String, flags: Int) =
+                    Result.failure<com.risediary.app.media.LocalVideoRef>(AssertionError("No video selection expected"))
+                override suspend fun check(video: com.risediary.app.media.LocalVideoRef) =
+                    com.risediary.app.media.VideoAccessState.INVALID
+                override suspend fun releaseUnused(referencedUris: Set<String>) = Unit
+            },
+            gate,
+            scope
+        )
     )
 
     private fun <T : Any> repository(type: Class<T>, flowGetter: String): T = requireNotNull(type.cast(

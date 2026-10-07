@@ -93,6 +93,11 @@ object AppIcons {
     val Timer: ImageVector get() = LucideIcons.Timer
     val TrackChanges: ImageVector get() = LucideIcons.Ruler
     val VolumeUp: ImageVector get() = LucideIcons.Volume2
+    val Video: ImageVector get() = LucideIcons.Video
+    val Fullscreen: ImageVector get() = LucideIcons.Maximize
+    val ExitFullscreen: ImageVector get() = LucideIcons.Minimize
+    val FastRewind: ImageVector get() = LucideIcons.Rewind
+    val FastForward: ImageVector get() = LucideIcons.FastForward
 
     // ── 强调态实心（被液体玻璃覆盖时为实心） ──
     val FlightTakeoff: ImageVector get() = LucideIcons.PlaneTakeoff

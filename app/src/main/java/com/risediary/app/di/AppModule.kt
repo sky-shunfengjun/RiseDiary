@@ -29,9 +29,25 @@ object AppModule {
         )
             .addMigrations(
                 AppDatabase.MIGRATION_1_2,
-                AppDatabase.MIGRATION_2_3
+                AppDatabase.MIGRATION_2_3,
+                AppDatabase.MIGRATION_3_4,
+                AppDatabase.MIGRATION_4_5,
+                AppDatabase.MIGRATION_5_6,
+                AppDatabase.MIGRATION_6_7, AppDatabase.MIGRATION_7_8
             )
+            .addCallback(com.risediary.app.data.UnsubmittedFormCleanup)
             .build()
+
+    @Provides
+    fun provideReadiness(database: AppDatabase): com.risediary.app.data.DatabaseReadiness =
+        com.risediary.app.data.DatabaseReadiness {
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                // Forces migration + schema validation and checks every user table before MAIN.
+                database.openHelper.writableDatabase.query(
+                    "SELECT (SELECT COUNT(*) FROM flights), (SELECT COUNT(*) FROM length_records), (SELECT COUNT(*) FROM tags), (SELECT COUNT(*) FROM achievements)"
+                ).use { check(it.moveToFirst()) { "数据库无法读取" } }
+            }
+        }
 
     @Provides
     fun provideFlightDao(database: AppDatabase): FlightDao = database.flightDao()

@@ -76,8 +76,52 @@ class TimerMathTest {
         assertEquals(2_000L, TimerMath.elapsed(session, 1_000L, 105_000L, 1))
     }
 
+    @Test fun twoHoursContinuesRunningWithoutALimitNotification() {
+        val session = TimerSession(TimerStatus.RUNNING, elapsedMillis = 7_200_000L,
+            resumedAtElapsedRealtime = 10_000L, bootCount = 1)
+        assertEquals(7_201_000L, TimerMath.elapsed(session, 11_000L, 1_000_000L, 1))
+        assertEquals(null, TimerMilestones.latestUnnotified(7_200_000L, 7))
+    }
+
+    @Test fun elapsedClampsAtTwentyFourHoursAfterALateTick() {
+        val session = TimerSession(TimerStatus.RUNNING, elapsedMillis = 86_399_000L,
+            resumedAtElapsedRealtime = 10_000L, bootCount = 1)
+        assertEquals(86_400_000L, TimerMath.elapsed(session, 15_000L, 1_000_000L, 1))
+    }
+
+    @Test fun delayedRestoreClampsAtTwentyFourHoursAndPreparesATerminalTransition() {
+        val session = TimerSession(TimerStatus.RUNNING, elapsedMillis = 86_399_000L,
+            resumedAtElapsedRealtime = 10_000L, bootCount = 1, notifiedMilestonesMask = 7)
+        val restored = TimerMath.restore(session, 40_000_000L, 999_000_000L, 1)
+        assertEquals(86_400_000L, restored.elapsedMillis)
+        assertEquals(0L, restored.resumedAtElapsedRealtime)
+        assertEquals(0L, restored.resumedAtWallClock)
+        val transition = prepareTimerTransition(restored)
+        assertEquals(TimerStatus.LIMIT_REACHED, transition.session.status)
+        assertEquals(TimerMilestone.LIMIT, transition.milestone)
+        assertEquals(15, transition.session.notifiedMilestonesMask)
+    }
+
+    @Test fun delayedRestoreKeepsActualLimitTimeInsteadOfRestoreTime() {
+        val session = TimerSession(TimerStatus.RUNNING, elapsedMillis = 86_399_000L,
+            resumedAtElapsedRealtime = 10_000L, bootCount = 1)
+        val restored = TimerMath.restore(session, 40_000_000L, 999_000_000L, 1)
+        assertEquals(959_011_000L, restored.endedAtEpochMillis)
+    }
+
+    @Test fun twentyFourHourReminderIsOnlyEligibleAtTheNewLimit() {
+        assertEquals(null, TimerMilestones.latestUnnotified(86_399_999L, 7))
+        assertEquals(TimerMilestone.LIMIT, TimerMilestones.latestUnnotified(86_400_000L, 7))
+        assertEquals(null, TimerMilestones.latestUnnotified(86_400_000L, 15))
+    }
+
+    @Test fun pausedLongSessionDoesNotAccumulateMoreTime() {
+        val session = TimerSession(TimerStatus.PAUSED, elapsedMillis = 43_200_000L, bootCount = 1)
+        assertEquals(43_200_000L, TimerMath.elapsed(session, 99_999_999L, 99_999_999L, 1))
+    }
+
     @Test
-    fun elapsedTimeIsCappedAtOneHundredTwentyMinutes() {
+    fun elapsedTimeIsCappedAtTwentyFourHours() {
         val session = TimerSession(
             status = TimerStatus.RUNNING,
             elapsedMillis = TimerMath.MAX_DURATION_MILLIS - 1_000L,

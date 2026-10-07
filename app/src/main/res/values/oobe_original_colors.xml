@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Copyright (C) 2023-2026 HyperCeiler Contributions
+  Copyright (C) 2026 sky-shunfengjun
+  SPDX-License-Identifier: AGPL-3.0-only
+  Adapted from fixed HyperCeiler 5e4686069dd7ab1f3697e256d5fc7d68fb73e317.
+  See LICENSES/AGPL-3.0.txt and THIRD-PARTY-NOTICES.
+-->
+<resources>
+    <!-- The upstream primary button is a fan widget; this public selector matches its blue treatment. -->
+    <color name="oobe_original_accent">#3482FF</color>
+    <color name="oobe_original_accent_pressed">#2673EE</color>
+    <color name="oobe_original_accent_disabled">#D9E6FA</color>
+</resources>

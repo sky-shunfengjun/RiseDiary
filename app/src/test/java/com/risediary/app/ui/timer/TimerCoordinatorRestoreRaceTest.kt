@@ -26,7 +26,7 @@ import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.Assert.assertEquals
 import org.junit.Test
-import sun.misc.Unsafe
+import androidx.datastore.preferences.core.intPreferencesKey
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class TimerCoordinatorRestoreRaceTest {
@@ -91,8 +91,10 @@ class TimerCoordinatorRestoreRaceTest {
         val holder = TimerStateHolder()
         val controller = TestController(holder.state)
         val disk = DeferredStore()
-        // Test the real load(), without initializing the unused Context-based file factory.
-        val store = allocateStore(disk)
+        // Exercise real load() using an isolated preferences store.
+        val store = TimerSessionStore(disk, BootIdentityProvider { 1 },
+            object : ElapsedRealtimeClock { override fun millis() = 0L },
+            Clock.fixed(Instant.EPOCH, ZoneOffset.UTC))
     }
 
     private class DeferredStore : DataStore<Preferences> {
@@ -101,6 +103,8 @@ class TimerCoordinatorRestoreRaceTest {
             error("Startup restore must only load")
         suspend fun completeLoad() {
             data.emit(preferencesOf(
+                intPreferencesKey("duration_policy_version") to 2,
+                stringPreferencesKey("session_id") to "restored",
                 stringPreferencesKey("status") to TimerStatus.PAUSED.name,
                 longPreferencesKey("elapsed_millis") to 30_000L
             ))
@@ -110,25 +114,15 @@ class TimerCoordinatorRestoreRaceTest {
     private class TestController(override val state: StateFlow<TimerSession>) : TimerController {
         var restores = 0
         override fun restore() { restores++ }
-        override fun start() = Unit
-        override fun pause() = Unit
-        override fun resume() = Unit
-        override fun finish() = Unit
-        override fun reset() = Unit
+        override fun start(request: com.risediary.app.service.TimerStartRequest) = Unit
+        override fun pause(sessionId: String) = Unit
+        override fun resume(sessionId: String) = Unit
+        override fun requestFinish(sessionId: String, wallClockNow: Long, elapsedRealtimeNow: Long, candidate: com.risediary.app.service.TimerFinishCandidate?) = Unit
+        override fun confirmFinish(sessionId: String) = Unit
+        override fun cancelFinish(sessionId: String) = Unit
+        override fun updatePlayback(sessionId: String, snapshot: com.risediary.app.media.VideoPlaybackSnapshot, immediate: Boolean) = Unit
+        override fun discard(sessionId: String) = Unit
+        override fun reset(sessionId: String) = Unit
     }
 
-    private companion object {
-        fun allocateStore(data: DataStore<Preferences>): TimerSessionStore {
-            val field = Unsafe::class.java.getDeclaredField("theUnsafe").apply { isAccessible = true }
-            val unsafe = field.get(null) as Unsafe
-            val store = unsafe.allocateInstance(TimerSessionStore::class.java) as TimerSessionStore
-            fun set(name: String, value: Any) = TimerSessionStore::class.java.getDeclaredField(name)
-                .apply { isAccessible = true }.set(store, value)
-            set("timerDataStore", data)
-            set("bootIdentity", BootIdentityProvider { 1 })
-            set("elapsedClock", object : ElapsedRealtimeClock { override fun millis() = 0L })
-            set("wallClock", Clock.fixed(Instant.EPOCH, ZoneOffset.UTC))
-            return store
-        }
-    }
 }

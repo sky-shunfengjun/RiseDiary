@@ -105,10 +105,12 @@ private fun LiquidSnackbar(
         LiquidSnackbarTone.SUCCESS -> StatusSuccess
         LiquidSnackbarTone.ERROR -> MiuixTheme.colorScheme.error
     }
+    val message = visuals?.message ?: data.visuals.message
     val surfaceAlpha = if (LocalRiseDarkTheme.current) 0.16f else 0.09f
 
     Row(
         modifier = Modifier
+            .copyErrorOnLongPress(message, tone == LiquidSnackbarTone.ERROR)
             .fillMaxWidth()
             .widthIn(max = 420.dp)
             .heightIn(min = 56.dp)
@@ -129,7 +131,7 @@ private fun LiquidSnackbar(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            text = visuals?.message ?: data.visuals.message,
+            text = message,
             modifier = Modifier.weight(1f),
             color = MiuixTheme.colorScheme.onSurface,
             fontSize = MiuixTheme.textStyles.body1.fontSize,

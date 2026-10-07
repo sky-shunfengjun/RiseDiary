@@ -39,7 +39,9 @@ import com.risediary.app.R
 import com.risediary.app.ui.navigation3.LocalNavigator
 import com.risediary.app.ui.navigation3.Route
 import com.risediary.app.data.entity.LengthRecord
+import com.risediary.app.data.DataMaintenanceGate
 import com.risediary.app.ui.components.LiquidAddButton
+import com.risediary.app.ui.components.InlineStatusContent
 import com.risediary.app.ui.components.LiquidAlertDialog
 import com.risediary.app.ui.components.liquidDialogCancelButtonColors
 import com.risediary.app.ui.components.liquidDialogConfirmButtonColors
@@ -70,7 +72,12 @@ fun LengthHistoryScreen(
 ) {
     val navigator = LocalNavigator.current
     val records by viewModel.periodRecords.collectAsStateWithLifecycle()
-    val error by viewModel.error.collectAsStateWithLifecycle()
+    val error by viewModel.pageError.collectAsStateWithLifecycle()
+    val saveError by viewModel.saveError.collectAsStateWithLifecycle()
+    val busy by viewModel.busy.collectAsStateWithLifecycle()
+    val loading by viewModel.loading.collectAsStateWithLifecycle()
+    val maintenance by viewModel.maintenanceState.collectAsStateWithLifecycle()
+    val writeEnabled = !busy && maintenance == DataMaintenanceGate.State.IDLE
     var editorRecord by remember { mutableStateOf<LengthRecord?>(null) }
     var showEditor by remember { mutableStateOf(false) }
     var deleteTarget by remember { mutableStateOf<LengthRecord?>(null) }
@@ -84,8 +91,11 @@ fun LengthHistoryScreen(
         floatingActionButton = { backdrop ->
             LiquidAddButton(
                 onClick = {
-                    editorRecord = null
-                    showEditor = true
+                    if (!viewModel.busy.value && viewModel.maintenanceState.value == DataMaintenanceGate.State.IDLE) {
+                        viewModel.clearError()
+                        editorRecord = null
+                        showEditor = true
+                    }
                 },
                 backdrop = backdrop,
                 contentDescription = stringResource(R.string.length_add_record)
@@ -105,7 +115,12 @@ fun LengthHistoryScreen(
             ),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            if (records.isEmpty()) {
+            error?.let { message ->
+                item {
+                    InlineStatusContent(listOf(message), onRetry = viewModel::retry, enabled = !busy && !loading)
+                }
+            }
+            if (records.isEmpty() && error == null) {
                 item {
                     Box(
                         modifier = Modifier
@@ -124,12 +139,13 @@ fun LengthHistoryScreen(
                                     editorRecord = null
                                     showEditor = true
                                 },
-                                colors = liquidDialogConfirmButtonColors()
+                                colors = liquidDialogConfirmButtonColors(),
+                                enabled = writeEnabled
                             )
                         }
                     }
                 }
-            } else {
+            } else if (records.isNotEmpty()) {
                 item {
                     RiseCard(modifier = Modifier.fillMaxWidth()) {
                         Column(
@@ -165,7 +181,8 @@ fun LengthHistoryScreen(
                             editorRecord = record
                             showEditor = true
                         },
-                        onDelete = { deleteTarget = record }
+                        onDelete = { deleteTarget = record },
+                        enabled = writeEnabled
                     )
                 }
             }
@@ -175,10 +192,14 @@ fun LengthHistoryScreen(
     if (showEditor) {
         LengthRecordDialog(
             record = editorRecord,
-            error = error,
+            error = saveError,
+            busy = busy,
+            canSave = writeEnabled,
             onDismiss = {
-                showEditor = false
-                viewModel.clearError()
+                if (!viewModel.busy.value) {
+                    showEditor = false
+                    viewModel.clearError()
+                }
             },
             onSave = {
                 viewModel.save(it, original = editorRecord) { showEditor = false }
@@ -194,6 +215,7 @@ fun LengthHistoryScreen(
             confirmButton = {
                 TextButton(
                     text = stringResource(R.string.action_delete),
+                    enabled = writeEnabled,
                     onClick = {
                         viewModel.delete(target)
                         deleteTarget = null
@@ -245,6 +267,8 @@ private fun ChartLegend() {
 private fun LengthRecordDialog(
     record: LengthRecord?,
     error: String?,
+    busy: Boolean,
+    canSave: Boolean,
     onDismiss: () -> Unit,
     onSave: (LengthRecord) -> Unit
 ) {
@@ -274,20 +298,23 @@ private fun LengthRecordDialog(
                     onValueChange = { if (it.isValidDecimal()) flaccid = it.take(6) },
                     label = stringResource(R.string.length_flaccid_label),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true
+                    singleLine = true,
+                    enabled = canSave
                 )
                 TextField(
                     value = erect,
                     onValueChange = { if (it.isValidDecimal()) erect = it.take(6) },
                     label = stringResource(R.string.length_erect_label),
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                    singleLine = true
+                    singleLine = true,
+                    enabled = canSave
                 )
                 TextField(
                     value = note,
                     onValueChange = { note = it.take(200) },
                     label = stringResource(R.string.length_note_label),
-                    maxLines = 3
+                    maxLines = 3,
+                    enabled = canSave
                 )
                 if (error != null) Text(error, color = MiuixTheme.colorScheme.error)
             }
@@ -295,6 +322,7 @@ private fun LengthRecordDialog(
         confirmButton = {
             TextButton(
                 text = stringResource(R.string.action_save),
+                enabled = canSave,
                 onClick = {
                     val todayStart = LocalDate.now()
                         .atStartOfDay(ZoneId.systemDefault())
@@ -316,6 +344,7 @@ private fun LengthRecordDialog(
         dismissButton = {
             TextButton(
                 text = stringResource(R.string.action_cancel),
+                enabled = !busy,
                 onClick = onDismiss,
                 colors = liquidDialogCancelButtonColors()
             )
@@ -327,7 +356,8 @@ private fun LengthRecordDialog(
 private fun LengthRecordCard(
     record: LengthRecord,
     onEdit: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    enabled: Boolean
 ) {
     val locale = LocalConfiguration.current.locales[0]
     val calendar = LocalCalendarEnvironment.current
@@ -336,7 +366,8 @@ private fun LengthRecordCard(
     }
     RiseCard(
         modifier = Modifier.fillMaxWidth(),
-        onClick = onEdit
+        onClick = onEdit,
+        enabled = enabled
     ) {
         Row(
             modifier = Modifier.fillMaxWidth().padding(16.dp),
@@ -353,10 +384,10 @@ private fun LengthRecordCard(
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                 )
             }
-            IconButton(onClick = onEdit) {
+            IconButton(onClick = onEdit, enabled = enabled) {
                 Icon(AppIcons.Edit, contentDescription = stringResource(R.string.action_edit))
             }
-            IconButton(onClick = onDelete) {
+            IconButton(onClick = onDelete, enabled = enabled) {
                 Icon(
                     AppIcons.Delete,
                     contentDescription = stringResource(R.string.action_delete),

@@ -22,10 +22,14 @@ sealed interface Route : NavKey {
     data object Timer : Route
 
     @Serializable
+    data class VideoTimer(val sessionId: String) : Route
+
+    @Serializable
     data class RecordForm(
         val isTimer: Boolean,
         val duration: Long,
         val startTime: Long,
+        val formSessionId: String? = null,
     ) : Route
 
     @Serializable
@@ -33,6 +37,18 @@ sealed interface Route : NavKey {
 
     @Serializable
     data class RecordEdit(val flightId: Long) : Route
+
+    @Serializable
+    data class RecordVideo(
+        val flightId: Long,
+        val openingId: String = java.util.UUID.randomUUID().toString()
+    ) : Route
+
+    @Serializable
+    data class VideoPreview(
+        val video: com.risediary.app.media.LocalVideoRef,
+        val openingId: String = java.util.UUID.randomUUID().toString()
+    ) : Route
 
     @Serializable
     data object TagManager : Route
@@ -72,4 +88,7 @@ sealed interface Route : NavKey {
 
     @Serializable
     data object OnboardingReview : Route
+
+    @Serializable
+    data object UpdateIntroReview : Route
 }

@@ -1,18 +1,24 @@
 package com.risediary.app.ui.form
 
 import android.content.Context
+import android.net.Uri
+import com.risediary.app.media.LocalVideoRef
+import com.risediary.app.media.VideoGrantRegistry
+import com.risediary.app.media.localVideoRef
+import com.risediary.app.media.validateLocalVideoFields
+import java.util.UUID
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.risediary.app.R
-import com.risediary.app.data.DefaultVolumeMode
 import com.risediary.app.data.QuantitySettingsSnapshot
 import com.risediary.app.data.UserPreferences
 import com.risediary.app.data.entity.Flight
 import com.risediary.app.data.entity.RecordVolumeMode
 import com.risediary.app.data.entity.Tag
+import com.risediary.app.data.RecordTimestamps
 import com.risediary.app.data.DataMaintenanceBusyException
 import com.risediary.app.data.repository.AchievementDetector
 import com.risediary.app.data.repository.FlightRepository
@@ -43,11 +49,16 @@ class FormViewModel @Inject constructor(
     private val clock: Clock,
     private val reminderScheduler: ReminderScheduler,
     private val timerController: TimerController,
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val videoGrants: VideoGrantRegistry,
+    private val forms: RecordFormSessionStore
 ) : ViewModel() {
-    val tags: StateFlow<List<Tag>> = tagRepository.allTags.stateIn(
-        viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList()
-    )
+    private val newRecordGlobalId = com.risediary.app.data.sync.RecordIdentity.newId()
+
+    private val tagReads = com.risediary.app.ui.RetainedReadFlow(viewModelScope, tagRepository.allTags, emptyList())
+    val tags = tagReads.data
+    val tagReadFailed = tagReads.failed
+    fun retryTags() = tagReads.retry()
 
     var startTime by mutableStateOf(clock.millis())
         private set
@@ -55,15 +66,19 @@ class FormViewModel @Inject constructor(
         private set
     var durationSeconds by mutableStateOf(0)
         private set
-    var useSpurtMode by mutableStateOf(false)
+    var useEstimatedMode by mutableStateOf(true)
         private set
-    var spurtCount by mutableStateOf("")
+    var estimatedTicks by mutableStateOf(0)
+        private set
+    var predictionMaxTicks by mutableStateOf(80)
+        private set
+    var isLegacyQuantityReadOnly by mutableStateOf(false)
+        private set
+    var legacyQuantityText by mutableStateOf("")
         private set
     var volumeMl by mutableStateOf("")
         private set
     var distanceCm by mutableStateOf("")
-        private set
-    var quickSpurtSelection by mutableStateOf<Int?>(null)
         private set
     var quickVolumeSelection by mutableStateOf<Int?>(null)
         private set
@@ -72,6 +87,7 @@ class FormViewModel @Inject constructor(
     var selectedTags by mutableStateOf<List<String>>(emptyList())
         private set
     var moodNote by mutableStateOf("")
+        private set
 
     var isTimerMode by mutableStateOf(false)
         private set
@@ -98,14 +114,155 @@ class FormViewModel @Inject constructor(
     var quantitySettingsReady by mutableStateOf(false)
         private set
 
+    var video by mutableStateOf<LocalVideoRef?>(null)
+        private set
+    var isSelectingVideo by mutableStateOf(false)
+        private set
+    var videoError by mutableStateOf<String?>(null)
+        private set
+    private val videoOwner = "form:" + UUID.randomUUID()
+
+    fun selectVideo(uri: Uri, flags: Int) {
+        if (isSelectingVideo || isSaving || isLoading || saved) return
+        isSelectingVideo = true
+        videoError = null
+        viewModelScope.launch {
+            try {
+                val current = listOfNotNull(originalFlight?.videoUri, video?.uriString).toSet()
+                video = videoGrants.acquire(videoOwner, uri.toString(), flags, current).getOrThrow()
+                updateVideoPin()
+                updateSession()
+                videoGrants.requestCleanup()
+            } catch (_: DataMaintenanceBusyException) {
+                videoError = "数据处理中，请稍后再选择视频"
+            } catch (error: CancellationException) {
+                throw error
+            } catch (_: Exception) {
+                videoError = "无法读取这个视频，请重新选择"
+            } finally { isSelectingVideo = false }
+        }
+    }
+
+    fun removeVideo() {
+        if (isSelectingVideo || isSaving || isLoading || saved) return
+        video = null
+        videoError = null
+        // Update memory before grant-mutex suspension, including an immediate Back or Save.
+        updateSession()
+        viewModelScope.launch {
+            updateVideoPin()
+            videoGrants.requestCleanup()
+        }
+    }
+
+    private suspend fun updateVideoPin() {
+        videoGrants.retain(videoOwner, listOfNotNull(originalFlight?.videoUri, video?.uriString).toSet())
+    }
+
+    override fun onCleared() {
+        formSnapshot?.let { forms.discard(it.formId) }
+        videoGrants.forget(videoOwner)
+    }
+
+    var formReady by mutableStateOf(false)
+        private set
+    var sessionExpired by mutableStateOf(false)
+        private set
+    var showDiscard by mutableStateOf(false)
+        private set
+    private var formSnapshot: RecordFormSessionSnapshot? = null
+    private var editBaseline: RecordFormSessionSnapshot? = null
+    private var timingSource = "manual"
+
+    private fun captureForm(seed: RecordFormSessionSnapshot? = formSnapshot) =
+        seed?.copy(startTime = startTime, endTime = endTime,
+            durationSeconds = durationSeconds, timingSource = timingSource, timeWasEdited = durationWasEdited,
+            quantity = quantityDraft.snapshot(), video = video, distanceText = distanceCm,
+            methodTags = selectedTags, moodNote = moodNote)
+
+    private fun updateSession() {
+        if (!formReady || saved || isLoading || isSaving || editingFlightId != null) return
+        captureForm()?.let { forms.update(it); formSnapshot = it }
+    }
+
+    private fun attachSession(snapshot: RecordFormSessionSnapshot) {
+        formSnapshot = snapshot
+        startTime = snapshot.startTime
+        endTime = snapshot.endTime
+        durationSeconds = snapshot.durationSeconds
+        durationWasEdited = snapshot.timeWasEdited
+        timingSource = snapshot.timingSource
+        isTimerMode = snapshot.sessionId != null
+        timerDuration = snapshot.durationSeconds * 1_000L
+        quantityDraft = RecordFormQuantityDraft.restore(snapshot.quantity)
+        quantityRangeInitialized = true
+        video = snapshot.video
+        distanceCm = snapshot.distanceText
+        selectedTags = snapshot.methodTags
+        moodNote = snapshot.moodNote
+        syncQuantityDisplay()
+        formReady = true
+        viewModelScope.launch { updateVideoPin() }
+    }
+
+    fun initSession(formId: String?) {
+        if (initialized) return
+        initialized = true
+        val snapshot = formId?.let(forms::get)
+        if (snapshot == null) sessionExpired = true else attachSession(snapshot)
+    }
+
+    // Direct callers can seed a form; navigation passes an already-created memory session.
+    private fun createInitialSession() {
+        isLoading = true
+        viewModelScope.launch {
+            try {
+                val settings = preferences.quantitySettings.first()
+                requireValidSettings(settings)
+                val seed = if (isTimerMode) forms.createFromTimer(com.risediary.app.service.TimerSession(
+                    status = com.risediary.app.service.TimerStatus.FINISHED,
+                    sessionId = UUID.randomUUID().toString(), startedAtEpochMillis = startTime,
+                    endedAtEpochMillis = endTime, elapsedMillis = timerDuration
+                ), settings.predictionMaxTicks) else forms.createManual(startTime, settings.predictionMaxTicks)
+                attachSession(seed)
+            } catch (cancelled: CancellationException) { throw cancelled }
+            catch (_: Exception) { errorMessage = "无法打开填写页面，请返回后重试" }
+            finally { isLoading = false }
+        }
+    }
+
+    val hasUnsavedContent: Boolean
+        get() = if (saved) false else if (editingFlightId != null) {
+            editBaseline?.let { baseline ->
+                val current = captureForm(baseline)
+                current?.copy(quantity = current.quantity.copy(predictionMaxTicks = baseline.quantity.predictionMaxTicks)) != baseline
+            } ?: false
+        } else formSnapshot?.let { forms.hasUnsavedContent(it.formId) } ?: false
+
+    private var leaving = false
+    fun leave(onReady: () -> Unit) {
+        if (isSaving || isLoading || isSelectingVideo || leaving) return
+        if (hasUnsavedContent) showDiscard = true else discardAndLeave(onReady)
+    }
+
+    fun cancelDiscard() { showDiscard = false }
+
+    fun discardAndLeave(onReady: () -> Unit) {
+        if (isSaving || isLoading || isSelectingVideo || leaving) return
+        leaving = true
+        showDiscard = false
+        formSnapshot?.let { forms.discard(it.formId) }
+        videoGrants.forget(videoOwner)
+        onReady()
+    }
     private var initialized = false
     private var durationWasEdited = false
-    private var volumeModeTouched = false
+    private var quantityRangeInitialized = false
     private var quantitySettings: QuantitySettingsSnapshot? = null
     private var quantitySettingsJob: Job? = null
     private var quantityDraft = RecordFormQuantityDraft()
     private val recordSaver = FormRecordSaveWorkflow(
-        flightRepository::insert, flightRepository::update, flightRepository::getById
+        flightRepository::insertOnce, flightRepository::update, flightRepository::getById
     )
     private val originalFlight: Flight?
         get() = recordSaver.persistedFlight
@@ -131,8 +288,11 @@ class FormViewModel @Inject constructor(
                     quantitySettingsReady = true
                     isQuantitySettingsLoading = false
                     quantitySettingsError = null
-                    if (!volumeModeTouched && originalFlight == null && spurtCount.isEmpty() && volumeMl.isEmpty()) {
-                        useSpurtMode = snapshot.defaultVolumeMode == DefaultVolumeMode.SPURTS
+                    if (!quantityRangeInitialized) {
+                        quantityDraft = if (originalFlight == null) RecordFormQuantityDraft.restore(
+                            quantityDraft.snapshot().copy(predictionMaxTicks = snapshot.predictionMaxTicks)
+                        ) else RecordFormQuantityDraft(originalFlight, snapshot.predictionMaxTicks)
+                        quantityRangeInitialized = true
                     }
                     syncQuantityDisplay()
                 }
@@ -142,7 +302,7 @@ class FormViewModel @Inject constructor(
                 quantitySettings = null
                 quantitySettingsReady = false
                 isQuantitySettingsLoading = false
-                quantitySettingsError = "无法读取射精量设置，请重试；当前草稿已保留"
+                quantitySettingsError = "无法读取射精量设置，请重试；当前输入已保留"
             }
         }
     }
@@ -155,6 +315,7 @@ class FormViewModel @Inject constructor(
         durationSeconds = (timerDuration / 1_000L).toInt()
         startTime = timerStartTimeMillis.takeIf { it > 0L } ?: (clock.millis() - timerDuration)
         endTime = startTime + timerDuration
+        createInitialSession()
     }
 
     fun initDirect() {
@@ -164,6 +325,7 @@ class FormViewModel @Inject constructor(
         startTime = clock.millis()
         durationSeconds = 60
         endTime = startTime + durationSeconds * 1_000L
+        createInitialSession()
     }
 
     fun initForEdit(flightId: Long) {
@@ -177,17 +339,26 @@ class FormViewModel @Inject constructor(
                     errorMessage = context.getString(R.string.form_error_record_missing)
                 } else {
                     recordSaver.loadOriginal(flight)
-                    quantityDraft = RecordFormQuantityDraft(flight)
+                    video = flight.localVideoRef()
+                    updateVideoPin()
+                    quantityDraft = RecordFormQuantityDraft(flight, quantitySettings?.predictionMaxTicks ?: 80)
                     editingFlightId = flight.id
+                    timingSource = flight.timingSource
+                    formReady = true
                     startTime = flight.startTime
                     endTime = flight.endTime
                     durationSeconds = flight.durationSeconds.coerceIn(1, RecordValidation.LEGACY_MAX_DURATION_SECONDS)
-                    spurtCount = flight.spurtCount?.toString().orEmpty()
-                    volumeMl = flight.semenVolumeMl?.toString().orEmpty()
-                    useSpurtMode = RecordVolumeMode.fromStoredValue(flight.volumeInputMode) == RecordVolumeMode.SPURTS
+                    quantityRangeInitialized = flight.predictionMaxTicks != null || quantitySettings != null
+                    syncQuantityDisplay()
                     distanceCm = flight.ejaculationDistanceCm?.toString().orEmpty()
                     selectedTags = TagJson.decode(flight.methodTags)
                     moodNote = flight.moodNote
+                    editBaseline = RecordFormSessionSnapshot(
+                        formId = videoOwner, submissionId = "edit:" + flight.id,
+                        startTime = startTime, endTime = endTime, durationSeconds = durationSeconds,
+                        timingSource = timingSource, quantity = quantityDraft.snapshot(),
+                        video = video, distanceText = distanceCm, methodTags = selectedTags, moodNote = moodNote
+                    )
                 }
             } catch (error: CancellationException) {
                 throw error
@@ -200,11 +371,16 @@ class FormViewModel @Inject constructor(
     }
 
     fun updateStartTime(value: Long) {
+        if (isSaving || isLoading || saved) return
         startTime = value
+        durationWasEdited = true
+        timingSource = "manual"
         recomputeEndTime()
+        updateSession()
     }
 
     fun updateEndTime(value: Long) {
+        if (isSaving || isLoading || saved) return
         if (value <= startTime) {
             errorMessage = context.getString(R.string.form_error_end_before_start)
             return
@@ -214,75 +390,82 @@ class FormViewModel @Inject constructor(
     }
 
     fun updateDurationSeconds(value: Int) {
+        if (isSaving || isLoading || saved) return
         durationWasEdited = true
+        timingSource = "manual"
         durationSeconds = value.coerceIn(0, MAX_DURATION_SECONDS)
         recomputeEndTime()
+        updateSession()
     }
 
     private fun recomputeEndTime() {
         endTime = startTime + durationSeconds * 1_000L
     }
 
-    fun toggleSpurtMode() {
-        if (!quantitySettingsReady) return
-        volumeModeTouched = true
-        quickSpurtSelection = null
+    fun selectVolumeMode(mode: RecordVolumeMode) {
+        if (isSaving || isLoading || saved) return
+        if (!quantitySettingsReady || isLegacyQuantityReadOnly) return
+        quantityDraft.selectMode(mode)
         quickVolumeSelection = null
-        useSpurtMode = !useSpurtMode
         syncQuantityDisplay()
+        updateSession()
     }
 
-    fun setSpurtCountInput(value: String) {
-        if (value.isEmpty() || value.all(Char::isDigit)) {
-            spurtCount = value.take(4)
-            quantityDraft.enter(RecordVolumeMode.SPURTS, spurtCount)
-            volumeModeTouched = true
-            syncQuantityDisplay()
-        }
-        quickSpurtSelection = null
+    fun updateEstimatedTicks(value: Int) {
+        if (!quantitySettingsReady || isLoading || isSaving || saved || isLegacyQuantityReadOnly) return
+        quantityDraft.setEstimatedTicks(value)
+        syncQuantityDisplay()
+        updateSession()
     }
 
-    fun setVolumeInput(value: String) {
+    fun beginLegacyQuantityEdit() {
+        if (!quantitySettingsReady || isLoading || isSaving || saved) return
+        quantityDraft.beginLegacyQuantityEdit()
+        syncQuantityDisplay()
+        updateSession()
+    }
+
+    fun updateManualVolume(value: String) {
+        if (isSaving || isLoading || saved) return
         if (isDecimalInput(value)) {
-            volumeMl = value.take(7)
-            quantityDraft.enter(RecordVolumeMode.MILLILITERS, volumeMl)
-            volumeModeTouched = true
+            quantityDraft.setManualText(value.take(7))
             syncQuantityDisplay()
         }
         quickVolumeSelection = null
+        updateSession()
     }
 
     fun setDistanceInput(value: String) {
+        if (isSaving || isLoading || saved) return
         if (isDecimalInput(value)) distanceCm = value.take(7)
         quickDistanceSelection = null
+        updateSession()
     }
 
     fun setMoodNoteInput(value: String) {
+        if (isSaving || isLoading || saved) return
         val noteError = RecordValidation.validateNote(value, originalFlight?.moodNote)
-        if (noteError == null) moodNote = value else errorMessage = noteError
-    }
-
-    fun quickSpurt(value: Int) {
-        useSpurtMode = true
-        setSpurtCountInput(value.toString())
-        quickSpurtSelection = value
-        quickVolumeSelection = null
+        if (noteError == null) { moodNote = value; updateSession() } else errorMessage = noteError
     }
 
     fun quickVolume(value: Int) {
-        useSpurtMode = false
-        setVolumeInput("$value.0")
+        if (isSaving || isLoading || saved) return
+        selectVolumeMode(RecordVolumeMode.MILLILITERS)
+        updateManualVolume("$value.0")
         quickVolumeSelection = value
-        quickSpurtSelection = null
     }
 
     fun quickDistance(value: Int) {
+        if (isSaving || isLoading || saved) return
         distanceCm = value.toString()
         quickDistanceSelection = value
+        updateSession()
     }
 
     fun toggleTag(tagName: String) {
+        if (isSaving || isLoading || saved) return
         selectedTags = if (tagName in selectedTags) selectedTags - tagName else selectedTags + tagName
+        updateSession()
     }
 
     fun consumeAchievement(key: String? = null) {
@@ -296,32 +479,37 @@ class FormViewModel @Inject constructor(
     }
 
     fun save() {
-        if (isSaving || isLoading || saved) return
+        if (isSaving || isLoading || isSelectingVideo || saved || !formReady) return
+        updateSession()
         isSaving = true
         errorMessage = null
-        val saveJob = preferences.maintenanceGate.launchWrite(viewModelScope) {
+        val saveJob = viewModelScope.launch {
             try {
+                preferences.maintenanceGate.write {
+                formSnapshot?.let { preferences.maintenanceGate.requireGeneration(it.dataGeneration) }
                 // A fresh strict read fixes both initial-load and stale-setting races.
                 val snapshot = preferences.quantitySettings.first()
                 requireValidSettings(snapshot)
                 quantitySettings = snapshot
                 quantitySettingsReady = true
                 quantitySettingsError = null
-                val values = quantityDraft.resolve(snapshot.mlPerSpurt).getOrThrow()
+                val values = quantityDraft.resolve().getOrThrow()
                 val validation = RecordValidation.validate(
                     durationSeconds, values.spurtCount, values.semenVolumeMl,
                     distanceCm.toFloatOrNull(), distanceCm.isNotBlank(), hasLegacyDuration
                 ) ?: RecordValidation.validateNote(moodNote, originalFlight?.moodNote)
+                    ?: validateLocalVideoFields(video?.uriString, video?.displayName, video?.mimeType)
+                    ?: com.risediary.app.util.RecordTimingPolicy.validate(startTime, endTime, durationSeconds, timingSource, hasLegacyDuration)
                 if (validation != null) {
                     errorMessage = validation
-                    return@launchWrite
+                    return@write
                 }
                 val now = clock.millis()
                 val existing = originalFlight
                 val flight = Flight(
                     id = existing?.id ?: 0,
                     startTime = startTime,
-                    endTime = startTime + durationSeconds * 1_000L,
+                    endTime = endTime,
                     durationSeconds = durationSeconds,
                     spurtCount = values.spurtCount,
                     semenVolumeMl = values.semenVolumeMl,
@@ -330,13 +518,20 @@ class FormViewModel @Inject constructor(
                     methodTags = TagJson.encode(selectedTags),
                     moodNote = if (existing != null && moodNote == existing.moodNote) moodNote else moodNote.trim(),
                     createdAt = existing?.createdAt ?: now,
-                    updatedAt = now
-                )
+                    updatedAt = existing?.let { RecordTimestamps.updatedAt(it.createdAt, it.updatedAt, now) } ?: now,
+                    videoUri = video?.uriString,
+                    videoDisplayName = video?.displayName,
+                    videoMimeType = video?.mimeType,
+                    recordDraftId = existing?.recordDraftId ?: formSnapshot?.submissionId,
+                    timingSource = timingSource,
+                    globalId = existing?.globalId ?: newRecordGlobalId,
+                    recordSource = existing?.recordSource ?: com.risediary.app.data.sync.RecordIdentity.PHONE,
+                    sourceDeviceId = existing?.sourceDeviceId
+                ).let(quantityDraft::applyTo)
                 val followUps = mutableListOf<suspend () -> Unit>({ reminderScheduler.onFlightDataChanged() })
-                if (isTimerMode) followUps += { timerController.reset() }
                 val result = recordSaver.save(
                     flight,
-                    afterInsert = { achievementDetector.checkAndUnlock(it).map { achievement -> achievement.key } },
+                    afterSave = { achievementDetector.checkAndUnlock(it).map { achievement -> achievement.key } },
                     followUps = followUps
                 )
                 newAchievementKeys = result.achievementKeys
@@ -344,10 +539,12 @@ class FormViewModel @Inject constructor(
                     saveWarning = "记录已保存，但成就、提醒或计时收尾未能全部完成。已保存的记录不会重复新增。"
                 }
                 saved = true
+                formSnapshot?.let { forms.discard(it.formId) }
+                }
             } catch (_: StaleRecordDraftException) {
-                errorMessage = "这条记录已变化或被移除；当前草稿已保留，请返回后重新打开"
+                errorMessage = "这条记录已变化或被移除；当前输入已保留，请返回后重新打开"
             } catch (_: DataMaintenanceBusyException) {
-                errorMessage = "数据恢复或清除中，请稍后再保存；当前草稿已保留"
+                errorMessage = "数据恢复或清除中，请稍后再保存；当前输入已保留"
             } catch (error: CancellationException) {
                 throw error
             } catch (error: Exception) {
@@ -362,7 +559,7 @@ class FormViewModel @Inject constructor(
         saveJob.invokeOnCompletion { cause ->
             if (cause is DataMaintenanceBusyException) {
                 viewModelScope.launch {
-                    errorMessage = "数据恢复或清除中，请稍后再保存；当前草稿已保留"
+                    errorMessage = "数据恢复或清除中，请稍后再保存；当前输入已保留"
                     isSaving = false
                 }
             }
@@ -370,22 +567,24 @@ class FormViewModel @Inject constructor(
     }
 
     private fun syncQuantityDisplay() {
-        val conversion = quantitySettings?.mlPerSpurt ?: return
-        spurtCount = quantityDraft.display(RecordVolumeMode.SPURTS, conversion)
-        volumeMl = quantityDraft.display(RecordVolumeMode.MILLILITERS, conversion)
+        val snapshot = quantityDraft.snapshot()
+        useEstimatedMode = snapshot.selectedMode == RecordVolumeMode.ESTIMATED.storedValue
+        estimatedTicks = snapshot.estimatedTicks
+        predictionMaxTicks = snapshot.predictionMaxTicks
+        isLegacyQuantityReadOnly = quantityDraft.isLegacyQuantityReadOnly
+        legacyQuantityText = originalFlight?.let(com.risediary.app.util.RecordQuantityDisplay::current).orEmpty()
+        volumeMl = snapshot.manualText
     }
 
     private fun requireValidSettings(snapshot: QuantitySettingsSnapshot) {
-        require(snapshot.mlPerSpurt.isFinite() && snapshot.mlPerSpurt in 0.1f..100f) {
-            "每股毫升设置无效，请重试读取设置"
-        }
+        com.risediary.app.util.PredictionQuantitySettings.requireMaximum(snapshot.predictionMaxTicks)
     }
 
     private fun isDecimalInput(value: String): Boolean = value.isEmpty() || value.matches(DECIMAL_PATTERN)
 
     private companion object {
         const val MAX_DURATION_SECONDS = RecordValidation.MAX_DURATION_SECONDS
-        const val MAX_DURATION_MILLIS = MAX_DURATION_SECONDS * 1_000L
+        const val MAX_DURATION_MILLIS = com.risediary.app.util.DurationPolicy.MAX_MILLIS
         val DECIMAL_PATTERN = Regex("""\d{0,4}(\.\d{0,2})?""")
     }
 }

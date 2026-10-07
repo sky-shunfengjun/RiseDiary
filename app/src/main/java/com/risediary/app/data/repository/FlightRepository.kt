@@ -13,6 +13,9 @@ interface FlightRepository {
     val allFlights: Flow<List<Flight>>
 
     suspend fun insert(flight: Flight): Long
+    suspend fun insertOnce(flight: Flight): Flight
+    /** Undo preserves identity and aborts collisions; unlike new submission it accepts existing IDs. */
+    suspend fun restoreDeleted(flight: Flight)
     suspend fun update(flight: Flight)
     suspend fun delete(flight: Flight)
     suspend fun getById(id: Long): Flight?
@@ -36,6 +39,7 @@ interface FlightRepository {
     suspend fun totalDistinctDays(): Int
     suspend fun getDistinctFlightDates(): List<String>
     suspend fun getRecent(limit: Int = 100): List<Flight>
+    suspend fun getAllMethodTags(): List<String> = getAll().map(Flight::methodTags)
     suspend fun getByTag(tag: String): List<Flight>
     suspend fun countByTag(tag: String): Int
     suspend fun getDayCountsSince(since: Long): Map<String, Int>
@@ -53,6 +57,13 @@ class RoomFlightRepository @Inject constructor(
     override val allFlights: Flow<List<Flight>> = dao.getAllFlow()
 
     override suspend fun insert(flight: Flight): Long = maintenanceGate.write { dao.insert(flight) }
+    override suspend fun insertOnce(flight: Flight): Flight = maintenanceGate.write { dao.insertOnce(flight) }
+    override suspend fun restoreDeleted(flight: Flight) = maintenanceGate.write {
+        require(flight.id > 0L)
+        if (dao.getById(flight.id) != null) throw com.risediary.app.data.DataWriteConflictException("记录已变化，无法撤销")
+        dao.insertNew(flight)
+        Unit
+    }
     override suspend fun update(flight: Flight) = maintenanceGate.write { dao.update(flight) }
     override suspend fun delete(flight: Flight) = maintenanceGate.write {
         maintenanceGate.requireCurrent(flight, dao.getById(flight.id))
@@ -60,6 +71,7 @@ class RoomFlightRepository @Inject constructor(
     }
     override suspend fun getById(id: Long): Flight? = dao.getById(id)
     override suspend fun getAll(): List<Flight> = dao.getAll()
+    override suspend fun getAllMethodTags(): List<String> = dao.getAllMethodTags()
     override suspend fun getAllStartTimes(): List<Long> = dao.getAllStartTimes()
 
     override suspend fun countToday(): Int {

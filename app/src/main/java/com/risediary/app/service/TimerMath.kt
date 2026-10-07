@@ -1,7 +1,9 @@
 package com.risediary.app.service
 
+import com.risediary.app.util.DurationPolicy
+
 object TimerMath {
-    const val MAX_DURATION_MILLIS = 120L * 60L * 1_000L
+    const val MAX_DURATION_MILLIS = DurationPolicy.MAX_MILLIS
 
     fun elapsed(
         session: TimerSession,
@@ -33,9 +35,9 @@ object TimerMath {
         val sameBoot = currentBootCount != null && currentBootCount >= 0 &&
             session.bootCount == currentBootCount &&
             elapsedRealtimeNow >= session.resumedAtElapsedRealtime
-        val elapsed = if (sameBoot) elapsedInCurrentProcess(session, elapsedRealtimeNow)
-            else session.elapsedMillis.coerceIn(0L, MAX_DURATION_MILLIS)
-        return session.copy(
+        val advanced = if (sameBoot) advance(session, elapsedRealtimeNow, wallClockNow) else session
+        val elapsed = advanced.elapsedMillis.coerceIn(0L, MAX_DURATION_MILLIS)
+        return advanced.copy(
             status = if (sameBoot) TimerStatus.RUNNING else TimerStatus.PAUSED,
             elapsedMillis = elapsed,
             resumedAtElapsedRealtime = if (sameBoot && elapsed < MAX_DURATION_MILLIS) elapsedRealtimeNow else 0L,
@@ -50,8 +52,13 @@ object TimerMath {
         wallClockNow: Long
     ): TimerSession {
         if (session.status != TimerStatus.RUNNING) return session
+        val elapsed = elapsedInCurrentProcess(session, elapsedRealtimeNow)
+        val crossedLimit = session.elapsedMillis < MAX_DURATION_MILLIS && elapsed >= MAX_DURATION_MILLIS
+        val excess = if (crossedLimit) ((elapsedRealtimeNow - session.resumedAtElapsedRealtime).coerceAtLeast(0L) -
+            (MAX_DURATION_MILLIS - session.elapsedMillis)).coerceAtLeast(0L) else 0L
         return session.copy(
-            elapsedMillis = elapsedInCurrentProcess(session, elapsedRealtimeNow),
+            endedAtEpochMillis = session.endedAtEpochMillis ?: if (crossedLimit) wallClockNow - excess else null,
+            elapsedMillis = elapsed,
             resumedAtElapsedRealtime = elapsedRealtimeNow,
             resumedAtWallClock = wallClockNow
         )
@@ -62,7 +69,7 @@ enum class TimerMilestone(val minutes: Int, val bit: Int) {
     THIRTY(30, 1 shl 0),
     SIXTY(60, 1 shl 1),
     NINETY(90, 1 shl 2),
-    LIMIT(120, 1 shl 3);
+    LIMIT(DurationPolicy.MAX_SECONDS / 60, 1 shl 3);
 
     val elapsedMillis: Long
         get() = minutes * 60_000L

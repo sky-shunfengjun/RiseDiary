@@ -157,6 +157,7 @@ fun LiquidSegmentedControl(
     showIcons: Boolean = true,
     labelFontSize: androidx.compose.ui.unit.TextUnit = 13.sp,
     showSelectionShadow: Boolean = true,
+    inlineIcon: Boolean = false,
 ) {
     if (options.isEmpty()) return
     var visualSelectedIndex by rememberSaveable(options.size) { mutableIntStateOf(selectedIndex.fastCoerceIn(0, options.lastIndex)) }
@@ -182,22 +183,29 @@ fun LiquidSegmentedControl(
     ) {
         options.forEachIndexed { index, option ->
             LiquidBottomTab({ select(index) }, Modifier.semantics { selected = index == visualSelectedIndex }) {
-                if (showIcons) {
-                    Icon(
-                        painter = rememberVectorPainter(option.icon),
-                        contentDescription = null,
-                        tint = Color.Unspecified,
-                        modifier = Modifier.size(20.dp).graphicsLayer(colorFilter = ColorFilter.tint(contentColor))
+                val label: @Composable () -> Unit = {
+                    if (showIcons) {
+                        Icon(
+                            painter = rememberVectorPainter(option.icon),
+                            contentDescription = null,
+                            tint = Color.Unspecified,
+                            modifier = Modifier.size(20.dp).graphicsLayer(colorFilter = ColorFilter.tint(contentColor))
+                        )
+                    }
+                    BasicText(
+                        option.label,
+                        style = TextStyle(
+                            contentColor,
+                            labelFontSize,
+                            fontWeight = if (index == visualSelectedIndex) FontWeight.SemiBold else FontWeight.Normal
+                        )
                     )
                 }
-                BasicText(
-                    option.label,
-                    style = TextStyle(
-                        contentColor,
-                        labelFontSize,
-                        fontWeight = if (index == visualSelectedIndex) FontWeight.SemiBold else FontWeight.Normal
-                    )
-                )
+                if (inlineIcon) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) { label() }
+                } else {
+                    label()
+                }
             }
         }
     }

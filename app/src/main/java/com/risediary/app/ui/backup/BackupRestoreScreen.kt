@@ -56,6 +56,8 @@ fun BackupRestoreScreen(
 ) {
     val navigator = LocalNavigator.current
     val state by vm.state.collectAsStateWithLifecycle()
+    val previewMessage by vm.previewMessage.collectAsStateWithLifecycle()
+    val preview by vm.preview.collectAsStateWithLifecycle()
     val message by vm.message.collectAsStateWithLifecycle()
     val maintenanceState by vm.maintenanceState.collectAsStateWithLifecycle()
     val showClearDialog by vm.showClearConfirm.collectAsStateWithLifecycle()
@@ -104,7 +106,7 @@ fun BackupRestoreScreen(
     SecondaryPageScaffold(
         topBlurProgress = rememberTopBlurProgress(scrollState),
         title = stringResource(R.string.settings_backup),
-        onBack = { navigator.pop() },
+        onBack = { vm.discardRestore(); navigator.pop() },
     ) { padding ->
         Column(
             modifier = Modifier
@@ -200,9 +202,8 @@ title = { Text(stringResource(R.string.backup_confirm_export_title)) },
                         color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                     )
                     Spacer(modifier = Modifier.height(12.dp))
-                    var showRestoreConfirm by remember { mutableStateOf(false) }
                     Button(
-                        onClick = { showRestoreConfirm = true },
+                        onClick = { importLauncher.launch(arrayOf("application/zip", "application/octet-stream")) },
                         enabled = state != BackupState.WORKING && maintenanceState == com.risediary.app.data.DataMaintenanceGate.State.IDLE,
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.buttonColorsPrimary()
@@ -224,35 +225,7 @@ title = { Text(stringResource(R.string.backup_confirm_export_title)) },
                         }
                     }
 
-                    if (showRestoreConfirm) {
-                        LiquidAlertDialog(
-                            onDismissRequest = { showRestoreConfirm = false },
-title = { Text(stringResource(R.string.backup_confirm_restore_title)) },
-                            text = { Text(stringResource(R.string.backup_confirm_restore_message)) },
-                            confirmButton = {
-                                TextButton(
-                                    text = stringResource(R.string.backup_confirm_restore_title),
-                                    onClick = {
-                                        showRestoreConfirm = false
-                                        importLauncher.launch(arrayOf("application/zip", "application/octet-stream"))
-                                    },
-                                    colors = ButtonDefaults.textButtonColors(
-                                        color = Color.Transparent,
-                                        textColor = MiuixTheme.colorScheme.error,
-                                        disabledColor = Color.Transparent,
-                                        disabledTextColor = MiuixTheme.colorScheme.error
-                                    )
-                                )
-                            },
-                            dismissButton = {
-                                TextButton(
-                                    text = stringResource(R.string.action_cancel),
-                                    onClick = { showRestoreConfirm = false },
-                                    colors = liquidDialogCancelButtonColors()
-                                )
-                            }
-                        )
-                    }
+
                 }
             }
 
@@ -349,4 +322,7 @@ title = { Text(stringResource(R.string.backup_confirm_restore_title)) },
             Spacer(modifier = Modifier.height(40.dp))
         }
     }
+
+    RestorePreviewSheet(preview, state == BackupState.WORKING, previewMessage,
+        vm::changeRestoreMode, vm::confirmRestore, vm::discardRestore)
 }

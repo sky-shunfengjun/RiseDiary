@@ -77,7 +77,21 @@ class UserPreferences internal constructor(
         maintenanceGate.write { dataStore.edit(block) }
     }
 
-    val securitySettings: Flow<SecuritySettingsSnapshot> = dataStore.data.map { prefs ->
+    val securitySettings: Flow<SecuritySettingsSnapshot> = dataStore.data.map(::securitySnapshot)
+
+    val launchSettings: Flow<AppLaunchSnapshot> = dataStore.data.map { prefs ->
+        AppLaunchSnapshot(securitySnapshot(prefs), prefs[KEY_UPDATE_INTRO_COMPLETED])
+    }
+
+    val updateIntroSettings: Flow<UpdateIntroSettingsSnapshot> = dataStore.data.map { prefs ->
+        UpdateIntroSettingsSnapshot(
+            predictionMaxTicks = com.risediary.app.util.PredictionQuantitySettings.normalizeStoredMaximum(prefs[KEY_PREDICTION_MAX_TICKS] ?: 80),
+            liveUpdatesEnabled = prefs[KEY_LIVE_UPDATES_ENABLED] ?: true,
+            detailVideoHiddenByDefault = prefs[KEY_DETAIL_VIDEO_HIDDEN] ?: false,
+        )
+    }
+
+    private fun securitySnapshot(prefs: Preferences): SecuritySettingsSnapshot =
         SecuritySettingsSnapshot(
             onboardingCompleted = prefs[KEY_ONBOARDING_COMPLETED] ?: false,
             lockEnabled = prefs[KEY_APP_LOCK_ENABLED] ?: false,
@@ -88,15 +102,47 @@ class UserPreferences internal constructor(
             backgroundAutoLock = prefs[KEY_BACKGROUND_AUTO_LOCK_ENABLED] ?: false,
             backgroundMode = BackgroundLockMode.fromStoredValue(prefs[KEY_BACKGROUND_LOCK_MODE])
         ).requireConsistent()
-    }
 
     val quantitySettings: Flow<QuantitySettingsSnapshot> = dataStore.data.map { prefs ->
-        val factor = prefs[KEY_ML_PER_SPURT] ?: 2f
-        check(factor.isFinite() && factor in 0.1f..100f) { "数量换算设置无效，请检查设置" }
-        QuantitySettingsSnapshot(factor, DefaultVolumeMode.fromStoredValue(prefs[KEY_DEFAULT_VOLUME_MODE]))
+        val ticks = com.risediary.app.util.PredictionQuantitySettings.normalizeStoredMaximum(prefs[KEY_PREDICTION_MAX_TICKS] ?: 80)
+        QuantitySettingsSnapshot(predictionMaxTicks = ticks)
     }
 
     internal suspend fun rawSnapshot(): Preferences = dataStore.data.first().toPreferences()
+    // Never substitute defaults after an IO error: the guide can save what it displays.
+    val onboardingSettings: Flow<OnboardingSettingsSnapshot> = dataStore.data.map { prefs ->
+        val settings = settingsSnapshot(prefs)
+        OnboardingSettingsSnapshot(
+            username = settings.username,
+            themeMode = settings.themeMode,
+            predictionMaxTicks = settings.predictionMaxTicks,
+            detailVideoHiddenByDefault = settings.detailVideoHiddenByDefault,
+            dailyReminderEnabled = settings.dailyReminderEnabled,
+            inactiveReminderEnabled = settings.inactiveReminderEnabled,
+            inactiveReminderDays = settings.inactiveReminderDays,
+            inactiveReminderTime = settings.inactiveReminderTime,
+            reminderTime = if (!settings.dailyReminderEnabled && settings.inactiveReminderEnabled) settings.inactiveReminderTime else settings.dailyReminderTime,
+            appLockEnabled = prefs[KEY_APP_LOCK_ENABLED] ?: false,
+            biometricEnabled = prefs[KEY_BIOMETRIC_UNLOCK_ENABLED] ?: false,
+            liveUpdatesEnabled = settings.liveUpdatesEnabled,
+        )
+    }
+
+    /** Only explicit changes in the guide update the paired recommendation. */
+    suspend fun setOnboardingReminders(enabledChanged: Boolean, enabled: Boolean, timeChanged: Boolean, time: String) {
+        val normalizedTime = normalizeReminderTime(time)
+        edit { prefs ->
+            if (enabledChanged) {
+                prefs[KEY_DAILY_REMINDER_ENABLED] = enabled
+                prefs[KEY_INACTIVE_REMINDER_ENABLED] = enabled
+                if (enabled) prefs[KEY_INACTIVE_REMINDER_DAYS] = 7
+            }
+            if (timeChanged || (enabledChanged && enabled)) {
+                prefs[KEY_DAILY_REMINDER_TIME] = normalizedTime
+                prefs[KEY_INACTIVE_REMINDER_TIME] = normalizedTime
+            }
+        }
+    }
     internal suspend fun restoreRaw(snapshot: Preferences) {
         dataStore.updateData { snapshot }
     }
@@ -104,6 +150,9 @@ class UserPreferences internal constructor(
     internal fun settingsSnapshot(prefs: Preferences): com.risediary.app.data.backup.SettingsSnapshot =
         com.risediary.app.data.backup.SettingsSnapshot(
             username = UsernamePolicy.normalize(prefs[KEY_USERNAME].orEmpty()),
+            liveUpdatesEnabled = prefs[KEY_LIVE_UPDATES_ENABLED] ?: true,
+            detailVideoHiddenByDefault = prefs[KEY_DETAIL_VIDEO_HIDDEN] ?: false,
+            predictionMaxTicks = com.risediary.app.util.PredictionQuantitySettings.normalizeStoredMaximum(prefs[KEY_PREDICTION_MAX_TICKS] ?: 80),
             mlPerSpurt = prefs[KEY_ML_PER_SPURT] ?: 2f,
             defaultVolumeMode = DefaultVolumeMode.fromStoredValue(prefs[KEY_DEFAULT_VOLUME_MODE]),
             dailyReminderEnabled = prefs[KEY_DAILY_REMINDER_ENABLED] ?: false,
@@ -126,6 +175,7 @@ class UserPreferences internal constructor(
 
     internal suspend fun clearAppLockForMaintenance() {
         dataStore.edit {
+            it[KEY_ONBOARDING_COMPLETED] = false
             it[KEY_APP_LOCK_ENABLED] = false
             it[KEY_APP_LOCK_PIN] = ""
             it[KEY_APP_LOCK_ATTEMPTS] = 0
@@ -147,6 +197,14 @@ class UserPreferences internal constructor(
     val defaultVolumeMode: Flow<DefaultVolumeMode> = safeData.map { prefs ->
         DefaultVolumeMode.fromStoredValue(prefs[KEY_DEFAULT_VOLUME_MODE])
     }
+
+    // Privacy-sensitive reads must never substitute a visible default after IO failure.
+    val detailVideoHiddenByDefault: Flow<Boolean> = dataStore.data.map { it[KEY_DETAIL_VIDEO_HIDDEN] ?: false }
+    suspend fun setDetailVideoHiddenByDefault(hidden: Boolean) { edit { it[KEY_DETAIL_VIDEO_HIDDEN] = hidden } }
+
+    // A failed read must not re-enable a setting the user disabled.
+    val liveUpdatesEnabled: Flow<Boolean> = dataStore.data.map { it[KEY_LIVE_UPDATES_ENABLED] ?: true }
+    suspend fun setLiveUpdatesEnabled(enabled: Boolean) { edit { it[KEY_LIVE_UPDATES_ENABLED] = enabled } }
 
     val dailyReminderEnabled: Flow<Boolean> = safeData.map { prefs ->
         prefs[KEY_DAILY_REMINDER_ENABLED] ?: false
@@ -248,10 +306,24 @@ class UserPreferences internal constructor(
     val reminderConfiguration: Flow<ReminderConfiguration> =
         safeData.map(::toReminderConfiguration)
 
+    // Scheduling must not treat an IO fallback as a user disabling reminders.
+    internal val strictReminderConfiguration: Flow<ReminderConfiguration> =
+        dataStore.data.map(::toReminderConfiguration)
+
+    internal suspend fun getReminderConfiguration(): ReminderConfiguration =
+        toReminderConfiguration(dataStore.data.first())
+
     // --- Setters ---
 
     suspend fun setUsername(value: String) {
         edit { it[KEY_USERNAME] = UsernamePolicy.normalize(value) }
+    }
+
+    val predictionMaxTicks: Flow<Int> = quantitySettings.map { it.predictionMaxTicks }
+
+    suspend fun setPredictionMaxTicks(value: Int) {
+        com.risediary.app.util.PredictionQuantitySettings.requireSettingMaximum(value)
+        edit { it[KEY_PREDICTION_MAX_TICKS] = value }
     }
 
     suspend fun setMlPerSpurt(value: Float) {
@@ -487,8 +559,19 @@ class UserPreferences internal constructor(
                 it[KEY_DAILY_REMINDER_TIME] = normalizedTime
                 it[KEY_INACTIVE_REMINDER_TIME] = normalizedTime
             }
-            if (firstRun) it[KEY_ONBOARDING_COMPLETED] = true
+            if (firstRun) {
+                it[KEY_ONBOARDING_COMPLETED] = true
+                it[KEY_UPDATE_INTRO_COMPLETED] = UpdateIntroCampaign.ID
+            }
         }
+    }
+
+    suspend fun finishUpdateIntro() {
+        edit { it[KEY_UPDATE_INTRO_COMPLETED] = UpdateIntroCampaign.ID }
+    }
+
+    suspend fun resetUpdateIntroCompletion() {
+        edit { it.remove(KEY_UPDATE_INTRO_COMPLETED) }
     }
 
     suspend fun markDefaultTagsInitialized() {
@@ -506,6 +589,9 @@ class UserPreferences internal constructor(
     internal suspend fun applySettingsForMaintenance(settings: com.risediary.app.data.backup.SettingsSnapshot) {
         dataStore.edit { prefs ->
             prefs[KEY_USERNAME] = UsernamePolicy.normalize(settings.username)
+            prefs[KEY_LIVE_UPDATES_ENABLED] = settings.liveUpdatesEnabled
+            prefs[KEY_DETAIL_VIDEO_HIDDEN] = settings.detailVideoHiddenByDefault
+            prefs[KEY_PREDICTION_MAX_TICKS] = com.risediary.app.util.PredictionQuantitySettings.normalizeStoredMaximum(settings.predictionMaxTicks)
             prefs[KEY_ML_PER_SPURT] = settings.mlPerSpurt
             prefs[KEY_DEFAULT_VOLUME_MODE] = settings.defaultVolumeMode.storedValue
             prefs[KEY_DAILY_REMINDER_ENABLED] = settings.dailyReminderEnabled
@@ -527,7 +613,7 @@ class UserPreferences internal constructor(
             prefs[KEY_THEME_MODE] = settings.themeMode
             prefs[KEY_HOME_CARD_ORDER] = settings.homeCardOrder
             prefs[KEY_HOME_CARD_VISIBILITY] = settings.homeCardVisibility
-            prefs[KEY_ONBOARDING_COMPLETED] = settings.onboardingCompleted
+            // Onboarding, update-intro completion and credentials belong to this device.
             // Reminder runtime state is device-local: clear stale sent-marks from
             // the previous device so reminders are not suppressed after restore,
             // and re-anchor the inactive reminder window.
@@ -611,6 +697,9 @@ class UserPreferences internal constructor(
 
     companion object {
         private val KEY_USERNAME = stringPreferencesKey("username")
+        private val KEY_LIVE_UPDATES_ENABLED = booleanPreferencesKey("live_updates_enabled")
+        private val KEY_DETAIL_VIDEO_HIDDEN = booleanPreferencesKey("detail_video_hidden_by_default")
+        private val KEY_PREDICTION_MAX_TICKS = intPreferencesKey("prediction_max_ticks")
         private val KEY_ML_PER_SPURT = floatPreferencesKey("ml_per_spurt")
         private val KEY_DEFAULT_VOLUME_MODE = stringPreferencesKey("default_volume_mode")
         private val KEY_DAILY_REMINDER_ENABLED = booleanPreferencesKey("daily_reminder_enabled")
@@ -645,6 +734,7 @@ class UserPreferences internal constructor(
         private val KEY_HOME_CARD_ORDER = stringPreferencesKey("home_card_order")
         private val KEY_HOME_CARD_VISIBILITY = stringPreferencesKey("home_card_visibility")
         private val KEY_ONBOARDING_COMPLETED = booleanPreferencesKey("onboarding_completed")
+        private val KEY_UPDATE_INTRO_COMPLETED = stringPreferencesKey("last_completed_update_intro_id")
         private val KEY_DEFAULT_TAGS_INITIALIZED =
             booleanPreferencesKey("default_tags_initialized")
     }

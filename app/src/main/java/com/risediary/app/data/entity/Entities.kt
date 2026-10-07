@@ -1,10 +1,12 @@
 package com.risediary.app.data.entity
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
 enum class RecordVolumeMode(val storedValue: String) {
+    ESTIMATED("estimated"),
     MILLILITERS("milliliters"),
     SPURTS("spurts");
 
@@ -19,7 +21,7 @@ enum class RecordVolumeMode(val storedValue: String) {
 
 @Entity(
     tableName = "flights",
-    indices = [Index(value = ["startTime"])]
+    indices = [Index(value = ["startTime"]), Index(value = ["recordDraftId"], unique = true), Index(value = ["globalId"], unique = true)]
 )
 data class Flight(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -33,19 +35,32 @@ data class Flight(
     val methodTags: String,
     val moodNote: String,
     val createdAt: Long = System.currentTimeMillis(),
-    val updatedAt: Long = System.currentTimeMillis()
+    val updatedAt: Long = System.currentTimeMillis(),
+    @ColumnInfo(defaultValue = "NULL") val legacySpurtCount: Int? = null,
+    @ColumnInfo(defaultValue = "NULL") val legacyVolumeMl: Float? = null,
+    @ColumnInfo(defaultValue = "NULL") val legacyVolumeInputMode: String? = null,
+    @ColumnInfo(defaultValue = "NULL") val predictionMaxTicks: Int? = null,
+    @ColumnInfo(defaultValue = "NULL") val videoUri: String? = null,
+    @ColumnInfo(defaultValue = "NULL") val videoDisplayName: String? = null,
+    @ColumnInfo(defaultValue = "NULL") val videoMimeType: String? = null,
+    @ColumnInfo(defaultValue = "NULL") val recordDraftId: String? = null,
+    @ColumnInfo(defaultValue = "'manual'") val timingSource: String = "manual",
+    @ColumnInfo(defaultValue = "''") val globalId: String = com.risediary.app.data.sync.RecordIdentity.newId(),
+    @ColumnInfo(defaultValue = "'phone'") val recordSource: String = com.risediary.app.data.sync.RecordIdentity.PHONE,
+    @ColumnInfo(defaultValue = "NULL") val sourceDeviceId: String? = null
 )
 
 @Entity(
     tableName = "length_records",
-    indices = [Index(value = ["recordDate"])]
+    indices = [Index(value = ["recordDate"]), Index(value = ["globalId"], unique = true)]
 )
 data class LengthRecord(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val recordDate: Long,
     val flaccidLengthCm: Float,
     val erectLengthCm: Float,
-    val note: String = ""
+    val note: String = "",
+    @ColumnInfo(defaultValue = "''") val globalId: String = com.risediary.app.data.sync.RecordIdentity.newId()
 )
 
 @Entity(

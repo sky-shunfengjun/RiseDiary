@@ -6,6 +6,12 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface TagDao {
+    @Query("SELECT length(name)*2+256 FROM tags WHERE id > :after ORDER BY id LIMIT 500")
+    suspend fun backupSizes(after: Long): List<Long>
+
+    @Query("SELECT * FROM tags WHERE id > :after ORDER BY id LIMIT :limit")
+    suspend fun backupBatch(after: Long, limit: Int = 500): List<Tag>
+
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
     suspend fun insert(tag: Tag): Long

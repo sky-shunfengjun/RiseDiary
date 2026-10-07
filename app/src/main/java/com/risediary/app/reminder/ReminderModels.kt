@@ -105,6 +105,22 @@ internal fun normalizeInactiveDays(value: Int): Int =
     }
 
 object ReminderScheduleCalculator {
+    /** Legacy jobs carried only a type; attribute a late delivery to its most recent scheduled occurrence. */
+    fun previousOccurrence(now: ZonedDateTime, type: ReminderType,
+        configuration: ReminderConfiguration): ZonedDateTime {
+        val time = configuration.time(type)
+        if (type == ReminderType.MONTHLY_LENGTH) {
+            val month = YearMonth.from(now)
+            val day = configuration.monthlyLengthDay.coerceIn(1, 28)
+            val candidate = atLocalTime(month.atDay(day), time, now.zone)
+            return if (!candidate.isAfter(now)) candidate
+                else atLocalTime(month.minusMonths(1).atDay(day), time, now.zone)
+        }
+        val candidate = atLocalTime(now.toLocalDate(), time, now.zone)
+        return if (!candidate.isAfter(now)) candidate
+            else atLocalTime(now.toLocalDate().minusDays(1), time, now.zone)
+    }
+
     fun nextDaily(now: ZonedDateTime, time: LocalTime): ZonedDateTime =
         nextOccurrence(now, now.toLocalDate(), time)
 

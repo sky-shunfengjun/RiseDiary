@@ -58,7 +58,9 @@ import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.risediary.app.BuildConfig
 import com.risediary.app.R
-import com.risediary.app.ui.about.effect.BgEffectBackground
+import com.risediary.app.ui.components.effect.BgEffectBackground
+import com.risediary.app.ui.policy.PolicyDocument
+import com.risediary.app.ui.policy.PolicySheet
 import com.risediary.app.ui.components.LiquidGlassButton
 import com.risediary.app.ui.components.PageTopBar
 import com.risediary.app.ui.icons.AppIcons
@@ -89,6 +91,7 @@ fun AboutScreen(
     val updateState by updateViewModel.state.collectAsStateWithLifecycle()
     val updateUi by updateViewModel.ui.collectAsStateWithLifecycle()
     val taps = remember { DeveloperTapCounter() }
+    var policyDocument by remember { mutableStateOf<PolicyDocument?>(null) }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     LaunchedEffect(updateUi.settings.developerEnabled, updateUi.developer.visible) { taps.reset() }
     DisposableEffect(lifecycle) {
@@ -285,16 +288,10 @@ fun AboutScreen(
                                 color = MiuixTheme.colorScheme.surfaceContainer
                             )
                         ) {
-                            Column(modifier = Modifier.padding(horizontal = 16.dp)) {
-                                AboutItem(
-                                    stringResource(R.string.about_usage_title),
-                                    stringResource(R.string.usage_disclaimer)
-                                )
-                                HorizontalDivider()
-                                AboutItem(
-                                    stringResource(R.string.about_data_privacy),
-                                    stringResource(R.string.about_privacy_content)
-                                )
+                            Column {
+                                ArrowPreference(title = stringResource(R.string.policy_terms_title), onClick = { taps.reset(); policyDocument = PolicyDocument.TERMS })
+                                HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+                                ArrowPreference(title = stringResource(R.string.policy_privacy_title), onClick = { taps.reset(); policyDocument = PolicyDocument.PRIVACY })
                             }
                         }
                     }
@@ -349,30 +346,10 @@ fun AboutScreen(
                 )
             }
         }
+        PolicySheet(policyDocument) { policyDocument = null }
     }
 
 
 }
 
 internal fun aboutLibrariesEntryHorizontalPadding() = 0.dp
-
-@Composable
-private fun AboutItem(title: String, desc: String) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 12.dp)
-    ) {
-        Text(
-            title,
-            fontSize = MiuixTheme.textStyles.body1.fontSize,
-            color = MiuixTheme.colorScheme.onSurface
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Text(
-            desc,
-            fontSize = MiuixTheme.textStyles.body2.fontSize,
-            color = MiuixTheme.colorScheme.onSurfaceVariantSummary
-        )
-    }
-}

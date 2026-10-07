@@ -83,7 +83,7 @@ class FormRecordStaleDraftTest {
         var updateCalls = 0
         private var nextId = 10L
         fun workflow() = FormRecordSaveWorkflow(
-            insert = { flight -> val id = nextId++; records[id] = flight.copy(id = id); id },
+            insert = { flight -> val id = nextId++; flight.copy(id = id).also { records[id] = it } },
             update = { updateCalls++; records[it.id] = it },
             readCurrent = { records[it] }
         )
