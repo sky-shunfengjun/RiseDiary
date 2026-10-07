@@ -18,9 +18,6 @@
 
 ## 应用截图
 
-以下截图来自 v1.1.2，供了解基本界面；v2.0.0 的数量录入、播放器、详情与引导界面已有调整。
-
-
 |    首页    |   记录页   | 新建记录页 |
 | :--------: | :--------: | :--------: |
 | <img src="screenshots/home.jpg" alt="首页" width="240"> | <img src="screenshots/records.jpg" alt="记录页" width="240"> | <img src="screenshots/new-record.jpg" alt="新建记录页" width="240"> |
