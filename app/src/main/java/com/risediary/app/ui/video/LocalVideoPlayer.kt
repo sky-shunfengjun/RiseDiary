@@ -22,6 +22,7 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.text.font.FontWeight
@@ -65,7 +66,12 @@ internal fun LocalVideoPlayer(
     surfaceEnabled: Boolean = true,
     coverContent: (@Composable (Backdrop) -> Unit)? = null,
     compactConcealed: Boolean = false,
-    fullscreenOverlayNeedsBackdrop: Boolean = false
+    fullscreenOverlayNeedsBackdrop: Boolean = false,
+    fullscreenBottomPadding: androidx.compose.ui.unit.Dp = 0.dp,
+    showFullscreenExit: Boolean = true,
+    fullscreenHeader: (@Composable (Boolean) -> Unit)? = null,
+    fullscreenTransportAction: (@Composable (Backdrop, Boolean, androidx.compose.ui.unit.Dp) -> Unit)? = null,
+    onFullscreenControlsHeight: (androidx.compose.ui.unit.Dp) -> Unit = {}
 ) {
     val actionable = controlsEnabled && !concealed && coverContent == null
     val videoFlow = remember(controller) { controller.playback.projectState { it?.video } }
@@ -79,6 +85,7 @@ internal fun LocalVideoPlayer(
     var interaction by remember { mutableIntStateOf(0) }
     var controlsTouched by remember(fullScreen) { mutableStateOf(false) }
     val keepControls: () -> Unit = { controlsVisible = true; interaction++ }
+    val density = LocalDensity.current
 
     DisposableEffect(player) {
         val listener = object : Player.Listener {
@@ -155,7 +162,7 @@ internal fun LocalVideoPlayer(
                         enabled = controlsVisible && actionable, dimWhenDisabled = false,
                         modifier = Modifier.size(48.dp)
                     )
-                    VideoGlassButton(
+                    if (showFullscreenExit) VideoGlassButton(
                         onClick = { if (controlsVisible && actionable) onFullScreen() }, backdrop = surfaceBackdrop, fullScreen = true,
                         icon = AppIcons.ExitFullscreen,
                         description = stringResource(R.string.video_exit_fullscreen),
@@ -163,14 +170,22 @@ internal fun LocalVideoPlayer(
                         modifier = Modifier.size(48.dp)
                     )
                 }
+                if (fullscreenHeader != null) Box(Modifier.fillMaxSize().then(controlsFade)) {
+                    fullscreenHeader(controlsVisible)
+                }
             }
             Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().safeDrawingPadding()
+                .padding(bottom = fullscreenBottomPadding)
+                .onSizeChanged { onFullscreenControlsHeight(with(density) { it.height.toDp() }) }
                 .padding(horizontal = 24.dp, vertical = 12.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 if (retainControls) {
                     VideoTransportControls(controller, null, duration, wantsPlay, ended,
                         surfaceBackdrop, true, keepControls, modifier = controlsFade,
-                        onTouch = { controlsTouched = it }, enabled = controlsVisible && actionable)
+                        onTouch = { controlsTouched = it }, enabled = controlsVisible && actionable,
+                        trailingAction = fullscreenTransportAction?.let { action -> { size ->
+                            action(surfaceBackdrop, controlsVisible && actionable, size)
+                        } })
                 }
             }
             fullscreenOverlay?.invoke(surfaceBackdrop)

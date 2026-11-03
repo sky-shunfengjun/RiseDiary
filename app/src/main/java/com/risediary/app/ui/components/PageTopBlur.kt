@@ -23,6 +23,7 @@ import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -149,6 +150,7 @@ fun PageTopBlurLayout(
             Box(
                 Modifier.fillMaxWidth()
                     .height(statusHeight + topBarHeight + fadeHeight)
+                    .testTag("rise-page-top-blur")
                     .graphicsLayer { alpha = intensity }
                     .then(effect),
             )

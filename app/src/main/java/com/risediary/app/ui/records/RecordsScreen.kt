@@ -1,5 +1,8 @@
 package com.risediary.app.ui.records
 
+import com.risediary.app.ui.components.RiseDialogAction
+import com.risediary.app.ui.components.DialogActionTone
+
 import com.risediary.app.ui.components.rememberTopBlurProgress
 import com.risediary.app.ui.components.PageTopBlurLayout
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -11,6 +14,8 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.PaddingValues
@@ -51,7 +56,6 @@ import com.risediary.app.data.repository.TagJson
 import com.risediary.app.ui.components.LiquidAlertDialog
 import com.risediary.app.ui.components.LiquidDateRangePickerDialog
 import com.risediary.app.ui.components.LiquidSnackbarTone
-import com.risediary.app.ui.components.liquidDialogCancelButtonColors
 import com.risediary.app.ui.components.mainPageBottomSpacing
 import com.risediary.app.ui.components.showLiquidSnackbar
 import com.risediary.app.ui.theme.RiseCard
@@ -294,11 +298,7 @@ fun RecordsScreen(
             onDismissRequest = { if (!writing) deleteTarget = null },
             title = { Text(stringResource(R.string.record_detail_delete_dialog_title)) },
             text = { Text(stringResource(R.string.record_detail_delete_dialog_message)) },
-            confirmButton = {
-                TextButton(
-                    text = stringResource(R.string.action_delete),
-                    enabled = !writing,
-                    onClick = {
+            confirmAction = RiseDialogAction(text = stringResource(R.string.action_delete), onClick = {
                         viewModel.delete(target) {
                         deleteTarget = null
                         val token = viewModel.pendingDeletions.value.firstOrNull { it.flight == target }?.token ?: return@delete
@@ -317,23 +317,8 @@ fun RecordsScreen(
                             }
                         }
                         }
-                    },
-                    colors = ButtonDefaults.textButtonColors(
-                        color = androidx.compose.ui.graphics.Color.Transparent,
-                        disabledColor = androidx.compose.ui.graphics.Color.Transparent,
-                        textColor = MiuixTheme.colorScheme.error,
-                        disabledTextColor = MiuixTheme.colorScheme.error
-                    )
-                )
-            },
-            dismissButton = {
-                TextButton(
-                    text = stringResource(R.string.action_cancel),
-                    enabled = !writing,
-                    onClick = { deleteTarget = null },
-                    colors = liquidDialogCancelButtonColors()
-                )
-            }
+                    }, tone = DialogActionTone.Destructive, enabled = !writing),
+            dismissAction = RiseDialogAction(text = stringResource(R.string.action_cancel), onClick = { deleteTarget = null }, tone = DialogActionTone.Normal, enabled = !writing)
         )
     }
 }
@@ -382,6 +367,7 @@ private fun FilterMenuRow(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun FlightCard(
     flight: Flight,
@@ -408,7 +394,7 @@ private fun FlightCard(
                     color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                 )
                 Spacer(modifier = Modifier.height(4.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     StatItem(AppIcons.Timer, formatDuration(flight.durationSeconds))
                     StatItem(
                         AppIcons.WaterDrop,

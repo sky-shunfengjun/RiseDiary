@@ -77,7 +77,7 @@ internal fun OnboardingPage(
 /** Normal setting surfaces follow the same miuix controls as the app. */
 @Composable
 internal fun OnboardingCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
-    Card(modifier = modifier, content = content)
+    Card(modifier = modifier, content = content, colors = top.yukonga.miuix.kmp.basic.CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer))
 }
 
 /** Page actions use miuix; navigation chrome alone uses the existing glass components. */

@@ -1,5 +1,8 @@
 package com.risediary.app.ui.tags
 
+import com.risediary.app.ui.components.RiseDialogAction
+import com.risediary.app.ui.components.DialogActionTone
+
 import com.risediary.app.ui.components.rememberTopBlurProgress
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -54,8 +57,6 @@ import com.risediary.app.ui.navigation3.Route
 import com.risediary.app.data.entity.Tag
 import com.risediary.app.ui.components.LiquidAddButton
 import com.risediary.app.ui.components.LiquidAlertDialog
-import com.risediary.app.ui.components.liquidDialogCancelButtonColors
-import com.risediary.app.ui.components.liquidDialogConfirmButtonColors
 import com.risediary.app.ui.components.SecondaryPageScaffold
 import com.risediary.app.ui.components.reorderByDragOffset
 import com.risediary.app.ui.theme.RiseCard
@@ -136,14 +137,13 @@ fun TagManagerScreen(
         topBlurProgress = rememberTopBlurProgress(listState),
         title = stringResource(R.string.settings_manage_tags),
         onBack = { navigator.pop() },
-        floatingActionButton = { backdrop ->
-            LiquidAddButton(
-                onClick = {
+        topBarActionsWidth = 48.dp,
+        actions = {
+            top.yukonga.miuix.kmp.basic.IconButton(onClick = {
                     if (!readFailed && !isSaving) { viewModel.clearError(); editingTag = null; showEditor = true }
-                },
-                backdrop = backdrop,
-                contentDescription = stringResource(R.string.tag_manager_add_tag)
-            )
+                }, enabled = !readFailed && !isSaving, modifier = Modifier.size(48.dp)) {
+                Icon(AppIcons.Add, stringResource(R.string.tag_manager_add_tag), Modifier.size(22.dp))
+            }
         }
     ) { padding ->
         LazyColumn(
@@ -305,31 +305,12 @@ fun TagManagerScreen(
                 )
                 }
             },
-            confirmButton = {
-                TextButton(
-                    text = stringResource(R.string.action_delete),
-                    enabled = !isSaving && !readFailed,
-                    onClick = {
+            confirmAction = RiseDialogAction(text = stringResource(R.string.action_delete), onClick = {
                         pendingOrderIds = null
                         if (error != null) viewModel.retryWrite()
                         else viewModel.delete(target) { deleteTarget = null }
-                    },
-                    colors = ButtonDefaults.textButtonColors(
-                        color = Color.Transparent,
-                        textColor = MiuixTheme.colorScheme.error,
-                        disabledColor = Color.Transparent,
-                        disabledTextColor = MiuixTheme.colorScheme.error
-                    )
-                )
-            },
-            dismissButton = {
-                TextButton(
-                    text = stringResource(R.string.action_cancel),
-                    enabled = !isSaving,
-                    onClick = { deleteTarget = null },
-                    colors = liquidDialogCancelButtonColors()
-                )
-            }
+                    }, tone = DialogActionTone.Destructive, enabled = !isSaving && !readFailed),
+            dismissAction = RiseDialogAction(text = stringResource(R.string.action_cancel), onClick = { deleteTarget = null }, tone = DialogActionTone.Normal, enabled = !isSaving)
         )
     }
 }
@@ -346,8 +327,8 @@ private fun TagEditorDialog(
     var color by remember(tag) { mutableStateOf(tag?.color ?: COLORS.first()) }
 
     LiquidAlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
+            onDismissRequest = onDismiss,
+            title = {
             Text(
                 if (tag == null) {
                     stringResource(R.string.tag_manager_add_tag)
@@ -356,7 +337,7 @@ private fun TagEditorDialog(
                 }
             )
         },
-        text = {
+            text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 TextField(
                     value = name,
@@ -386,22 +367,9 @@ private fun TagEditorDialog(
                 }
             }
         },
-        confirmButton = {
-            TextButton(
-                text = stringResource(R.string.action_save),
-                enabled = !isSaving,
-                onClick = { onSave(name, color) },
-                colors = liquidDialogConfirmButtonColors()
-            )
-        },
-        dismissButton = {
-            TextButton(
-                text = stringResource(R.string.action_cancel),
-                onClick = onDismiss,
-                colors = liquidDialogCancelButtonColors()
-            )
-        }
-    )
+            confirmAction = RiseDialogAction(text = stringResource(R.string.action_save), onClick = { onSave(name, color) }, tone = DialogActionTone.Normal, enabled = !isSaving),
+            dismissAction = RiseDialogAction(text = stringResource(R.string.action_cancel), onClick = onDismiss, tone = DialogActionTone.Normal)
+        )
 }
 
 private fun String.toComposeColor(): Color =

@@ -165,6 +165,7 @@ class VideoTimerViewModel internal constructor(
                     return@launch
                 }
                 if (current.sessionId == id && current.status != TimerStatus.IDLE) {
+                    check(current.videoSource is VideoSourceRef.DeviceVideo) { "请返回素材库计时页面" }
                     startedState.value = true
                     gate.acknowledgeStarted()
                     current.video?.let { load(it) }

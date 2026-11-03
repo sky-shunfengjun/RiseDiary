@@ -49,6 +49,8 @@ class TimerService : Service() {
     @Inject lateinit var videoGrants: VideoGrantRegistry
     @Inject lateinit var preferences: UserPreferences
     @Inject lateinit var notifications: TimerNotificationFactory
+    @Inject lateinit var libraryUsage: com.risediary.app.data.library.LibraryUsageRegistry
+    @Inject lateinit var database: com.risediary.app.data.AppDatabase
 
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val json = Json { encodeDefaults = true }
@@ -156,10 +158,16 @@ class TimerService : Service() {
             val session = TimerSessionPolicy.start(current, request,
                 wallClock.millis(), elapsedClock.millis(), bootIdentity.currentBootCount())
             if (session == current) return@write
+            val material = session.videoSource as? com.risediary.app.media.VideoSourceRef.LibraryVideo
+            if (material != null) {
+                check(libraryUsage.hold("timer-service", material.materialId)) { "素材正在删除" }
+                try { check(database.libraryDao().asset(material.materialId)?.state == "ready") { "素材已不可用" } }
+                catch (e: Exception) { libraryUsage.release("timer-service"); throw e }
+            }
             NotificationManagerCompat.from(this).cancel(MILESTONE_NOTIFICATION_ID)
             lastNotificationKey = null
             stateHolder.setCommandError(null)
-            videoGrants.retain("timer-service", listOfNotNull(session.video?.video?.uriString).toSet())
+            videoGrants.retain("timer-service", listOfNotNull((session.videoSource as? com.risediary.app.media.VideoSourceRef.DeviceVideo)?.video?.uriString).toSet())
             if (commitTransition(prepareTimerTransition(session), true)) startTicker()
         }
     }
@@ -330,6 +338,7 @@ class TimerService : Service() {
                 commandStartId = handledStartId
             ).commit(transition, persist)
             pendingTransition = null
+            libraryUsage.release("timer-service")
             stateHolder.setPersistenceError(false)
             stateHolder.setCommandError(null)
             if (transition.session.isActive) notifyState(transition.session)
@@ -445,6 +454,7 @@ class TimerService : Service() {
         tickerJob?.cancel()
         serviceScope.cancel()
         videoGrants.forget("timer-service")
+        if (pendingTransition == null) libraryUsage.release("timer-service")
         super.onDestroy()
     }
 

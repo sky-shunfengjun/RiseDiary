@@ -2,11 +2,15 @@ package com.risediary.app.ui.video
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.v2.createComposeRule
+import androidx.compose.ui.unit.dp
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.risediary.app.service.TimerSession
@@ -19,6 +23,29 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 class FloatingTimerCapsuleTest {
     @get:Rule val compose = createComposeRule()
+
+    @Test fun libraryClockStartsBelowTheHeaderAndDraggingKeepsThatAreaFree() {
+        val position = mutableStateOf(FloatingTimerPosition())
+        compose.setContent {
+            MiuixTheme {
+                Box(Modifier.fillMaxSize()) {
+                    Box(Modifier.fillMaxWidth().height(72.dp).testTag("fixed-header"))
+                    FloatingTimerCapsule(TimerSession(status = TimerStatus.RUNNING), rememberLayerBackdrop(),
+                        position.value, { position.value = it }, false, {}, null, null, false, {},
+                        topInset = 72.dp) {}
+                }
+            }
+        }
+        val header = compose.onNodeWithTag("fixed-header").fetchSemanticsNode().boundsInRoot
+        val initial = compose.onNodeWithTag("floating_timer_capsule").fetchSemanticsNode().boundsInRoot
+        assertTrue(initial.top > header.bottom)
+        compose.onNodeWithTag("floating_timer_capsule").performTouchInput {
+            swipe(center, center + Offset(50f, -500f), 500)
+        }
+        val dragged = compose.onNodeWithTag("floating_timer_capsule").fetchSemanticsNode().boundsInRoot
+        assertTrue(dragged.top > header.bottom)
+        assertEquals(header, compose.onNodeWithTag("fixed-header").fetchSemanticsNode().boundsInRoot)
+    }
 
     @Test fun tappingExpandsSharedActionsAndBlankTapCloses() {
         val expanded = mutableStateOf(false)

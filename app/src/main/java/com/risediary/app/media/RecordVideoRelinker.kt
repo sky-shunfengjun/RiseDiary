@@ -21,7 +21,9 @@ class RecordVideoRelinker @Inject constructor(
                 gate.requireCurrent(expected, flights.getById(expected.id))
                 val video = grants.acquire(owner, uri, flags, setOfNotNull(expected.videoUri)).getOrThrow()
                 val updated = expected.copy(videoUri = video.uriString,
-                    videoDisplayName = video.displayName, videoMimeType = video.mimeType, updatedAt = RecordTimestamps.updatedAt(expected.createdAt, expected.updatedAt, clock.millis()))
+                    videoDisplayName = video.displayName, videoMimeType = video.mimeType,
+                    materialId = null, materialName = null, materialRemoved = false,
+                    updatedAt = RecordTimestamps.updatedAt(expected.createdAt, expected.updatedAt, clock.millis()))
                 flights.update(updated)
                 updated
             }

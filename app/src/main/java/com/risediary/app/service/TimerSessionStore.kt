@@ -77,6 +77,7 @@ class TimerSessionStore internal constructor(
         require(session.elapsedMillis in 0L..TimerMath.MAX_DURATION_MILLIS)
         require(session.sessionId == null || (session.sessionId.isNotBlank() && session.sessionId.length <= 128))
         require((session.kind == TimerKind.VIDEO) == (session.video != null))
+        com.risediary.app.media.requireVideoSource(session.video?.video, session.videoSource)
         session.video?.let {
             require(com.risediary.app.media.validateLocalVideoFields(it.video.uriString, it.video.displayName, it.video.mimeType) == null)
             require(it.positionMillis >= 0L && it.speed in listOf(0.5f, 1f, 1.25f, 1.5f, 2f))

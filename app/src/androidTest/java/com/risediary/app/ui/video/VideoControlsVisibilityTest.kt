@@ -5,6 +5,7 @@ import android.content.Context
 import android.view.View
 import android.view.ViewGroup
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.Row
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -15,6 +16,7 @@ import androidx.compose.ui.test.click
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithContentDescription
 import androidx.compose.ui.test.onRoot
+import androidx.compose.ui.test.onNodeWithText
 import androidx.compose.ui.test.performTouchInput
 import androidx.media3.common.Player
 import androidx.media3.ui.PlayerView
@@ -29,6 +31,8 @@ import org.junit.Assert.assertSame
 import org.junit.Rule
 import org.junit.Test
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.IconButton
 
 /** Hidden controls must stop accepting actions at the start of their visual fade. */
 class VideoControlsVisibilityTest {
@@ -42,6 +46,22 @@ class VideoControlsVisibilityTest {
     private lateinit var surface: PlayerView
     private val context = ApplicationProvider.getApplicationContext<Context>()
     private var exits = 0
+
+    @Test fun libraryHeaderHidesWithTransportAndHasNoShrinkButton() {
+        showPlayer(library = true)
+        val exit = context.getString(R.string.video_exit_fullscreen)
+        compose.onNodeWithContentDescription(exit).assertDoesNotExist()
+        compose.onNodeWithText("素材标题").assertIsDisplayed()
+        compose.onNodeWithText("返回素材库").assertIsDisplayed()
+        compose.runOnIdle { surface.performClick() }
+        compose.mainClock.advanceTimeByFrame()
+        compose.onNodeWithText("素材标题").assertDoesNotExist()
+        compose.onNodeWithText("返回素材库").assertDoesNotExist()
+        compose.runOnIdle { surface.performClick() }
+        compose.mainClock.advanceTimeBy(200)
+        compose.onNodeWithText("素材标题").assertIsDisplayed()
+        compose.onNodeWithContentDescription(exit).assertDoesNotExist()
+    }
 
     @Test fun hiddenControlsLoseAccessibilityActionsBeforeFadeFinishes() {
         showPlayer()
@@ -78,7 +98,7 @@ class VideoControlsVisibilityTest {
         compose.mainClock.advanceTimeBy(500)
     }
 
-    private fun showPlayer() {
+    private fun showPlayer(library: Boolean = false) {
         // Generated two-second fixture only; no user media or device permissions are touched.
         context.contentResolver.openFileDescriptor(TestVideoProvider.READABLE, "r")!!.use { }
         compose.setContent {
@@ -95,7 +115,13 @@ class VideoControlsVisibilityTest {
             root = LocalView.current.rootView
             MiuixTheme {
                 LocalVideoPlayer(controller, owner, fullScreen = true,
-                    onFullScreen = { exits++ }, modifier = Modifier.fillMaxSize())
+                    onFullScreen = { exits++ }, modifier = Modifier.fillMaxSize(), showFullscreenExit = !library,
+                    fullscreenHeader = if (library) ({ visible ->
+                        Row {
+                            IconButton({}, enabled = visible) { Text("返回素材库") }
+                            Text("素材标题")
+                        }
+                    }) else null)
             }
         }
         compose.waitUntil(15_000) {

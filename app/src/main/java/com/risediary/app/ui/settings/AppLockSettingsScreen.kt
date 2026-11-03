@@ -1,5 +1,8 @@
 package com.risediary.app.ui.settings
 
+import com.risediary.app.ui.components.RiseDialogAction
+import com.risediary.app.ui.components.DialogActionTone
+
 import com.risediary.app.ui.components.rememberTopBlurProgress
 import android.content.Context
 import android.content.ContextWrapper
@@ -27,7 +30,6 @@ import com.risediary.app.ui.navigation3.Route
 import com.risediary.app.R
 import com.risediary.app.ui.components.LiquidAlertDialog
 import com.risediary.app.ui.components.SecondaryPageScaffold
-import com.risediary.app.ui.components.liquidDialogCancelButtonColors
 import com.risediary.app.ui.theme.RiseCard
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Text
@@ -150,28 +152,11 @@ fun AppLockSettingsScreen(
             onDismissRequest = { showDisableDialog = false },
             title = { Text(stringResource(R.string.settings_app_lock_disable_title)) },
             text = { Text(stringResource(R.string.settings_app_lock_disable_message)) },
-            confirmButton = {
-                TextButton(
-                    text = stringResource(R.string.settings_app_lock_continue_verify),
-                    onClick = {
+            confirmAction = RiseDialogAction(text = stringResource(R.string.settings_app_lock_continue_verify), onClick = {
                         showDisableDialog = false
                         navigator.push(Route.LockDisable)
-                    },
-                    colors = ButtonDefaults.textButtonColors(
-                        color = androidx.compose.ui.graphics.Color.Transparent,
-                        disabledColor = androidx.compose.ui.graphics.Color.Transparent,
-                        textColor = MiuixTheme.colorScheme.error,
-                        disabledTextColor = MiuixTheme.colorScheme.error
-                    )
-                )
-            },
-            dismissButton = {
-                TextButton(
-                    text = stringResource(R.string.action_cancel),
-                    onClick = { showDisableDialog = false },
-                    colors = liquidDialogCancelButtonColors()
-                )
-            }
+                    }, tone = DialogActionTone.Destructive),
+            dismissAction = RiseDialogAction(text = stringResource(R.string.action_cancel), onClick = { showDisableDialog = false }, tone = DialogActionTone.Normal)
         )
     }
 }

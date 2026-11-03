@@ -7,7 +7,10 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class TimerStateHolder @Inject constructor() {
+class TimerStateHolder @Inject constructor(
+    private val usage: com.risediary.app.data.library.LibraryUsageRegistry
+) {
+    constructor() : this(com.risediary.app.data.library.LibraryUsageRegistry())
     private val stateLock = Any()
     private var generation = 0L
     private val mutableState = MutableStateFlow(TimerSession())
@@ -23,6 +26,7 @@ class TimerStateHolder @Inject constructor() {
 
     fun set(session: TimerSession) {
         synchronized(stateLock) {
+            protect(session)
             // Count actions even when StateFlow suppresses an equal value, including an idle reset.
             generation++
             mutableState.value = session
@@ -38,10 +42,17 @@ class TimerStateHolder @Inject constructor() {
         val persisted = load()
         return synchronized(stateLock) {
             if (generation == expectedGeneration) {
+                protect(persisted)
                 generation++
                 mutableState.value = persisted
             }
             mutableState.value
         }
+    }
+
+    private fun protect(session: TimerSession) {
+        val material = session.videoSource as? com.risediary.app.media.VideoSourceRef.LibraryVideo
+        if (material != null && session.status != TimerStatus.IDLE) check(usage.hold(this, material.materialId)) { "素材正在删除" }
+        else usage.release(this)
     }
 }

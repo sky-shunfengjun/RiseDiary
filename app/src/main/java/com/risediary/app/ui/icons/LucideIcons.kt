@@ -14,6 +14,8 @@ import androidx.compose.ui.unit.dp
  * Stroke 2px round caps by default; Filled variants for selected/emphasis states.
  */
 object LucideIcons {
+    val Folder: ImageVector by lazy { icon("Folder", PathSpec("M20 20H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2Z", false)) }
+    val Search: ImageVector by lazy { icon("Search", PathSpec("M21 21l-4.3-4.3 M19 11a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z", false)) }
     private class PathSpec(val d: String, val filled: Boolean)
 
     private fun icon(name: String, vararg specs: PathSpec): ImageVector =

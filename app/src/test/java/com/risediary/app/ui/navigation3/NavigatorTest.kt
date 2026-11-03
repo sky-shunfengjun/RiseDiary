@@ -6,6 +6,15 @@ import androidx.compose.runtime.saveable.SaverScope
 import org.junit.Test
 
 class NavigatorTest {
+    @Test fun notificationReusesTheOriginalViewerAfterTheUserStartedTimingADifferentQueueItem() {
+        val navigator = Navigator(Route.Main)
+        val original = Route.LibraryViewer("first-material", "same-timer")
+        navigator.push(original)
+        navigator.push(Route.ModeSelect)
+        navigator.push(Route.LibraryViewer("timed-material", "same-timer"))
+        assertEquals(original, navigator.current())
+        assertEquals(2, navigator.backStackSize())
+    }
     @Test
     fun opening_an_existing_destination_returns_to_its_original_entry() {
         val navigator = Navigator(Route.Main)

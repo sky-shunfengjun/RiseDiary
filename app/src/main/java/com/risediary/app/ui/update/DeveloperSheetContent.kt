@@ -1,5 +1,10 @@
 package com.risediary.app.ui.update
 
+import com.risediary.app.ui.components.RiseDialogAction
+import com.risediary.app.ui.components.DialogActionTone
+import com.risediary.app.ui.components.RiseDialogActions
+import com.risediary.app.ui.components.RiseDialogActionButton
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
@@ -59,13 +64,7 @@ internal fun DeveloperSheetContent(
                         enabled = enabled,
                         modifier = Modifier.fillMaxWidth().testTag("developer_password"),
                     )
-                    TextButton(
-                        text = stringResource(R.string.developer_verify),
-                        modifier = Modifier.fillMaxWidth(),
-                        enabled = enabled,
-                        colors = ButtonDefaults.textButtonColorsPrimary(),
-                        onClick = { focus.clearFocus(); viewModel.verifyDeveloperPassword(password) },
-                    )
+                    RiseDialogActionButton(RiseDialogAction(stringResource(R.string.developer_verify), { focus.clearFocus(); viewModel.verifyDeveloperPassword(password) }, DialogActionTone.Normal, enabled = enabled), Modifier.fillMaxWidth(), emphasized = true)
                 }
             }
         } else {
@@ -100,6 +99,7 @@ internal fun DeveloperSheetContent(
                 }
             }
             PlayerDiagnosticsEntry(viewModel.videoDiagnostics, enabled)
+            com.risediary.app.ui.catalog.UiPatternMenuEntry(enabled)
             if (onRestartUpdateIntro != null) Card(
                 Modifier.fillMaxWidth().testTag("developer_update_intro"),
                 colors = CardDefaults.defaultColors(color = updateSheetCardColor()),
@@ -143,12 +143,10 @@ internal fun DeveloperResetDialog(show: Boolean, viewModel: UpdateViewModel) {
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text(stringResource(R.string.developer_reset_message))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                TextButton(text = stringResource(R.string.developer_reset_cancel), modifier = Modifier.weight(1f),
-                    onClick = viewModel::cancelDeveloperReset)
-                TextButton(text = stringResource(R.string.developer_reset_confirm), modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.textButtonColorsPrimary(), onClick = viewModel::confirmDeveloperReset)
-            }
+            RiseDialogActions(
+                confirmAction = RiseDialogAction(stringResource(R.string.developer_reset_confirm), viewModel::confirmDeveloperReset, DialogActionTone.Destructive),
+                dismissAction = RiseDialogAction(stringResource(R.string.developer_reset_cancel), viewModel::cancelDeveloperReset, DialogActionTone.Normal)
+            )
         }
     }
 }
@@ -175,13 +173,13 @@ private fun PlayerDiagnosticsEntry(diagnostics: com.risediary.app.media.VideoDia
                 checked = active, onCheckedChange = diagnostics::setEnabled)
             if (active) Text(snapshot.report())
             else Text("开启后播放同一视频，可对比普通与全屏模式的掉帧和缓冲。")
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                TextButton("关闭", modifier = Modifier.weight(1f), onClick = { show = false })
-                TextButton("复制", modifier = Modifier.weight(1f), enabled = active, onClick = {
+            RiseDialogActions(
+                confirmAction = RiseDialogAction("复制", {
                     val clipboard = context.getSystemService(android.content.ClipboardManager::class.java)
                     clipboard.setPrimaryClip(android.content.ClipData.newPlainText("播放器诊断", snapshot.report()))
-                })
-            }
+                }, DialogActionTone.Normal, enabled = active),
+                dismissAction = RiseDialogAction("关闭", { show = false }, DialogActionTone.Normal)
+            )
         }
     }
 }

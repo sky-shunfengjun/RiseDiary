@@ -19,6 +19,15 @@ sealed interface Route : NavKey {
     data object ModeSelect : Route
 
     @Serializable
+    data object LibraryBrowse : Route
+
+    @Serializable
+    data class LibraryFolder(val folderId: String) : Route
+
+    @Serializable
+    data class LibraryViewer(val assetId: String, val openingId: String = java.util.UUID.randomUUID().toString()) : Route
+
+    @Serializable
     data object Timer : Route
 
     @Serializable

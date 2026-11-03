@@ -30,13 +30,16 @@ class Navigator(
     private val resultBus = mutableMapOf<String, MutableSharedFlow<Any>>()
 
     fun push(key: Route) {
-        val existingIndex = backStack.indexOf(key)
+        // The entry may have started on a different queue item before its timer fixed the material.
+        val target = if (key is Route.LibraryViewer) backStack.filterIsInstance<Route.LibraryViewer>()
+            .firstOrNull { it.openingId == key.openingId } ?: key else key
+        val existingIndex = backStack.indexOf(target)
         if (existingIndex >= 0) {
             // miuix-nav keys identify saved state and ViewModels. Reuse that
             // entry instead of creating a second page with the same identity.
             while (backStack.lastIndex > existingIndex) backStack.removeAt(backStack.lastIndex)
         } else {
-            backStack.add(key)
+            backStack.add(target)
         }
     }
 

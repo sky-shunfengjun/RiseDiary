@@ -54,11 +54,11 @@ internal fun RecordDetailContent(
     var retainedError by remember { mutableStateOf(error) }
     SideEffect { error?.let { retainedError = it } }
     Column(Modifier.fillMaxSize().verticalScroll(scrollState).padding(contentPadding).padding(vertical = 4.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        verticalArrangement = Arrangement.spacedBy(14.dp)) {
         RecordDetailSummary(flight)
         videoContent?.invoke()
         RiseCard(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(18.dp)) {
                 FormSectionTitle(AppIcons.Schedule, stringResource(R.string.record_detail_time_details))
                 DetailTimeValue(stringResource(R.string.record_detail_start_time), formatDetailDateTime(flight.startTime, calendar.zoneId))
                 DetailTimeValue(stringResource(R.string.record_detail_end_time), formatDetailDateTime(flight.endTime, calendar.zoneId))

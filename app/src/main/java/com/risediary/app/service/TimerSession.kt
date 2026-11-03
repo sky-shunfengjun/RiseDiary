@@ -1,6 +1,7 @@
 package com.risediary.app.service
 
 import com.risediary.app.media.VideoPlaybackSnapshot
+import com.risediary.app.media.VideoSourceRef
 import kotlinx.serialization.Serializable
 
 @Serializable
@@ -14,7 +15,8 @@ data class TimerStartRequest(
     val kind: TimerKind,
     val video: VideoPlaybackSnapshot? = null,
     val startedAtEpochMillis: Long? = null,
-    val startedAtElapsedRealtime: Long? = null
+    val startedAtElapsedRealtime: Long? = null,
+    val videoSource: VideoSourceRef? = video?.let { VideoSourceRef.DeviceVideo(it.video) }
 )
 
 @Serializable
@@ -39,7 +41,8 @@ data class TimerSession(
     val video: VideoPlaybackSnapshot? = null,
     val finishCandidate: TimerFinishCandidate? = null,
     val endedAtEpochMillis: Long? = null,
-    val liveUpdateDismissed: Boolean = false
+    val liveUpdateDismissed: Boolean = false,
+    val videoSource: VideoSourceRef? = video?.let { VideoSourceRef.DeviceVideo(it.video) }
 ) {
     val isActive: Boolean get() = status == TimerStatus.RUNNING || status == TimerStatus.PAUSED
     val isTerminal: Boolean get() = status == TimerStatus.FINISHED || status == TimerStatus.LIMIT_REACHED

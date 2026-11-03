@@ -2,10 +2,7 @@ package com.risediary.app.ui.form
 
 import android.content.Context
 import android.net.Uri
-import com.risediary.app.media.LocalVideoRef
-import com.risediary.app.media.VideoGrantRegistry
-import com.risediary.app.media.localVideoRef
-import com.risediary.app.media.validateLocalVideoFields
+import com.risediary.app.media.*
 import java.util.UUID
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -51,7 +48,8 @@ class FormViewModel @Inject constructor(
     private val timerController: TimerController,
     @ApplicationContext private val context: Context,
     private val videoGrants: VideoGrantRegistry,
-    private val forms: RecordFormSessionStore
+    private val forms: RecordFormSessionStore,
+    private val libraryUsage: com.risediary.app.data.library.LibraryUsageRegistry = com.risediary.app.data.library.LibraryUsageRegistry()
 ) : ViewModel() {
     private val newRecordGlobalId = com.risediary.app.data.sync.RecordIdentity.newId()
 
@@ -116,6 +114,8 @@ class FormViewModel @Inject constructor(
 
     var video by mutableStateOf<LocalVideoRef?>(null)
         private set
+    private var videoSource: VideoSourceRef? = null
+    private var removedMaterialName: String? = null
     var isSelectingVideo by mutableStateOf(false)
         private set
     var videoError by mutableStateOf<String?>(null)
@@ -130,6 +130,9 @@ class FormViewModel @Inject constructor(
             try {
                 val current = listOfNotNull(originalFlight?.videoUri, video?.uriString).toSet()
                 video = videoGrants.acquire(videoOwner, uri.toString(), flags, current).getOrThrow()
+                videoSource = video?.let(VideoSourceRef::DeviceVideo)
+                removedMaterialName = null
+                libraryUsage.release(videoOwner)
                 updateVideoPin()
                 updateSession()
                 videoGrants.requestCleanup()
@@ -146,6 +149,9 @@ class FormViewModel @Inject constructor(
     fun removeVideo() {
         if (isSelectingVideo || isSaving || isLoading || saved) return
         video = null
+        videoSource = null
+        removedMaterialName = null
+        libraryUsage.release(videoOwner)
         videoError = null
         // Update memory before grant-mutex suspension, including an immediate Back or Save.
         updateSession()
@@ -156,12 +162,14 @@ class FormViewModel @Inject constructor(
     }
 
     private suspend fun updateVideoPin() {
-        videoGrants.retain(videoOwner, listOfNotNull(originalFlight?.videoUri, video?.uriString).toSet())
+        videoGrants.retain(videoOwner, listOfNotNull(originalFlight?.videoUri,
+            (videoSource as? VideoSourceRef.DeviceVideo)?.video?.uriString).toSet())
     }
 
     override fun onCleared() {
         formSnapshot?.let { forms.discard(it.formId) }
         videoGrants.forget(videoOwner)
+        libraryUsage.release(videoOwner)
     }
 
     var formReady by mutableStateOf(false)
@@ -177,7 +185,8 @@ class FormViewModel @Inject constructor(
     private fun captureForm(seed: RecordFormSessionSnapshot? = formSnapshot) =
         seed?.copy(startTime = startTime, endTime = endTime,
             durationSeconds = durationSeconds, timingSource = timingSource, timeWasEdited = durationWasEdited,
-            quantity = quantityDraft.snapshot(), video = video, distanceText = distanceCm,
+            quantity = quantityDraft.snapshot(), video = video, videoSource = videoSource,
+            removedMaterialName = removedMaterialName, distanceText = distanceCm,
             methodTags = selectedTags, moodNote = moodNote)
 
     private fun updateSession() {
@@ -197,6 +206,8 @@ class FormViewModel @Inject constructor(
         quantityDraft = RecordFormQuantityDraft.restore(snapshot.quantity)
         quantityRangeInitialized = true
         video = snapshot.video
+        videoSource = snapshot.videoSource
+        removedMaterialName = snapshot.removedMaterialName
         distanceCm = snapshot.distanceText
         selectedTags = snapshot.methodTags
         moodNote = snapshot.moodNote
@@ -253,6 +264,7 @@ class FormViewModel @Inject constructor(
         showDiscard = false
         formSnapshot?.let { forms.discard(it.formId) }
         videoGrants.forget(videoOwner)
+        libraryUsage.release(videoOwner)
         onReady()
     }
     private var initialized = false
@@ -339,7 +351,11 @@ class FormViewModel @Inject constructor(
                     errorMessage = context.getString(R.string.form_error_record_missing)
                 } else {
                     recordSaver.loadOriginal(flight)
-                    video = flight.localVideoRef()
+                    video = flight.playbackVideoRef()
+                    videoSource = flight.videoSourceRef()
+                    removedMaterialName = flight.materialName.takeIf { flight.materialRemoved }
+                    (videoSource as? VideoSourceRef.LibraryVideo)?.let { check(libraryUsage.hold(videoOwner, it.materialId)) { "素材正在删除，请重试" } }
+                    if (removedMaterialName != null) videoError = "原素材已移除：$removedMaterialName"
                     updateVideoPin()
                     quantityDraft = RecordFormQuantityDraft(flight, quantitySettings?.predictionMaxTicks ?: 80)
                     editingFlightId = flight.id
@@ -357,7 +373,8 @@ class FormViewModel @Inject constructor(
                         formId = videoOwner, submissionId = "edit:" + flight.id,
                         startTime = startTime, endTime = endTime, durationSeconds = durationSeconds,
                         timingSource = timingSource, quantity = quantityDraft.snapshot(),
-                        video = video, distanceText = distanceCm, methodTags = selectedTags, moodNote = moodNote
+                        video = video, videoSource = videoSource, removedMaterialName = removedMaterialName,
+                        distanceText = distanceCm, methodTags = selectedTags, moodNote = moodNote
                     )
                 }
             } catch (error: CancellationException) {
@@ -527,7 +544,7 @@ class FormViewModel @Inject constructor(
                     globalId = existing?.globalId ?: newRecordGlobalId,
                     recordSource = existing?.recordSource ?: com.risediary.app.data.sync.RecordIdentity.PHONE,
                     sourceDeviceId = existing?.sourceDeviceId
-                ).let(quantityDraft::applyTo)
+                ).withVideoAssociation(video, videoSource, removedMaterialName).let(quantityDraft::applyTo)
                 val followUps = mutableListOf<suspend () -> Unit>({ reminderScheduler.onFlightDataChanged() })
                 val result = recordSaver.save(
                     flight,
@@ -540,6 +557,7 @@ class FormViewModel @Inject constructor(
                 }
                 saved = true
                 formSnapshot?.let { forms.discard(it.formId) }
+                libraryUsage.release(videoOwner)
                 }
             } catch (_: StaleRecordDraftException) {
                 errorMessage = "这条记录已变化或被移除；当前输入已保留，请返回后重新打开"

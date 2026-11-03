@@ -22,6 +22,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -34,6 +41,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -70,15 +78,14 @@ fun SecondaryPageScaffold(
     topBlurProgress: () -> Float = { 0f },
     adaptiveBottomActionSpace: Boolean = false,
     topBarActionsWidth: Dp = 0.dp,
+    windowInsets: WindowInsets = WindowInsets.systemBars,
+    titleContent: (@Composable (Modifier) -> Unit)? = null,
     content: @Composable (PaddingValues) -> Unit
 ) {
-    val statusBarTopDp = WindowInsets.statusBars
-        .asPaddingValues()
-        .calculateTopPadding()
-    val navigationBarBottomDp = WindowInsets.navigationBars
-        .asPaddingValues()
-        .calculateBottomPadding()
     val density = LocalDensity.current
+    val statusBarTopDp = with(density) { windowInsets.getTop(this).toDp() }
+    val navigationBarBottomDp = with(density) { windowInsets.getBottom(this).toDp() }
+    var measuredHeaderHeight by remember(density, statusBarTopDp) { mutableStateOf(statusBarTopDp + 60.dp) }
     var bottomActionHeightDp by remember { mutableFloatStateOf(0f) }
     val pageBackground = backgroundBrush()
     val currentBackground by rememberUpdatedState(pageBackground)
@@ -102,7 +109,8 @@ fun SecondaryPageScaffold(
     ProvidePageBackdrop(backdrop) {
         PageTopBlurLayout(
             progress = topBlurProgress,
-            topBarHeight = 60.dp,
+            topBarHeight = measuredHeaderHeight,
+            includeStatusBar = false,
             fadeHeight = 24.dp,
             modifier = modifier
                 .fillMaxSize()
@@ -116,14 +124,17 @@ fun SecondaryPageScaffold(
                     backdrop = backdrop,
                     actions = actions,
                     titleAlpha = titleAlpha,
-                    actionsWidth = topBarActionsWidth
+                    actionsWidth = topBarActionsWidth,
+                    titleContent = titleContent,
+                    windowInsets = windowInsets,
+                    modifier = Modifier.testTag("rise-page-header").onSizeChanged { measuredHeaderHeight = with(density) { it.height.toDp() } }
                 )
 
                 if (floatingActionButton != null) {
                     Box(
                         modifier = Modifier
                             .align(Alignment.BottomEnd)
-                            .navigationBarsPadding()
+                            .windowInsetsPadding(windowInsets.only(WindowInsetsSides.Bottom))
                             .padding(end = 20.dp, bottom = 20.dp)
                     ) {
                         floatingActionButton(backdrop)
@@ -134,7 +145,7 @@ fun SecondaryPageScaffold(
                     Box(
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
-                            .navigationBarsPadding()
+                            .windowInsetsPadding(windowInsets.only(WindowInsetsSides.Bottom))
                             .imePadding()
                             .padding(horizontal = 20.dp, vertical = 12.dp)
                     ) {
@@ -153,7 +164,7 @@ fun SecondaryPageScaffold(
                 content(
                     PaddingValues(
                         start = 20.dp,
-                        top = statusBarTopDp + 76.dp,
+                        top = measuredHeaderHeight + 16.dp,
                         end = 20.dp,
                         bottom = navigationBarBottomDp +
                             when {
@@ -181,27 +192,29 @@ fun PageTopBar(
     actions: @Composable RowScope.() -> Unit = {},
     titleAlpha: (() -> Float)? = null,
     endPadding: Dp = 12.dp,
-    actionsWidth: Dp = 0.dp
+    actionsWidth: Dp = 0.dp,
+    windowInsets: WindowInsets = WindowInsets.systemBars,
+    titleContent: (@Composable (Modifier) -> Unit)? = null
 ) {
     val baseAlpha = titleAlpha?.invoke() ?: 1f
-    Box(
+    Row(
         modifier = modifier
             .fillMaxWidth()
-            .statusBarsPadding()
-            .height(60.dp)
-            .padding(start = 20.dp, end = endPadding)
+            .windowInsetsPadding(windowInsets.only(WindowInsetsSides.Top))
+            .heightIn(min = 60.dp)
+            .padding(start = 20.dp, end = endPadding),
+        verticalAlignment = Alignment.CenterVertically
     ) {
         LiquidBackButton(
             onClick = onBack,
             backdrop = backdrop,
-            modifier = Modifier.align(Alignment.CenterStart)
-        )
-        Text(
-            text = title,
             modifier = Modifier
-                .align(Alignment.CenterStart)
-                .padding(start = 62.dp, end = actionsWidth)
-                .graphicsLayer { alpha = baseAlpha },
+        )
+        val titleModifier = Modifier.weight(1f).padding(start = 14.dp, top = 8.dp, bottom = 8.dp)
+            .graphicsLayer { alpha = baseAlpha }
+        if (titleContent != null) titleContent(titleModifier) else Text(
+            text = title,
+            modifier = titleModifier,
             fontSize = 30.sp,
             fontWeight = FontWeight.SemiBold,
             color = MiuixTheme.colorScheme.onSurface,
@@ -209,7 +222,7 @@ fun PageTopBar(
             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
         )
         Row(
-            modifier = Modifier.align(Alignment.CenterEnd),
+            modifier = Modifier.then(if (actionsWidth > 0.dp) Modifier.width(actionsWidth) else Modifier),
             verticalAlignment = Alignment.CenterVertically,
             content = actions
         )

@@ -13,6 +13,10 @@ import kotlin.math.abs
 
 internal object BackupJsonCodec {
     fun flightToJson(value: Flight) = JSONObject().apply {
+        com.risediary.app.media.validateMaterialAssociation(value.materialId, value.materialName, value.materialRemoved, value.videoUri)
+        put("materialId", value.materialId ?: JSONObject.NULL)
+        put("materialName", value.materialName ?: JSONObject.NULL)
+        put("materialRemoved", value.materialRemoved)
         com.risediary.app.data.repository.TagJson.validate(value.methodTags)
         put("id", value.id)
         put("globalId", value.globalId)
@@ -120,6 +124,12 @@ internal object BackupJsonCodec {
                 val videoUri = videoText("videoUri")
                 val videoName = videoText("videoDisplayName")
                 val videoMime = videoText("videoMimeType")
+                val materialId = videoText("materialId")
+                val materialName = videoText("materialName")
+                val materialRemoved = if (has("materialRemoved")) get("materialRemoved").also {
+                    require(it is Boolean) { "素材删除状态无效" }
+                } as Boolean else false
+                com.risediary.app.media.validateMaterialAssociation(materialId, materialName, materialRemoved, videoUri)
                 require(com.risediary.app.media.validateLocalVideoFields(videoUri, videoName, videoMime) == null) {
                     "视频关联信息无效"
                 }
@@ -153,6 +163,9 @@ internal object BackupJsonCodec {
                     videoUri = videoUri,
                     videoDisplayName = videoName,
                     videoMimeType = videoMime,
+                    materialId = materialId,
+                    materialName = materialName,
+                    materialRemoved = materialRemoved,
                     recordDraftId = videoText("recordDraftId")?.also { require(it.isNotBlank() && it.length <= 128) },
                     timingSource = if (has("timingSource")) requireNotNull(videoText("timingSource")) else "manual",
                     ejaculationDistanceCm = if (isNull("ejaculationDistanceCm")) null
@@ -281,6 +294,7 @@ internal object BackupJsonCodec {
             val value = row.get(key)
             if (value === JSONObject.NULL) return@forEach
             require(when {
+                key == "materialRemoved" -> value is Boolean
                 key in int32 -> value is Number && runCatching { requireBackupInt(value) }.isSuccess
                 key in integers -> value is Int || value is Long
                 key in numbers -> value is Number && value.toDouble().isFinite()

@@ -1,5 +1,8 @@
 package com.risediary.app.ui.length
 
+import com.risediary.app.ui.components.RiseDialogAction
+import com.risediary.app.ui.components.DialogActionTone
+
 import com.risediary.app.ui.components.rememberTopBlurProgress
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.Canvas
@@ -43,8 +46,6 @@ import com.risediary.app.data.DataMaintenanceGate
 import com.risediary.app.ui.components.LiquidAddButton
 import com.risediary.app.ui.components.InlineStatusContent
 import com.risediary.app.ui.components.LiquidAlertDialog
-import com.risediary.app.ui.components.liquidDialogCancelButtonColors
-import com.risediary.app.ui.components.liquidDialogConfirmButtonColors
 import com.risediary.app.ui.components.LengthTrendChart
 import com.risediary.app.ui.components.SecondaryPageScaffold
 import com.risediary.app.ui.theme.CardBlue
@@ -88,20 +89,18 @@ fun LengthHistoryScreen(
         topBlurProgress = rememberTopBlurProgress(listState),
         title = stringResource(R.string.home_length_title),
         onBack = { navigator.pop() },
-        floatingActionButton = { backdrop ->
-            LiquidAddButton(
-                onClick = {
+        topBarActionsWidth = 48.dp,
+        actions = {
+            top.yukonga.miuix.kmp.basic.IconButton(onClick = {
                     if (!viewModel.busy.value && viewModel.maintenanceState.value == DataMaintenanceGate.State.IDLE) {
                         viewModel.clearError()
                         editorRecord = null
                         showEditor = true
                     }
-                },
-                backdrop = backdrop,
-                contentDescription = stringResource(R.string.length_add_record)
-            )
-        },
-        reserveFloatingActionButtonSpace = false
+                }, enabled = writeEnabled, modifier = Modifier.size(48.dp)) {
+                Icon(AppIcons.Add, stringResource(R.string.length_add_record), Modifier.size(22.dp))
+            }
+        }
     ) { innerPadding ->
         LazyColumn(
             state = listState,
@@ -111,7 +110,7 @@ fun LengthHistoryScreen(
                 start = innerPadding.calculateLeftPadding(LayoutDirection.Ltr),
                 top = innerPadding.calculateTopPadding(),
                 end = innerPadding.calculateRightPadding(LayoutDirection.Ltr),
-                bottom = innerPadding.calculateBottomPadding() + 88.dp
+                bottom = innerPadding.calculateBottomPadding()
             ),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
@@ -125,7 +124,7 @@ fun LengthHistoryScreen(
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .height(320.dp),
+                            .padding(vertical = 24.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
@@ -133,14 +132,12 @@ fun LengthHistoryScreen(
                                 stringResource(R.string.length_empty),
                                 color = MiuixTheme.colorScheme.onSurfaceVariantSummary
                             )
-                            TextButton(
-                                text = stringResource(R.string.length_add_first),
-                                onClick = {
+                            com.risediary.app.ui.components.RiseDialogActionButton(
+                                RiseDialogAction(text = stringResource(R.string.length_add_first), onClick = {
                                     editorRecord = null
                                     showEditor = true
                                 },
-                                colors = liquidDialogConfirmButtonColors(),
-                                enabled = writeEnabled
+                                    tone = DialogActionTone.Normal, enabled = writeEnabled), emphasized = true
                             )
                         }
                     }
@@ -212,29 +209,11 @@ fun LengthHistoryScreen(
             onDismissRequest = { deleteTarget = null },
             title = { Text(stringResource(R.string.length_delete_dialog_title)) },
             text = { Text(stringResource(R.string.length_delete_dialog_message)) },
-            confirmButton = {
-                TextButton(
-                    text = stringResource(R.string.action_delete),
-                    enabled = writeEnabled,
-                    onClick = {
+            confirmAction = RiseDialogAction(text = stringResource(R.string.action_delete), onClick = {
                         viewModel.delete(target)
                         deleteTarget = null
-                    },
-                    colors = ButtonDefaults.textButtonColors(
-                        color = androidx.compose.ui.graphics.Color.Transparent,
-                        textColor = MiuixTheme.colorScheme.error,
-                        disabledColor = androidx.compose.ui.graphics.Color.Transparent,
-                        disabledTextColor = MiuixTheme.colorScheme.error
-                    )
-                )
-            },
-            dismissButton = {
-                TextButton(
-                    text = stringResource(R.string.action_cancel),
-                    onClick = { deleteTarget = null },
-                    colors = liquidDialogCancelButtonColors()
-                )
-            }
+                    }, tone = DialogActionTone.Destructive, enabled = writeEnabled),
+            dismissAction = RiseDialogAction(text = stringResource(R.string.action_cancel), onClick = { deleteTarget = null }, tone = DialogActionTone.Normal)
         )
     }
 }
@@ -281,8 +260,8 @@ private fun LengthRecordDialog(
     var note by remember(record) { mutableStateOf(record?.note.orEmpty()) }
 
     LiquidAlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
+            onDismissRequest = onDismiss,
+            title = {
             Text(
                 if (record == null) {
                     stringResource(R.string.length_add_record)
@@ -291,7 +270,7 @@ private fun LengthRecordDialog(
                 }
             )
         },
-        text = {
+            text = {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 TextField(
                     value = flaccid,
@@ -319,11 +298,7 @@ private fun LengthRecordDialog(
                 if (error != null) Text(error, color = MiuixTheme.colorScheme.error)
             }
         },
-        confirmButton = {
-            TextButton(
-                text = stringResource(R.string.action_save),
-                enabled = canSave,
-                onClick = {
+            confirmAction = RiseDialogAction(text = stringResource(R.string.action_save), onClick = {
                     val todayStart = LocalDate.now()
                         .atStartOfDay(ZoneId.systemDefault())
                         .toInstant()
@@ -337,19 +312,9 @@ private fun LengthRecordDialog(
                             note = note.trim()
                         )
                     )
-                },
-                colors = liquidDialogConfirmButtonColors()
-            )
-        },
-        dismissButton = {
-            TextButton(
-                text = stringResource(R.string.action_cancel),
-                enabled = !busy,
-                onClick = onDismiss,
-                colors = liquidDialogCancelButtonColors()
-            )
-        }
-    )
+                }, tone = DialogActionTone.Normal, enabled = canSave),
+            dismissAction = RiseDialogAction(text = stringResource(R.string.action_cancel), onClick = onDismiss, tone = DialogActionTone.Normal, enabled = !busy)
+        )
 }
 
 @Composable

@@ -19,8 +19,10 @@ internal fun videoOrientation(width: Int, height: Int, pixelRatio: Float): Video
 }
 
 internal fun beginVideoOrientation(
-    width: Int, height: Int, pixelRatio: Float, fallback: VideoOrientation
+    width: Int, height: Int, pixelRatio: Float, fallback: VideoOrientation,
+    preferred: VideoOrientation? = null
 ): VideoOrientationSession {
+    if (preferred != null) return VideoOrientationSession(preferred, autoDecided = true)
     val resolved = videoOrientation(width, height, pixelRatio)
     return VideoOrientationSession(resolved ?: fallback, autoDecided = resolved != null)
 }

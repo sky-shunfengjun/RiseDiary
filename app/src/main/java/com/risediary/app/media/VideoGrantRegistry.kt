@@ -23,11 +23,14 @@ class VideoGrantRegistry internal constructor(
     private val scope: CoroutineScope
 ) {
     @Inject constructor(database: AppDatabase, access: VideoFileAccess, gate: DataMaintenanceGate,
+        @dagger.hilt.android.qualifiers.ApplicationContext context: android.content.Context,
         timerStore: com.risediary.app.service.TimerSessionStore,
         forms: com.risediary.app.ui.form.RecordFormSessionStore) :
         this({
             database.flightDao().getVideoUris().toSet() +
-                forms.videoUris() + listOfNotNull(timerStore.load().video?.video?.uriString)
+                forms.videoUris() + listOfNotNull((timerStore.load().videoSource as? VideoSourceRef.DeviceVideo)?.video?.uriString) +
+                com.risediary.app.data.library.LibraryTransferJournal(java.io.File(context.filesDir,
+                    "library-transfer.json")).read().remaining.map { it.uri }
         }, access, gate, CoroutineScope(SupervisorJob() + Dispatchers.IO))
 
     private val mutex = Mutex()

@@ -52,3 +52,18 @@ dev-logs/
 # ===== 本地交付物 =====
 /artifacts/
 skills-lock.json
+
+# ===== 私密配置、本地备份与运行数据 =====
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+*.db
+*.db-*
+*.sqlite
+*.sqlite3
+*.rdlib
+/backup/
+/backups/

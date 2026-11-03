@@ -34,6 +34,8 @@ import top.yukonga.miuix.kmp.icon.extended.UploadCloud
  * - 默认描边（空心），仅强调态（底栏选中）用 Filled 实心变体。
  */
 object AppIcons {
+    val Folder: ImageVector get() = LucideIcons.Folder
+    val Search: ImageVector get() = LucideIcons.Search
     // ── miuix 直用 ──
     val Add: ImageVector get() = MiuixIcons.Add
     val ArrowBack: ImageVector get() = MiuixIcons.Back

@@ -1,5 +1,8 @@
 package com.risediary.app.ui.timer
 
+import com.risediary.app.ui.components.RiseDialogAction
+import com.risediary.app.ui.components.DialogActionTone
+
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Column
@@ -11,8 +14,6 @@ import com.risediary.app.R
 import com.risediary.app.service.TimerSession
 import com.risediary.app.service.TimerStatus
 import com.risediary.app.ui.components.LiquidAlertDialog
-import com.risediary.app.ui.components.liquidDialogCancelButtonColors
-import com.risediary.app.ui.components.liquidDialogConfirmButtonColors
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
@@ -36,10 +37,10 @@ internal fun TimerLeaveDialog(
         if (owned && session.isTerminal && session.finishCandidate == null) vm.openRecord()
     }
     LiquidAlertDialog(
-        onDismissRequest = ::dismiss,
-        modifier = Modifier.verticalScroll(rememberScrollState()),
-        title = { Text(stringResource(R.string.timer_leave_dialog_title), style = MiuixTheme.textStyles.title3) },
-        text = {
+            onDismissRequest = ::dismiss,
+            modifier = Modifier.verticalScroll(rememberScrollState()),
+            title = { Text(stringResource(R.string.timer_leave_dialog_title), style = MiuixTheme.textStyles.title3) },
+            text = {
             Column {
                 Text(stringResource(when {
                     starting -> R.string.timer_leave_starting
@@ -49,36 +50,15 @@ internal fun TimerLeaveDialog(
                 vm.error?.let { Text(it, color = MiuixTheme.colorScheme.error) }
             }
         },
-        neutralButton = {
-            TextButton(
-                text = stringResource(when {
+            neutralAction = RiseDialogAction(text = stringResource(when {
                     vm.discarding && vm.busy -> R.string.timer_leave_terminating
                     vm.discarding -> R.string.timer_leave_retry_terminate
                     else -> R.string.timer_leave_terminate
-                }),
-                onClick = { vm.discardTimer(expectedSessionId = sessionId, beforeSend = beforeDiscard) },
-                enabled = !blocked && owned && session.finishCandidate == null &&
-                    (session.isActive || session.isTerminal),
-                colors = ButtonDefaults.textButtonColors(
-                    color = Color.Transparent, disabledColor = Color.Transparent,
-                    textColor = MiuixTheme.colorScheme.error,
-                    disabledTextColor = MiuixTheme.colorScheme.disabledOnSecondaryVariant
-                )
-            )
-        },
-        confirmButton = {
-            TextButton(
-                text = stringResource(if (session.status == TimerStatus.PAUSED)
-                    R.string.timer_leave_paused_confirm else R.string.timer_leave_confirm),
-                onClick = onLeave,
-                enabled = !blocked && !vm.discarding && owned && session.isActive && session.finishCandidate == null,
-                colors = liquidDialogConfirmButtonColors()
-            )
-        },
-        dismissButton = {
-            TextButton(stringResource(R.string.timer_leave_cancel), ::dismiss,
-                enabled = !blocked && !vm.discarding, colors = liquidDialogCancelButtonColors())
-        },
-        adaptiveActions = true
-    )
+                }), onClick = { vm.discardTimer(expectedSessionId = sessionId, beforeSend = beforeDiscard) }, tone = DialogActionTone.Destructive, enabled = !blocked && owned && session.finishCandidate == null &&
+                    (session.isActive || session.isTerminal)),
+            confirmAction = RiseDialogAction(text = stringResource(if (session.status == TimerStatus.PAUSED)
+                    R.string.timer_leave_paused_confirm else R.string.timer_leave_confirm), onClick = onLeave, tone = DialogActionTone.Normal, enabled = !blocked && !vm.discarding && owned && session.isActive && session.finishCandidate == null),
+            dismissAction = RiseDialogAction(text = stringResource(R.string.timer_leave_cancel), onClick = ::dismiss, tone = DialogActionTone.Normal, enabled = !blocked && !vm.discarding),
+            adaptiveActions = true
+        )
 }

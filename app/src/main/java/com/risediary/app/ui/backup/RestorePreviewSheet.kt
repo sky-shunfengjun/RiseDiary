@@ -1,6 +1,11 @@
 /* Copyright (C) 2026 sky-shunfengjun. SPDX-License-Identifier: GPL-3.0-only */
 package com.risediary.app.ui.backup
 
+import com.risediary.app.ui.components.RiseDialogAction
+import com.risediary.app.ui.components.DialogActionTone
+import com.risediary.app.ui.components.RiseDialogActions
+import com.risediary.app.ui.components.RiseDialogActionButton
+
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.MutableTransitionState
 import androidx.compose.animation.core.tween
@@ -127,7 +132,7 @@ private fun RestorePreviewBody(preview: RestorePreview, message: String, enabled
             RestoreOtherData()
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(stringResource(R.string.restore_settings_changes), style = MiuixTheme.textStyles.title4)
-                Card(Modifier.fillMaxWidth()) {
+                Card(Modifier.fillMaxWidth(), colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surface)) {
                     Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         if (preview.settingsChanges.isEmpty()) Text(stringResource(R.string.restore_settings_unchanged),
                             style = MiuixTheme.textStyles.body2, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
@@ -146,37 +151,12 @@ private fun RestorePreviewBody(preview: RestorePreview, message: String, enabled
 
 @Composable
 private fun RestoreSheetActions(mode: RestoreMode, enabled: Boolean, confirm: () -> Unit, cancel: () -> Unit) {
-    val density = LocalDensity.current
-    val actionHeight = uiActionHeightDp(density.fontScale).dp
-    val accent = if (mode == RestoreMode.REPLACE) MiuixTheme.colorScheme.error else MiuixTheme.colorScheme.primary
-    BoxWithConstraints(
-        Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 24.dp, vertical = 16.dp)
-    ) {
-        val cancelAction: @Composable (Modifier) -> Unit = { modifier ->
-            TextButton(stringResource(R.string.restore_cancel), enabled = enabled,
-                onClick = { if (enabled) cancel() }, modifier = modifier.heightIn(min = actionHeight))
-        }
-        val confirmAction: @Composable (Modifier) -> Unit = { modifier ->
-            TextButton(stringResource(R.string.restore_confirm), enabled = enabled,
-                onClick = { if (enabled) confirm() }, modifier = modifier.heightIn(min = actionHeight),
-                colors = ButtonDefaults.textButtonColors(
-                    color = accent, textColor = MiuixTheme.colorScheme.onPrimary,
-                    disabledColor = accent.copy(alpha = .35f),
-                    disabledTextColor = MiuixTheme.colorScheme.onPrimary.copy(alpha = .6f)
-                ))
-        }
-        if (dialogActionsShouldStack(maxWidth.value, density.fontScale)) {
-            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                cancelAction(Modifier.fillMaxWidth())
-                confirmAction(Modifier.fillMaxWidth())
-            }
-        } else {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                cancelAction(Modifier.weight(1f))
-                confirmAction(Modifier.weight(1f))
-            }
-        }
-    }
+    RiseDialogActions(
+        confirmAction = RiseDialogAction(stringResource(R.string.restore_confirm), confirm,
+            if (mode == RestoreMode.REPLACE) DialogActionTone.Destructive else DialogActionTone.Normal, enabled),
+        dismissAction = RiseDialogAction(stringResource(R.string.restore_cancel), cancel, DialogActionTone.Normal, enabled),
+        modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 24.dp, vertical = 16.dp)
+    )
 }
 
 @Composable
@@ -190,9 +170,9 @@ private fun RestoreModeCards(currentMode: RestoreMode, enabled: Boolean, changeM
                 pressFeedbackType = PressFeedbackType.Sink,
                 showIndication = true,
                 onClick = { if (enabled && !isSelected) changeMode(mode) },
-                colors = CardDefaults.defaultColors(color = if (isSelected) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.surfaceContainer)
+                colors = CardDefaults.defaultColors(color = if (isSelected) Color(com.risediary.app.ui.components.RiseNormalActionColor) else MiuixTheme.colorScheme.surface)
             ) {
-                Column(Modifier.fillMaxWidth().heightIn(min = 96.dp).semantics {
+                Column(Modifier.fillMaxWidth().heightIn(min = 80.dp).semantics {
                     selected = isSelected
                     role = Role.RadioButton
                 }.padding(horizontal = 10.dp, vertical = 14.dp),
@@ -201,7 +181,7 @@ private fun RestoreModeCards(currentMode: RestoreMode, enabled: Boolean, changeM
                     Text(stringResource(if (mode == RestoreMode.MERGE) R.string.restore_merge else R.string.restore_replace),
                         fontWeight = FontWeight.SemiBold, color = foreground)
                     Text(stringResource(if (mode == RestoreMode.MERGE) R.string.restore_merge_hint else R.string.restore_replace_hint),
-                        style = MiuixTheme.textStyles.body2, color = foreground.copy(alpha = .85f))
+                        style = MiuixTheme.textStyles.body2, color = foreground.copy(alpha = if (isSelected) .95f else .85f))
                 }
             }
         }
@@ -210,7 +190,7 @@ private fun RestoreModeCards(currentMode: RestoreMode, enabled: Boolean, changeM
 
 @Composable
 private fun RestoreRecordSummary(name: String, count: RestoreCounts, mode: RestoreMode, isFlight: Boolean) {
-    Card(Modifier.fillMaxWidth()) {
+    Card(Modifier.fillMaxWidth(), colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surface)) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Icon(if (isFlight) AppIcons.Notes else AppIcons.Straighten, null, Modifier.size(20.dp), tint = MiuixTheme.colorScheme.primary)
@@ -236,7 +216,7 @@ private fun RestoreRecordSummary(name: String, count: RestoreCounts, mode: Resto
 
 @Composable
 private fun RestoreOtherData() {
-    Card(Modifier.fillMaxWidth()) {
+    Card(Modifier.fillMaxWidth(), colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surface)) {
         Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(stringResource(R.string.restore_other_data), style = MiuixTheme.textStyles.title4)
             Text(stringResource(R.string.restore_labels_achievements), style = MiuixTheme.textStyles.body2)

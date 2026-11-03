@@ -19,6 +19,40 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 
 class BackupRecoveryJournalTest {
+    @Test fun historicalVersionTwoRecordRemainsReadable() {
+        val bytes = java.io.ByteArrayOutputStream()
+        java.io.DataOutputStream(bytes).use { out ->
+            fun text(value: String) { out.writeInt(value.length); value.forEach { out.writeChar(it.code) } }
+            out.writeInt(1)
+            out.writeLong(41); out.writeLong(1000); out.writeLong(61000); out.writeInt(60)
+            out.writeBoolean(false); out.writeBoolean(false); text("milliliters")
+            out.writeBoolean(false); text("[]"); text("keep")
+            out.writeLong(1000); out.writeLong(61000)
+            repeat(8) { out.writeBoolean(false) }
+            text("manual"); text("11111111-1111-4111-8111-111111111111"); text("phone")
+            out.writeBoolean(false)
+            repeat(5) { out.writeInt(0) }
+            text("{}")
+        }
+        val payload = bytes.toByteArray()
+        val file = File(temporary.root, "historical-v2.bin")
+        java.io.DataOutputStream(file.outputStream()).use { out ->
+            out.writeInt(0x52444331); out.writeInt(2); out.writeInt(payload.size)
+            out.write(java.security.MessageDigest.getInstance("SHA-256").digest(payload)); out.write(payload)
+        }
+        val row = BackupRecoveryJournal(Disk(file)).load()!!.flights.single()
+        assertEquals(41L, row.id); assertEquals("keep", row.moodNote)
+        assertNull(row.materialId); assertNull(row.materialName); assertFalse(row.materialRemoved)
+    }
+    @Test fun materialAssociationSurvivesInternalRollbackSnapshot() {
+        val file = File(temporary.root, "material-recovery.bin")
+        val original = snapshot().let { it.copy(flights = it.flights.map { row -> row.copy(
+            videoUri = null, videoDisplayName = null, videoMimeType = null,
+            materialId = "11111111-1111-4111-8111-111111111111", materialName = "素材") }) }
+        val journal = BackupRecoveryJournal(Disk(file))
+        journal.persist(original)
+        assertEquals(original.flights, BackupRecoveryJournal(Disk(file)).load()!!.flights)
+    }
     @get:Rule val temporary = TemporaryFolder()
 
     @Test fun reconstructedJournalRetainsEveryRawPreferenceTypeAndOriginalRows() {

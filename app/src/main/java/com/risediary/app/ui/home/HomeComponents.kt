@@ -88,7 +88,7 @@ internal fun HomeCardHeader(
         ) {
             Icon(icon, null, Modifier.size(20.dp), tint = MiuixTheme.colorScheme.primary)
         }
-        Spacer(modifier = Modifier.width(10.dp))
+        Spacer(modifier = Modifier.width(12.dp))
         Text(
             text = title,
             style = MiuixTheme.textStyles.title4,

@@ -12,6 +12,8 @@ import com.risediary.app.media.VideoFileAccess
 import com.risediary.app.media.VideoGrantRegistry
 import com.risediary.app.media.VideoPlaybackSnapshot
 import com.risediary.app.media.localVideoRef
+import com.risediary.app.media.playbackVideoRef
+import com.risediary.app.media.libraryMaterialId
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.util.UUID
@@ -29,7 +31,8 @@ class VideoPlayerViewModel @Inject constructor(
     private val access: VideoFileAccess,
     private val grants: VideoGrantRegistry,
     private val flights: FlightRepository,
-    private val savedState: SavedStateHandle
+    private val savedState: SavedStateHandle,
+    private val libraryUsage: com.risediary.app.data.library.LibraryUsageRegistry
 ) : ViewModel() {
     val controller = factory.create()
     private val owner = "player:" + UUID.randomUUID()
@@ -66,7 +69,7 @@ class VideoPlayerViewModel @Inject constructor(
         recordId = id
         opening = viewModelScope.launch {
             try {
-                val video = flights.getById(id)?.localVideoRef()
+                val video = flights.getById(id)?.playbackVideoRef()
                 if (video == null) {
                     loadingState.value = false
                     accessFailure.value = "这条记录没有视频"
@@ -89,7 +92,9 @@ class VideoPlayerViewModel @Inject constructor(
             loadingState.value = true
             accessFailure.value = null
             try {
-                grants.retain(owner, setOf(video.uriString))
+                val material = video.libraryMaterialId()
+                if (material != null) check(libraryUsage.hold(owner, material)) { "素材正在删除" }
+                else { libraryUsage.release(owner); grants.retain(owner, setOf(video.uriString)) }
                 val state = access.check(video)
                 if (state != VideoAccessState.READABLE) {
                     controller.pause()
@@ -123,5 +128,6 @@ class VideoPlayerViewModel @Inject constructor(
     override fun onCleared() {
         controller.release()
         grants.forget(owner)
+        libraryUsage.release(owner)
     }
 }

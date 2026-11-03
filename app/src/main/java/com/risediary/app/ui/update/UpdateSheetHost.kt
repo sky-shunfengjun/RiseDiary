@@ -1,5 +1,10 @@
 package com.risediary.app.ui.update
 
+import com.risediary.app.ui.components.RiseDialogAction
+import com.risediary.app.ui.components.DialogActionTone
+import com.risediary.app.ui.components.RiseDialogActions
+import com.risediary.app.ui.components.RiseDialogActionButton
+
 import android.content.Intent
 import androidx.core.net.toUri
 import android.provider.Settings
@@ -298,19 +303,10 @@ fun UpdateSheetHost(
             ) {
                 Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     Text(stringResource(R.string.update_cancel_message))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        TextButton(
-                            text = stringResource(R.string.update_continue_download),
-                            modifier = Modifier.weight(1f),
-                            onClick = viewModel::keepDownloading,
-                        )
-                        TextButton(
-                            text = stringResource(R.string.update_cancel_download),
-                            modifier = Modifier.weight(1f),
-                            colors = ButtonDefaults.textButtonColorsPrimary(),
-                            onClick = viewModel::confirmCancel,
-                        )
-                    }
+                    RiseDialogActions(
+                        confirmAction = RiseDialogAction(stringResource(R.string.update_cancel_download), viewModel::confirmCancel, DialogActionTone.Destructive),
+                        dismissAction = RiseDialogAction(stringResource(R.string.update_continue_download), viewModel::keepDownloading, DialogActionTone.Normal)
+                    )
                 }
             }
         }

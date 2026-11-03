@@ -1,5 +1,8 @@
 package com.risediary.app.ui.records
 
+import com.risediary.app.ui.components.RiseDialogAction
+import com.risediary.app.ui.components.DialogActionTone
+
 import android.app.Activity
 import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -24,6 +27,7 @@ import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.risediary.app.media.VideoAccessState
 import com.risediary.app.media.localVideoRef
+import com.risediary.app.media.playbackVideoRef
 import com.risediary.app.ui.components.*
 import com.risediary.app.ui.icons.AppIcons
 import com.risediary.app.ui.navigation3.LocalNavigator
@@ -58,7 +62,7 @@ fun RecordDetailScreen(
     val fullscreen = rememberVideoFullscreenState(controller, active)
     val owner = remember(controller) { VideoSurfaceOwner(controller) }
     DisposableEffect(owner) { onDispose { owner.release(); videoViewModel.session.setPresentationActive(false) } }
-    val video = flight?.localVideoRef()
+    val video = flight?.playbackVideoRef()
     val matching = videoState.recordId == flightId && videoState.video == video
     val shownState = if (matching) videoState else DetailVideoState(recordId = flightId, video = video)
     val currentFullscreen by rememberUpdatedState(fullscreen)
@@ -153,8 +157,7 @@ fun RecordDetailScreen(
             topBlurProgress = if (!loading && flight != null) rememberTopBlurProgress(scrollState) else { { 0f } },
             actions = {
                 flight?.let { value ->
-                    FloatingToolbar(outSidePadding = PaddingValues(0.dp), cornerRadius = 100.dp) {
-                        Row(Modifier.padding(horizontal = 2.dp)) {
+                    Row(Modifier.padding(horizontal = 2.dp)) {
                             IconButton(enabled = !videoBusy && !loading, onClick = {
                                 videoViewModel.session.onBackground()
                                 navigator.push(Route.RecordEdit(value.id))
@@ -167,7 +170,7 @@ fun RecordDetailScreen(
                                     tint = MiuixTheme.colorScheme.error)
                             }
                         }
-                    }
+
                 }
             }
         ) { padding ->
@@ -184,21 +187,24 @@ fun RecordDetailScreen(
                             videoViewModel.session::show, videoViewModel.session::hide, onRetryVideo, ::pickVideo,
                             { if (displayState.controlsEnabled && !videoBusy) fullscreen.enter() },
                             modifier = Modifier.fillMaxWidth(), busy = videoBusy, active = active)
+                    }) } ?: flight?.materialName?.takeIf { flight?.materialRemoved == true }?.let { removed -> ({
+                        com.risediary.app.ui.theme.RiseCard(Modifier.fillMaxWidth()) {
+                            Text("素材已移除：$removed", Modifier.padding(20.dp), color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
+                        }
                     }) })
             }
         }
     }
     if (showDeleteConfirm) {
-        LiquidAlertDialog(onDismissRequest = { showDeleteConfirm = false }, adaptiveActions = true,
+        LiquidAlertDialog(
+            onDismissRequest = { showDeleteConfirm = false },
+            adaptiveActions = true,
             title = { Text(stringResource(R.string.record_detail_delete_dialog_title)) },
             text = { Text(stringResource(R.string.record_detail_delete_dialog_message)) },
-            confirmButton = {
-                TextButton(stringResource(R.string.action_delete), {
+            confirmAction = RiseDialogAction(text = stringResource(R.string.action_delete), onClick = {
                     showDeleteConfirm = false; controller.pause(); viewModel.delete(deleteForUndo)
-                }, colors = ButtonDefaults.textButtonColors(color = Color.Transparent, disabledColor = Color.Transparent,
-                    textColor = MiuixTheme.colorScheme.error, disabledTextColor = MiuixTheme.colorScheme.error))
-            }, dismissButton = {
-                TextButton(stringResource(R.string.action_cancel), { showDeleteConfirm = false }, colors = liquidDialogCancelButtonColors())
-            })
+                }, tone = DialogActionTone.Destructive),
+            dismissAction = RiseDialogAction(text = stringResource(R.string.action_cancel), onClick = { showDeleteConfirm = false }, tone = DialogActionTone.Normal)
+        )
     }
 }

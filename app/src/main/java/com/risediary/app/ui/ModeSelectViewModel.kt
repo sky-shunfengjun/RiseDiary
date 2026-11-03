@@ -16,7 +16,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
 import javax.inject.Inject
 
-internal enum class FlightEntry { NORMAL, VIDEO, MANUAL }
+internal enum class FlightEntry { NORMAL, VIDEO, LIBRARY, MANUAL }
 
 @HiltViewModel
 class ModeSelectViewModel @Inject constructor(
@@ -65,6 +65,7 @@ class ModeSelectViewModel @Inject constructor(
                     nextRoute = when (entry) {
                         FlightEntry.NORMAL -> Route.Timer
                         FlightEntry.VIDEO -> Route.VideoTimer(UUID.randomUUID().toString())
+                        FlightEntry.LIBRARY -> Route.LibraryBrowse
                         FlightEntry.MANUAL -> {
                             val maximum = preferences.quantitySettings.first().predictionMaxTicks
                             val form = forms.createManual(clock.millis(), maximum)
@@ -86,9 +87,11 @@ class ModeSelectViewModel @Inject constructor(
     fun dismissError() { error = null }
     fun dismissCurrent() { currentTimer = null }
     fun returnToTimer() {
-        currentTimer?.let { nextRoute = if (it.kind == TimerKind.VIDEO)
-            Route.VideoTimer(requireNotNull(it.sessionId)) else Route.Timer }
+        if (busy || nextRoute != null) return
+        val shownId = currentTimer?.sessionId
         currentTimer = null
+        val destination = shownId?.let { resolveTimerNotificationRoute(TimerNotificationEntry(it, "return"), timer.state.value, locked = false) }
+        if (destination == null) error = "这次计时已结束，请重新选择" else nextRoute = destination
     }
 
     private suspend fun clearTimer(session: TimerSession) {

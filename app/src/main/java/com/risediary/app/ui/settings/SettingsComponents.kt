@@ -75,7 +75,7 @@ internal fun SettingsGroupHeader(title: String) {
         fontSize = MiuixTheme.textStyles.body2.fontSize,
         fontWeight = FontWeight.SemiBold,
         color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
-        modifier = Modifier.padding(start = 6.dp)
+        modifier = Modifier.padding(start = 16.dp)
     )
 }
 

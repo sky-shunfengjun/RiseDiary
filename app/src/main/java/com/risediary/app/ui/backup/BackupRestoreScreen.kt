@@ -1,5 +1,8 @@
 package com.risediary.app.ui.backup
 
+import com.risediary.app.ui.components.RiseDialogAction
+import com.risediary.app.ui.components.DialogActionTone
+
 import com.risediary.app.ui.components.rememberTopBlurProgress
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -32,8 +35,6 @@ import com.risediary.app.ui.navigation3.LocalNavigator
 import com.risediary.app.ui.navigation3.Route
 import com.risediary.app.ui.components.SecondaryPageScaffold
 import com.risediary.app.ui.components.LiquidAlertDialog
-import com.risediary.app.ui.components.liquidDialogCancelButtonColors
-import com.risediary.app.ui.components.liquidDialogConfirmButtonColors
 import com.risediary.app.ui.components.LiquidSnackbarTone
 import com.risediary.app.ui.components.showLiquidSnackbar
 import com.risediary.app.ui.theme.CardRed
@@ -161,31 +162,19 @@ fun BackupRestoreScreen(
 
                     if (showExportConfirm) {
                         LiquidAlertDialog(
-                            onDismissRequest = { showExportConfirm = false },
-title = { Text(stringResource(R.string.backup_confirm_export_title)) },
-                            text = { Text(stringResource(R.string.backup_confirm_export_message)) },
-                            confirmButton = {
-                                TextButton(
-                                    text = stringResource(R.string.backup_confirm_export_title),
-                                    onClick = {
+            onDismissRequest = { showExportConfirm = false },
+            title = { Text(stringResource(R.string.backup_confirm_export_title)) },
+            text = { Text(stringResource(R.string.backup_confirm_export_message)) },
+            confirmAction = RiseDialogAction(text = stringResource(R.string.backup_confirm_export_title), onClick = {
                                         showExportConfirm = false
                                         if (vm.needsUserSelectedExportDestination) {
                                             exportLauncher.launch(vm.defaultFilename())
                                         } else {
                                             vm.exportBackup()
                                         }
-                                    },
-                                    colors = liquidDialogConfirmButtonColors()
-                                )
-                            },
-                            dismissButton = {
-                                TextButton(
-                                    text = stringResource(R.string.action_cancel),
-                                    onClick = { showExportConfirm = false },
-                                    colors = liquidDialogCancelButtonColors()
-                                )
-                            }
-                        )
+                                    }, tone = DialogActionTone.Normal),
+            dismissAction = RiseDialogAction(text = stringResource(R.string.action_cancel), onClick = { showExportConfirm = false }, tone = DialogActionTone.Normal)
+        )
                     }
                 }
             }
@@ -263,13 +252,13 @@ title = { Text(stringResource(R.string.backup_confirm_export_title)) },
                 var inputText by remember { mutableStateOf("") }
                 val confirmText = stringResource(R.string.backup_clear_confirmation_text)
                 LiquidAlertDialog(
-                    onDismissRequest = {
+            onDismissRequest = {
                         vm.dismissClearDialog()
                         inputText = ""
                     },
-                    containerColor = MiuixTheme.colorScheme.surface,
-                    title = { Text(stringResource(R.string.backup_clear_danger_title), color = CardRed) },
-                    text = {
+            containerColor = MiuixTheme.colorScheme.surface,
+            title = { Text(stringResource(R.string.backup_clear_danger_title), color = CardRed) },
+            text = {
                         Column {
                             Text(stringResource(R.string.backup_clear_danger_message))
                             Spacer(modifier = Modifier.height(12.dp))
@@ -283,40 +272,18 @@ title = { Text(stringResource(R.string.backup_confirm_export_title)) },
                             )
                         }
                     },
-                    confirmButton = {
-                        val confirmed = inputText.trim() == confirmText
-                        TextButton(
-                            text = stringResource(R.string.backup_clear_confirm_button),
-                            onClick = {
+            confirmAction = run { val confirmed = inputText.trim() == confirmText
+                RiseDialogAction(text = stringResource(R.string.backup_clear_confirm_button), onClick = {
                                 vm.clearAllData()
                                 vm.dismissClearDialog()
                                 inputText = ""
-                            },
-                            enabled = confirmed,
-                            colors = ButtonDefaults.textButtonColors(
-                                color = Color.Transparent,
-                                textColor = if (confirmed) {
-                                    CardRed
-                                } else {
-                                    MiuixTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-                                },
-                                disabledColor = Color.Transparent,
-                                disabledTextColor =
-                                    MiuixTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-                            )
-                        )
-                    },
-                    dismissButton = {
-                        TextButton(
-                            text = stringResource(R.string.action_cancel),
-                            onClick = {
+                            }, tone = DialogActionTone.Destructive, enabled = confirmed)
+            },
+            dismissAction = RiseDialogAction(text = stringResource(R.string.action_cancel), onClick = {
                                 vm.dismissClearDialog()
                                 inputText = ""
-                            },
-                            colors = liquidDialogCancelButtonColors()
-                        )
-                    }
-                )
+                            }, tone = DialogActionTone.Normal)
+        )
             }
 
             Spacer(modifier = Modifier.height(40.dp))

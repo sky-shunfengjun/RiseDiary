@@ -1,5 +1,6 @@
 package com.risediary.app.ui.components
 
+
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -52,22 +53,10 @@ fun LiquidSingleDatePickerDialog(
     }
 
     LiquidDatePickerDialog(
-        onDismissRequest = onDismissRequest,
-        dismissButton = {
-            TextButton(
-                text = stringResource(R.string.action_cancel),
-                onClick = onDismissRequest,
-                colors = liquidDialogCancelButtonColors()
-            )
-        },
-        confirmButton = {
-            TextButton(
-                text = stringResource(R.string.action_confirm),
-                onClick = { onConfirm(selectedDate) },
-                colors = liquidDialogConfirmButtonColors()
-            )
-        }
-    ) {
+            onDismissRequest = onDismissRequest,
+            dismissAction = RiseDialogAction(text = stringResource(R.string.action_cancel), onClick = onDismissRequest, tone = DialogActionTone.Normal),
+            confirmAction = RiseDialogAction(text = stringResource(R.string.action_confirm), onClick = { onConfirm(selectedDate) }, tone = DialogActionTone.Normal)
+        ) {
         CompactCalendar(
             title = stringResource(R.string.calendar_pick_date),
             visibleMonth = visibleMonth,
@@ -90,28 +79,15 @@ fun LiquidDateRangePickerDialog(
     var visibleMonth by remember { mutableStateOf(YearMonth.from(today)) }
 
     LiquidDatePickerDialog(
-        onDismissRequest = onDismissRequest,
-        dismissButton = {
-            TextButton(
-                text = stringResource(R.string.action_cancel),
-                onClick = onDismissRequest,
-                colors = liquidDialogCancelButtonColors()
-            )
-        },
-        confirmButton = {
-            TextButton(
-                text = stringResource(R.string.action_confirm),
-                enabled = selectedStart != null,
-                onClick = {
+            onDismissRequest = onDismissRequest,
+            dismissAction = RiseDialogAction(text = stringResource(R.string.action_cancel), onClick = onDismissRequest, tone = DialogActionTone.Normal),
+            confirmAction = RiseDialogAction(text = stringResource(R.string.action_confirm), onClick = {
                     val start = selectedStart
                     if (start != null) {
                         onConfirm(start, selectedEnd ?: start)
                     }
-                },
-                colors = liquidDialogConfirmButtonColors()
-            )
-        }
-    ) {
+                }, tone = DialogActionTone.Normal, enabled = selectedStart != null)
+        ) {
         CompactCalendar(
             title = when {
                 selectedStart == null -> stringResource(R.string.calendar_pick_start_date)

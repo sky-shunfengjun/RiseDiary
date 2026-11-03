@@ -17,6 +17,9 @@ import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.risediary.app.media.*
 import com.risediary.app.R
+import com.risediary.app.service.TimerSession
+import com.risediary.app.service.TimerStatus
+import com.risediary.app.ui.library.LibraryTimerControls
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Rule
@@ -25,6 +28,38 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 class VideoTransportLayoutTest {
     @get:Rule val compose = createComposeRule()
+
+    @Test fun libraryRowHasFullSizePlayThenSpeedAndTimerWithoutSeekOrLoopButtons() {
+        lateinit var controller: Media3VideoPlayerController
+        var started by mutableStateOf(false)
+        compose.setContent {
+            val context = LocalContext.current
+            controller = remember { Media3VideoPlayerController(context) }
+            DisposableEffect(controller) { onDispose { controller.release() } }
+            MiuixTheme {
+                VideoTransportControls(controller, null, 60_000L, false, false, rememberLayerBackdrop(), true, {},
+                    Modifier.width(320.dp), trailingAction = { size ->
+                        LibraryTimerControls(if (started) TimerSession(status = TimerStatus.RUNNING) else null, false,
+                            rememberLayerBackdrop(), { started = true }, {}, {}, true, buttonSize = size)
+                    })
+            }
+        }
+        val play = compose.onNodeWithContentDescription("播放视频").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val speed = compose.onNodeWithText("1×").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        val timer = compose.onNodeWithTag("library-timer-controls").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        assertTrue(play.left < speed.left && speed.right < timer.left)
+        assertTrue(kotlin.math.abs(play.center.y - timer.center.y) < 2f)
+        compose.onNodeWithContentDescription("单个视频循环").assertDoesNotExist()
+        compose.onNodeWithContentDescription("快退 ${controller.player.seekBackIncrement / 1_000L} 秒").assertDoesNotExist()
+        compose.onNodeWithContentDescription("快进 ${controller.player.seekForwardIncrement / 1_000L} 秒").assertDoesNotExist()
+        assertEquals(play.width, speed.width, 0.5f)
+        assertEquals(play.height, speed.height, 0.5f)
+        assertEquals(play.width, timer.width, 0.5f)
+        assertEquals(play.height, timer.height, 0.5f)
+        compose.onNodeWithContentDescription("开始计时").performClick()
+        val finish = compose.onNodeWithContentDescription("我已起飞").assertIsDisplayed().fetchSemanticsNode().boundsInRoot
+        assertEquals(play.width, finish.width, 0.5f)
+    }
 
     @Test fun disablingControlsCancelsTemporaryScrubBeforeTheyAreShownAgain() {
         lateinit var controller: Media3VideoPlayerController

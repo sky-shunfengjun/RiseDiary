@@ -79,6 +79,28 @@ class UserPreferences internal constructor(
 
     val securitySettings: Flow<SecuritySettingsSnapshot> = dataStore.data.map(::securitySnapshot)
 
+    val libraryView: Flow<com.risediary.app.data.library.LibraryViewMode> = safeData.map { prefs ->
+        com.risediary.app.data.library.LibraryViewMode.entries.firstOrNull { it.name == prefs[KEY_LIBRARY_VIEW] }
+            ?: com.risediary.app.data.library.LibraryViewMode.GRID
+    }
+    val librarySort: Flow<com.risediary.app.data.library.LibrarySort> = safeData.map { prefs ->
+        com.risediary.app.data.library.LibrarySort.entries.firstOrNull { it.name == prefs[KEY_LIBRARY_SORT] }
+            ?: com.risediary.app.data.library.LibrarySort.NEWEST
+    }
+    suspend fun setLibraryView(value: com.risediary.app.data.library.LibraryViewMode) { edit { it[KEY_LIBRARY_VIEW] = value.name } }
+    suspend fun setLibrarySort(value: com.risediary.app.data.library.LibrarySort) { edit { it[KEY_LIBRARY_SORT] = value.name } }
+
+    // Strict read: a failed settings read must not replace today's persisted recommendation.
+    val libraryRecommendation: Flow<com.risediary.app.data.library.LibraryRecommendationChoice?> = dataStore.data.map { prefs ->
+        runCatching { com.risediary.app.data.library.LibraryRecommendationChoice(
+            prefs[KEY_LIBRARY_RECOMMENDATION_DAY] ?: return@map null,
+            prefs[KEY_LIBRARY_RECOMMENDATION_ID] ?: return@map null) }.getOrNull()
+    }
+    suspend fun setLibraryRecommendation(value: com.risediary.app.data.library.LibraryRecommendationChoice) = edit {
+        it[KEY_LIBRARY_RECOMMENDATION_DAY] = value.day
+        it[KEY_LIBRARY_RECOMMENDATION_ID] = value.id
+    }
+
     val launchSettings: Flow<AppLaunchSnapshot> = dataStore.data.map { prefs ->
         AppLaunchSnapshot(securitySnapshot(prefs), prefs[KEY_UPDATE_INTRO_COMPLETED])
     }
@@ -696,6 +718,10 @@ class UserPreferences internal constructor(
     // --- Preference Keys ---
 
     companion object {
+        private val KEY_LIBRARY_VIEW = stringPreferencesKey("library_view")
+        private val KEY_LIBRARY_RECOMMENDATION_DAY = stringPreferencesKey("library_recommendation_day")
+        private val KEY_LIBRARY_RECOMMENDATION_ID = stringPreferencesKey("library_recommendation_id")
+        private val KEY_LIBRARY_SORT = stringPreferencesKey("library_sort")
         private val KEY_USERNAME = stringPreferencesKey("username")
         private val KEY_LIVE_UPDATES_ENABLED = booleanPreferencesKey("live_updates_enabled")
         private val KEY_DETAIL_VIDEO_HIDDEN = booleanPreferencesKey("detail_video_hidden_by_default")

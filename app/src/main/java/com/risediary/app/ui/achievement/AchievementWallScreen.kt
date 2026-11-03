@@ -129,7 +129,7 @@ private fun AchievementCard(
         cornerRadius = 24.dp,
         colors = CardDefaults.defaultColors(
             color = if (isUnlocked) accentColor.copy(alpha = 0.12f)
-            else MiuixTheme.colorScheme.surface.copy(alpha = 0.08f)
+            else MiuixTheme.colorScheme.surfaceContainer
         )
     ) {
         Column(
@@ -161,7 +161,7 @@ private fun AchievementCard(
                 fontSize = MiuixTheme.textStyles.body1.fontSize,
                 fontWeight = FontWeight.SemiBold,
                 color = if (isUnlocked) MiuixTheme.colorScheme.onSurface
-                else MiuixTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                else MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 textAlign = TextAlign.Center
             )
 
@@ -171,9 +171,9 @@ private fun AchievementCard(
             Text(
                 text = stringResource(def.descriptionRes),
                 fontSize = MiuixTheme.textStyles.footnote1.fontSize,
-                color = MiuixTheme.colorScheme.onSurface.copy(alpha = 0.45f),
+                color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                 textAlign = TextAlign.Center,
-                maxLines = 2
+                maxLines = 4
             )
 
             Spacer(modifier = Modifier.height(8.dp))

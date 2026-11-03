@@ -12,12 +12,13 @@ internal object TimerSessionPolicy {
         if (current.sessionId == request.sessionId && current.status != TimerStatus.IDLE) return current
         check(current.status == TimerStatus.IDLE) { "请先处理当前计时" }
         require((request.kind == TimerKind.VIDEO) == (request.video != null))
-        request.video?.let { require(validateLocalVideoFields(it.video.uriString, it.video.displayName, it.video.mimeType) == null) }
+        com.risediary.app.media.requireVideoSource(request.video?.video, request.videoSource)
+        request.video?.let { require(it.positionMillis >= 0 && it.speed in listOf(0.5f, 1f, 1.25f, 1.5f, 2f)) }
         val wall = request.startedAtEpochMillis ?: wallClockNow
         val mono = request.startedAtElapsedRealtime ?: elapsedRealtimeNow
         require(wall > 0L && mono in 0L..elapsedRealtimeNow)
         return TimerSession(status = TimerStatus.RUNNING, sessionId = request.sessionId,
-            kind = request.kind, video = request.video, startedAtEpochMillis = wall,
+            kind = request.kind, video = request.video, videoSource = request.videoSource, startedAtEpochMillis = wall,
             resumedAtElapsedRealtime = mono, resumedAtWallClock = wall, bootCount = bootCount)
     }
 

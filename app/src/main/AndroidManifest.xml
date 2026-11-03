@@ -5,6 +5,7 @@
     <uses-sdk tools:overrideLibrary="top.yukonga.miuix.kmp.blur" />
 
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
@@ -26,6 +27,17 @@
         android:supportsRtl="false"
         tools:targetApi="33"
         android:theme="@style/Theme.RiseDiary">
+
+        <provider
+            android:name=".media.LibraryContentProvider"
+            android:authorities="${applicationId}.library"
+            android:exported="false"
+            android:grantUriPermissions="false" />
+
+        <service
+            android:name=".service.LibraryTransferService"
+            android:foregroundServiceType="dataSync"
+            android:exported="false" />
 
         <provider
             android:name="androidx.startup.InitializationProvider"

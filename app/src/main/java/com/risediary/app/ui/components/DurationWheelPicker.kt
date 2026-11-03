@@ -1,5 +1,6 @@
 package com.risediary.app.ui.components
 
+
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -123,31 +124,12 @@ fun DurationPickerBottomSheet(
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(modifier = Modifier.height(12.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                TextButton(
-                    text = stringResource(R.string.action_cancel),
-                    onClick = onDismiss,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(48.dp)
-                        .clip(RoundedCornerShape(24.dp))
-                        .background(MiuixTheme.colorScheme.onSurface.copy(alpha = 0.045f))
-                )
-                Button(
-                    onClick = { onConfirm(durationSecondsFromParts(parts)) },
-                    enabled = durationSecondsFromParts(parts) > 0,
-                    modifier = Modifier
-                        .weight(1f)
-                        .height(48.dp),
-                    cornerRadius = 24.dp
-                ) {
-                    Text(stringResource(R.string.action_confirm))
-                }
-            }
+            RiseDialogActions(
+                confirmAction = RiseDialogAction(stringResource(R.string.action_confirm),
+                    { onConfirm(durationSecondsFromParts(parts)) }, DialogActionTone.Normal,
+                    enabled = durationSecondsFromParts(parts) > 0),
+                dismissAction = RiseDialogAction(stringResource(R.string.action_cancel), onDismiss, DialogActionTone.Normal)
+            )
         }
     }
 }

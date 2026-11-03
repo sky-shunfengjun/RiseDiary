@@ -57,6 +57,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
@@ -98,7 +99,18 @@ private val LocalLiquidBottomTabScale =
  */
 @Composable
 fun mainPageBottomSpacing(): Dp =
-    WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 88.dp
+    WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + mainBottomBarHeight() + 24.dp
+
+/** Match the four labels' wrapped height without changing glass effect parameters. */
+@Composable
+fun mainBottomBarHeight(): Dp {
+    val fontScale = LocalDensity.current.fontScale
+    val screenWidth = androidx.compose.ui.platform.LocalConfiguration.current.screenWidthDp.toFloat()
+    val tabWidth = ((screenWidth - 24f - 64f - 8f - 8f) / 4f).coerceAtLeast(1f)
+    val charactersPerLine = kotlin.math.floor(tabWidth / (12f * fontScale)).coerceAtLeast(1f)
+    val lines = kotlin.math.ceil(3f / charactersPerLine)
+    return maxOf(64f, 28f + 2f + 16f * fontScale * lines + 12f).dp
+}
 
 /**
  * 捕获层（隐藏采样 Row）标记：该层只画实心图标供玻璃胶囊采样，
@@ -185,6 +197,7 @@ internal fun LiquidBottomTabs(
     containerHeight: Dp = 64.dp,
     contentPadding: Dp = 4.dp,
     showSelectionShadow: Boolean = true,
+    backgroundCapture: GraphicsLayer? = null,
     content: @Composable RowScope.() -> Unit
 ) {
     val isLightTheme = !LocalRiseDarkTheme.current
@@ -319,6 +332,10 @@ internal fun LiquidBottomTabs(
                             scaleX = scale
                             scaleY = scale
                         },
+                        onDrawBackdrop = { drawBackdrop ->
+                            drawBackdrop()
+                            backgroundCapture?.record { drawBackdrop() }
+                        },
                         onDrawSurface = { drawRect(containerColor) }
                     )
                     .then(interactiveHighlight.modifier)
@@ -394,6 +411,10 @@ internal fun LiquidBottomTabs(
                             val scale = lerp(1f, 1f + 16.dp.toPx() / size.width, progress)
                             scaleX = scale
                             scaleY = scale
+                        },
+                        onDrawBackdrop = { drawBackdrop ->
+                            drawBackdrop()
+                            backgroundCapture?.record { drawBackdrop() }
                         },
                         onDrawSurface = { drawRect(containerColor) }
                     )

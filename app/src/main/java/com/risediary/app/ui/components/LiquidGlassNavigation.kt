@@ -35,16 +35,19 @@ import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.layer.GraphicsLayer
 import androidx.compose.ui.graphics.isSpecified
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.fastCoerceAtMost
@@ -84,10 +87,12 @@ fun LiquidGlassBottomBar(
     onTabSelected: (Int) -> Unit,
     onFlightClick: () -> Unit,
     backdrop: Backdrop,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    contrastSamplingActive: Boolean = true
 ) {
     val tabs = listOf(
         BottomTab(stringResource(R.string.bottom_tab_home), AppIcons.Home, AppIcons.HomeFilled),
+        BottomTab(stringResource(R.string.bottom_tab_library), AppIcons.Video, AppIcons.Video),
         BottomTab(stringResource(R.string.bottom_tab_records), AppIcons.List, AppIcons.ListFilled),
         BottomTab(stringResource(R.string.bottom_tab_settings), AppIcons.Settings, AppIcons.SettingsFilled)
     )
@@ -108,8 +113,12 @@ fun LiquidGlassBottomBar(
             pendingNavigationIndex = index
         }
     }
-    val contentColor = if (!LocalRiseDarkTheme.current) Color.Black else Color.White
-    val iconColorFilter = ColorFilter.tint(contentColor)
+    val dark = LocalRiseDarkTheme.current
+    val themeContentColor = if (dark) Color.White else Color.Black
+    val tabsContrast = rememberGlassBackdropContrast(tabs.size,
+        surface = (if (dark) Color(0xFF121212) else Color(0xFFFAFAFA)).copy(alpha = .14f), enabled = contrastSamplingActive)
+    val flightContrast = rememberGlassBackdropContrast(enabled = contrastSamplingActive)
+    val isLtr = LocalLayoutDirection.current == LayoutDirection.Ltr
 
     Row(modifier, horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
         LiquidBottomTabs(
@@ -117,18 +126,21 @@ fun LiquidGlassBottomBar(
             onTabSelected = selectTab,
             backdrop = backdrop,
             tabsCount = tabs.size,
+            containerHeight = mainBottomBarHeight(),
+            backgroundCapture = tabsContrast.capture,
             modifier = Modifier.weight(1f).selectableGroup()
         ) {
             tabs.forEachIndexed { index, tab ->
                 LiquidBottomTab({ selectTab(index) }, Modifier.semantics { selected = index == visualSelectedTabIndex }) {
                     val sampling = LocalLiquidBottomTabSampling.current
+                    val contentColor = if (sampling) themeContentColor else tabsContrast.colors[if (isLtr) index else tabs.lastIndex - index]
                     Icon(
                         painter = rememberVectorPainter(if (sampling) tab.filledIcon else tab.icon),
                         contentDescription = null,
                         tint = Color.Unspecified,
-                        modifier = Modifier.size(28.dp).graphicsLayer(colorFilter = iconColorFilter)
+                        modifier = Modifier.size(28.dp).graphicsLayer(colorFilter = ColorFilter.tint(contentColor))
                     )
-                    BasicText(tab.label, style = TextStyle(contentColor, 12.sp))
+                    BasicText(tab.label, style = TextStyle(contentColor, 12.sp, textAlign = androidx.compose.ui.text.style.TextAlign.Center))
                 }
             }
         }
@@ -138,9 +150,10 @@ fun LiquidGlassBottomBar(
             modifier = Modifier.size(64.dp),
             highlightIntensity = 0.36f,
             highlightRadiusMultiplier = 0.98f,
-            pressExpansion = 2.dp
+            pressExpansion = 2.dp,
+            backgroundCapture = flightContrast.capture
         ) {
-            Icon(AppIcons.FlightTakeoff, stringResource(R.string.bottom_tab_start_flight), tint = contentColor, modifier = Modifier.size(28.dp))
+            Icon(AppIcons.FlightTakeoff, stringResource(R.string.bottom_tab_start_flight), tint = flightContrast.colors.single(), modifier = Modifier.size(28.dp))
         }
     }
 }
@@ -226,6 +239,7 @@ internal fun LiquidGlassButton(
     highlightIntensity: Float = 1f,
     highlightRadiusMultiplier: Float = 1.5f,
     pressExpansion: Dp = 4.dp,
+    backgroundCapture: GraphicsLayer? = null,
     content: @Composable RowScope.() -> Unit
 ) {
     val animationScope = rememberCoroutineScope()
@@ -262,6 +276,10 @@ internal fun LiquidGlassButton(
                         scaleX = scale + maxDragScale * abs(cos(offsetAngle) * offset.x / size.maxDimension) * (width / heightPx).fastCoerceAtMost(1f)
                         scaleY = scale + maxDragScale * abs(sin(offsetAngle) * offset.y / size.maxDimension) * (heightPx / width).fastCoerceAtMost(1f)
                     }
+                },
+                onDrawBackdrop = { drawBackdrop ->
+                    drawBackdrop()
+                    backgroundCapture?.record { drawBackdrop() }
                 },
                 onDrawSurface = {
                     if (tint.isSpecified) {

@@ -1,6 +1,9 @@
 package com.risediary.app.ui.theme
 
 import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import android.view.Window
 import android.graphics.Color as AndroidColor
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -13,6 +16,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.DialogWindowProvider
 import androidx.core.view.WindowCompat
 import top.yukonga.miuix.kmp.theme.ColorSchemeMode
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -86,7 +90,7 @@ private fun applySystemBarAppearance(
     view: android.view.View,
     appearance: SystemBarAppearance
 ) {
-    val window = (view.context as? Activity)?.window ?: return
+    val window = (view.parent as? DialogWindowProvider)?.window ?: view.context.activityWindow() ?: return
     WindowCompat.setDecorFitsSystemWindows(window, false)
     window.statusBarColor = AndroidColor.TRANSPARENT
     window.navigationBarColor = AndroidColor.TRANSPARENT
@@ -101,6 +105,12 @@ private fun applySystemBarAppearance(
         isAppearanceLightStatusBars = appearance.lightStatusBarIcons
         isAppearanceLightNavigationBars = appearance.lightNavigationBarIcons
     }
+}
+
+private tailrec fun Context.activityWindow(): Window? = when (this) {
+    is Activity -> window
+    is ContextWrapper -> if (baseContext === this) null else baseContext.activityWindow()
+    else -> null
 }
 
 @Composable

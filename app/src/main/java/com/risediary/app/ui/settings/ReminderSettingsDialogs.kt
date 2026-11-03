@@ -1,5 +1,8 @@
 package com.risediary.app.ui.settings
 
+import com.risediary.app.ui.components.RiseDialogAction
+import com.risediary.app.ui.components.DialogActionTone
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -18,8 +21,6 @@ import com.risediary.app.R
 import com.risediary.app.reminder.ReminderType
 import com.risediary.app.ui.components.LiquidAlertDialog
 import com.risediary.app.ui.components.WheelColumn
-import com.risediary.app.ui.components.liquidDialogCancelButtonColors
-import com.risediary.app.ui.components.liquidDialogConfirmButtonColors
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import java.time.LocalTime
@@ -86,25 +87,13 @@ internal fun ReminderSettingsDialogs(
                     )
                 }
             },
-            confirmButton = {
-                TextButton(
-                    text = stringResource(R.string.action_confirm),
-                    onClick = {
+            confirmAction = RiseDialogAction(text = stringResource(R.string.action_confirm), onClick = {
                         onTimeSelected(
                             type,
                             String.format(Locale.ROOT, "%02d:%02d", pickedHour, pickedMinute)
                         )
-                    },
-                    colors = liquidDialogConfirmButtonColors()
-                )
-            },
-            dismissButton = {
-                TextButton(
-                    text = stringResource(R.string.action_cancel),
-                    onClick = onDismissTime,
-                    colors = liquidDialogCancelButtonColors()
-                )
-            }
+                    }, tone = DialogActionTone.Normal),
+            dismissAction = RiseDialogAction(text = stringResource(R.string.action_cancel), onClick = onDismissTime, tone = DialogActionTone.Normal)
         )
     }
 
@@ -128,20 +117,8 @@ internal fun ReminderSettingsDialogs(
                     Modifier.fillMaxWidth()
                 )
             },
-            confirmButton = {
-                TextButton(
-                    text = stringResource(R.string.action_confirm),
-                    onClick = { onMonthlyDaySelected(pickedDay) },
-                    colors = liquidDialogConfirmButtonColors()
-                )
-            },
-            dismissButton = {
-                TextButton(
-                    text = stringResource(R.string.action_cancel),
-                    onClick = onDismissMonthlyDay,
-                    colors = liquidDialogCancelButtonColors()
-                )
-            }
+            confirmAction = RiseDialogAction(text = stringResource(R.string.action_confirm), onClick = { onMonthlyDaySelected(pickedDay) }, tone = DialogActionTone.Normal),
+            dismissAction = RiseDialogAction(text = stringResource(R.string.action_cancel), onClick = onDismissMonthlyDay, tone = DialogActionTone.Normal)
         )
     }
 
@@ -150,20 +127,8 @@ internal fun ReminderSettingsDialogs(
             onDismissRequest = onDismissNotificationBlocked,
             title = { Text(stringResource(R.string.settings_notification_blocked_title)) },
             text = { Text(stringResource(R.string.settings_notification_blocked_message)) },
-            confirmButton = {
-                TextButton(
-                    text = stringResource(R.string.settings_open_system_settings),
-                    onClick = onOpenNotificationSettings,
-                    colors = liquidDialogConfirmButtonColors()
-                )
-            },
-            dismissButton = {
-                TextButton(
-                    text = stringResource(R.string.action_cancel),
-                    onClick = onDismissNotificationBlocked,
-                    colors = liquidDialogCancelButtonColors()
-                )
-            }
+            confirmAction = RiseDialogAction(text = stringResource(R.string.settings_open_system_settings), onClick = onOpenNotificationSettings, tone = DialogActionTone.Normal),
+            dismissAction = RiseDialogAction(text = stringResource(R.string.action_cancel), onClick = onDismissNotificationBlocked, tone = DialogActionTone.Normal)
         )
     }
 
@@ -172,20 +137,8 @@ internal fun ReminderSettingsDialogs(
             onDismissRequest = onDismissExactAlarm,
             title = { Text(stringResource(R.string.settings_exact_alarm_dialog_title)) },
             text = { Text(stringResource(R.string.settings_exact_alarm_dialog_message)) },
-            confirmButton = {
-                TextButton(
-                    text = stringResource(R.string.settings_open_system_settings),
-                    onClick = onOpenExactAlarmSettings,
-                    colors = liquidDialogConfirmButtonColors()
-                )
-            },
-            dismissButton = {
-                TextButton(
-                    text = stringResource(R.string.action_cancel),
-                    onClick = onDismissExactAlarm,
-                    colors = liquidDialogCancelButtonColors()
-                )
-            }
+            confirmAction = RiseDialogAction(text = stringResource(R.string.settings_open_system_settings), onClick = onOpenExactAlarmSettings, tone = DialogActionTone.Normal),
+            dismissAction = RiseDialogAction(text = stringResource(R.string.action_cancel), onClick = onDismissExactAlarm, tone = DialogActionTone.Normal)
         )
     }
 }

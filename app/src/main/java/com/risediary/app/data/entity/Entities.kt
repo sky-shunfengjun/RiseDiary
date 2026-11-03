@@ -47,7 +47,10 @@ data class Flight(
     @ColumnInfo(defaultValue = "'manual'") val timingSource: String = "manual",
     @ColumnInfo(defaultValue = "''") val globalId: String = com.risediary.app.data.sync.RecordIdentity.newId(),
     @ColumnInfo(defaultValue = "'phone'") val recordSource: String = com.risediary.app.data.sync.RecordIdentity.PHONE,
-    @ColumnInfo(defaultValue = "NULL") val sourceDeviceId: String? = null
+    @ColumnInfo(defaultValue = "NULL") val sourceDeviceId: String? = null,
+    @ColumnInfo(defaultValue = "NULL") val materialId: String? = null,
+    @ColumnInfo(defaultValue = "NULL") val materialName: String? = null,
+    @ColumnInfo(defaultValue = "0") val materialRemoved: Boolean = false
 )
 
 @Entity(

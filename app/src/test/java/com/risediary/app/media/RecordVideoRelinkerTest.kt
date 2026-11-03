@@ -17,6 +17,19 @@ import org.junit.Test
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class RecordVideoRelinkerTest {
+    @Test fun replacingALibraryVideoWithAPhoneVideoDoesNotLeaveTwoAssociations() = runTest {
+        val f = Fixture(this)
+        val linked = original.copy(videoUri = null, videoDisplayName = null, videoMimeType = null,
+            materialId = "af461c43-d0b7-4b6a-92a6-100c6a892944", materialName = "素材.mp4")
+        f.records[linked.id] = linked
+        val result = f.relinker.relink(linked, f.gate.snapshotGeneration(), "relink", "content://videos/new", 1)
+        assertNull(result.materialId)
+        assertNull(result.materialName)
+        assertFalse(result.materialRemoved)
+        assertEquals("content://videos/new", result.videoUri)
+        assertEquals(linked.durationSeconds, result.durationSeconds)
+        assertEquals(linked.moodNote, result.moodNote)
+    }
     private val original = Flight(id = 1, startTime = 100_000, endTime = 112_000,
         durationSeconds = 8, timingSource = "timer", spurtCount = null, semenVolumeMl = 2.3f,
         volumeInputMode = "estimated", predictionMaxTicks = 80, legacySpurtCount = 3,

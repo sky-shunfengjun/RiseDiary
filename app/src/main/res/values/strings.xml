@@ -302,6 +302,20 @@
     <string name="backup_processing">正在处理…</string>
 
     <string name="bottom_tab_home">首页</string>
+    <string name="bottom_tab_library">素材库</string>
+    <string name="library_empty_title">还没有素材</string>
+    <string name="library_empty_description">把喜欢的视频收进来\n随时打开，专注这一刻</string>
+    <string name="library_import">导入视频</string>
+    <string name="library_choose_videos">选择视频</string>
+    <string name="library_import_notice">视频将复制到应用内部，手机原件会保留。内部副本会随卸载删除，请保留原件。导入后的副本不会出现在系统相册中。</string>
+    <string name="library_transfer_channel">素材库传输</string>
+    <string name="library_transfer_title">正在处理素材</string>
+    <string name="library_transfer_count">已处理 %1$d / %2$d 项</string>
+    <string name="library_transfer_bytes">已复制 %1$s / %2$s</string>
+    <string name="library_duplicate">%1$s：已跳过，相同视频已在「%2$s」</string>
+    <string name="library_load_more">加载更多</string>
+    <string name="library_dismiss_transfer">收起结果</string>
+    <string name="library_ignore_pending">忽略未完成项</string>
     <string name="bottom_tab_records">记录</string>
     <string name="bottom_tab_settings">设置</string>
     <string name="bottom_tab_start_flight">开始起飞</string>
@@ -693,4 +707,5 @@
     <string name="restore_confirm">确认恢复</string>
     <string name="restore_cancel">取消</string>
     <string name="about_libraries_acknowledgement">本项目开发过程中，使用了以下项目的部分或全部内容，为项目功能实现与效率提升提供了重要支撑。在此特别向所有相关开源项目的维护者与贡献者致以诚挚的感谢，感谢社区开发者们的开源共享精神。</string>
+    <string name="action_more">更多操作</string>
 </resources>

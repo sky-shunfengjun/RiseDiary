@@ -30,7 +30,8 @@ internal data class VideoFullscreenState(
 
 /** Shared window ownership only. Player and PlayerView remain owned by their page session. */
 @Composable
-internal fun rememberVideoFullscreenState(controller: VideoPlayerController, active: Boolean): VideoFullscreenState {
+internal fun rememberVideoFullscreenState(controller: VideoPlayerController, active: Boolean,
+    initialDirection: VideoOrientation? = null): VideoFullscreenState {
     val activity = LocalContext.current.findVideoActivity()
     val configuration = LocalConfiguration.current
     var phase by rememberSaveable { mutableStateOf(FullscreenEntryPhase.CLOSED) }
@@ -74,7 +75,7 @@ internal fun rememberVideoFullscreenState(controller: VideoPlayerController, act
             ?: WindowInsetsControllerCompat.BEHAVIOR_DEFAULT
         val size = player.videoSize
         orientation = beginVideoOrientation(size.width, size.height, size.pixelWidthHeightRatio,
-            windowDirection ?: VideoOrientation.PORTRAIT)
+            windowDirection ?: VideoOrientation.PORTRAIT, preferred = initialDirection)
         requestDirection(orientation.direction)
         phase = beginFullscreenEntry(orientation.direction, windowDirection)
     }

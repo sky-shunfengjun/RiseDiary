@@ -6,7 +6,11 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface FlightDao {
-    @Query("SELECT (length(moodNote)+length(methodTags)+COALESCE(length(videoUri),0)+COALESCE(length(videoDisplayName),0))*2+1024 FROM flights WHERE id > :after ORDER BY id LIMIT 500")
+    @Query("SELECT COUNT(*) FROM flights WHERE materialId IN (:ids)")
+    suspend fun countMaterialLinks(ids: List<String>): Int
+    @Query("UPDATE flights SET materialId = NULL, materialRemoved = 1 WHERE materialId IN (:ids)")
+    suspend fun unlinkMaterials(ids: List<String>)
+    @Query("SELECT (length(moodNote)+length(methodTags)+COALESCE(length(videoUri),0)+COALESCE(length(videoDisplayName),0)+COALESCE(length(materialId),0)+COALESCE(length(materialName),0))*2+1024 FROM flights WHERE id > :after ORDER BY id LIMIT 500")
     suspend fun backupSizes(after: Long): List<Long>
 
     @Query("SELECT * FROM flights WHERE id > :after ORDER BY id LIMIT :limit")

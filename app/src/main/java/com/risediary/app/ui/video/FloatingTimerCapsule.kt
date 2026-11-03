@@ -32,6 +32,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.kyant.backdrop.Backdrop
 import com.kyant.backdrop.drawBackdrop
@@ -58,6 +59,7 @@ internal fun FloatingTimerCapsule(
     onRetryPersistence: () -> Unit,
     sessionFlow: kotlinx.coroutines.flow.StateFlow<TimerSession>? = null,
     panelVisibility: androidx.compose.animation.core.MutableTransitionState<Boolean>? = null,
+    topInset: Dp = 0.dp,
     actions: @Composable () -> Unit
 ) {
     val visibility = panelVisibility ?: remember { androidx.compose.animation.core.MutableTransitionState(expanded) }
@@ -69,7 +71,7 @@ internal fun FloatingTimerCapsule(
             Box(Modifier.matchParentSize().testTag("timer_panel_dismiss")
                 .pointerInput(Unit) { detectTapGestures { onExpandedChange(false) } })
         }
-        BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding().padding(8.dp)) {
+        BoxWithConstraints(Modifier.fillMaxSize().safeDrawingPadding().padding(top = topInset).padding(8.dp)) {
             val widthPx = with(density) { maxWidth.toPx() }
             val heightPx = with(density) { maxHeight.toPx() }
             val capsuleWidth = floatingTimerCapsuleWidth(maxWidth.value, density.fontScale).dp

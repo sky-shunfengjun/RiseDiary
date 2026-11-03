@@ -14,11 +14,13 @@ import com.risediary.app.data.entity.LengthRecord
 import com.risediary.app.data.entity.Tag
 
 @Database(
-    entities = [Flight::class, LengthRecord::class, Tag::class, Achievement::class, com.risediary.app.data.draft.RecordDraftEntity::class],
-    version = 8,
+    entities = [Flight::class, LengthRecord::class, Tag::class, Achievement::class, com.risediary.app.data.draft.RecordDraftEntity::class,
+        com.risediary.app.data.library.LibraryFolder::class, com.risediary.app.data.library.LibraryAsset::class],
+    version = 9,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
+    abstract fun libraryDao(): com.risediary.app.data.library.LibraryDao
 
     abstract fun recordDraftDao(): com.risediary.app.data.draft.RecordDraftDao
     abstract fun flightDao(): FlightDao
@@ -27,6 +29,18 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun achievementDao(): AchievementDao
 
     companion object {
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE flights ADD COLUMN materialId TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE flights ADD COLUMN materialName TEXT DEFAULT NULL")
+                db.execSQL("ALTER TABLE flights ADD COLUMN materialRemoved INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("CREATE TABLE IF NOT EXISTS library_folders (id TEXT NOT NULL PRIMARY KEY, parentId TEXT, name TEXT NOT NULL, createdAt INTEGER NOT NULL)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_library_folders_parentId ON library_folders(parentId)")
+                db.execSQL("CREATE TABLE IF NOT EXISTS library_assets (id TEXT NOT NULL PRIMARY KEY, folderId TEXT, mediaType TEXT NOT NULL, originalName TEXT NOT NULL, name TEXT NOT NULL, mimeType TEXT NOT NULL, sizeBytes INTEGER NOT NULL, durationMillis INTEGER, sha256 TEXT NOT NULL, coverFrameMillis INTEGER, createdAt INTEGER NOT NULL, state TEXT NOT NULL)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_library_assets_folderId ON library_assets(folderId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_library_assets_sha256 ON library_assets(sha256)")
+            }
+        }
         val MIGRATION_7_8 = object : Migration(7, 8) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE length_records ADD COLUMN globalId TEXT NOT NULL DEFAULT ''")

@@ -73,7 +73,7 @@ fun SettingsScreen(
                 end = 20.dp,
                 bottom = mainPageBottomSpacing()
             ),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
             overscrollEffect = null
         ) {
             item {
@@ -90,7 +90,7 @@ fun SettingsScreen(
 
             item { SettingsGroupHeader(stringResource(R.string.settings_group_personal)) }
             item {
-                Card(modifier = Modifier.fillMaxWidth()) {
+                Card(modifier = Modifier.fillMaxWidth(), colors = top.yukonga.miuix.kmp.basic.CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)) {
                     Column {
                         val username by vm.username.collectAsStateWithLifecycle()
                         SettingsEditItem(
@@ -121,7 +121,7 @@ fun SettingsScreen(
 
             item { SettingsGroupHeader(stringResource(R.string.settings_group_reminders)) }
             item {
-                Card(modifier = Modifier.fillMaxWidth()) {
+                Card(modifier = Modifier.fillMaxWidth(), colors = top.yukonga.miuix.kmp.basic.CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)) {
                     Column {
                         ArrowPreference(
                             title = stringResource(R.string.settings_reminder_settings),
@@ -176,7 +176,7 @@ fun SettingsScreen(
 
             item { SettingsGroupHeader(stringResource(R.string.settings_group_privacy)) }
             item {
-                Card(modifier = Modifier.fillMaxWidth()) {
+                Card(modifier = Modifier.fillMaxWidth(), colors = top.yukonga.miuix.kmp.basic.CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)) {
                     Column {
                         val lockEnabled by vm.appLockEnabled.collectAsStateWithLifecycle()
                         ArrowPreference(
@@ -208,7 +208,7 @@ fun SettingsScreen(
 
             item { SettingsGroupHeader(stringResource(R.string.settings_group_data)) }
             item {
-                Card(modifier = Modifier.fillMaxWidth()) {
+                Card(modifier = Modifier.fillMaxWidth(), colors = top.yukonga.miuix.kmp.basic.CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)) {
                     ArrowPreference(
                         title = stringResource(R.string.settings_backup),
                         summary = stringResource(R.string.settings_backup_summary),
@@ -220,7 +220,7 @@ fun SettingsScreen(
 
             item { SettingsGroupHeader(stringResource(R.string.settings_group_display)) }
             item {
-                Card(modifier = Modifier.fillMaxWidth()) {
+                Card(modifier = Modifier.fillMaxWidth(), colors = top.yukonga.miuix.kmp.basic.CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)) {
                     Column {
                         val theme by vm.themeMode.collectAsStateWithLifecycle()
                         SettingsThemeDropdown(
@@ -239,7 +239,7 @@ fun SettingsScreen(
 
             item { SettingsGroupHeader(stringResource(R.string.settings_group_about)) }
             item {
-                Card(modifier = Modifier.fillMaxWidth()) {
+                Card(modifier = Modifier.fillMaxWidth(), colors = top.yukonga.miuix.kmp.basic.CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)) {
                     Column {
                         ArrowPreference(
                             title = stringResource(R.string.settings_review_onboarding),

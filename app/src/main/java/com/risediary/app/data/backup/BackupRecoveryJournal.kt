@@ -157,7 +157,7 @@ internal class BackupRecoveryJournal(private val storage: BackupRecoveryStorage)
             envelope.skipBytes(32)
             val input = DataInputStream(RemainingInput(envelope, size))
             suspend fun rows(consume: suspend () -> Unit) { repeat(input.readCount()) { consume() } }
-            rows { sink.flight(input.readFlight()) }
+            rows { sink.flight(input.readFlight(version)) }
             rows {
                 val id = input.readLong(); val date = input.readLong()
                 val flaccid = input.readFloat(); val erect = input.readFloat(); val note = input.readText()
@@ -231,9 +231,10 @@ internal class BackupRecoveryJournal(private val storage: BackupRecoveryStorage)
         writeOptionalText(value.videoUri); writeOptionalText(value.videoDisplayName); writeOptionalText(value.videoMimeType)
         writeOptionalText(value.recordDraftId); writeText(value.timingSource); writeText(value.globalId)
         writeText(value.recordSource); writeOptionalText(value.sourceDeviceId)
+        writeOptionalText(value.materialId); writeOptionalText(value.materialName); writeBoolean(value.materialRemoved)
     }
 
-    private fun DataInputStream.readFlight() = Flight(
+    private fun DataInputStream.readFlight(version: Int) = Flight(
         id = readLong(), startTime = readLong(), endTime = readLong(), durationSeconds = readInt(),
         spurtCount = readOptionalInt(), semenVolumeMl = readOptionalFloat(), volumeInputMode = readText(),
         ejaculationDistanceCm = readOptionalFloat(), methodTags = readText(), moodNote = readText(),
@@ -242,7 +243,8 @@ internal class BackupRecoveryJournal(private val storage: BackupRecoveryStorage)
         videoUri = readOptionalText(), videoDisplayName = readOptionalText(), videoMimeType = readOptionalText(),
         recordDraftId = readOptionalText(), timingSource = readText(), globalId = readText(),
         recordSource = readText(), sourceDeviceId = readOptionalText()
-    )
+    ).let { row -> if (version >= 3) row.copy(materialId = readOptionalText(), materialName = readOptionalText(),
+        materialRemoved = readBoolean()) else row }
 
     private fun DataOutputStream.writePreferences(preferences: Preferences) {
         val values = preferences.asMap().entries.sortedBy { it.key.name }
@@ -317,7 +319,7 @@ internal class BackupRecoveryJournal(private val storage: BackupRecoveryStorage)
 
     companion object {
         private const val MAGIC = 0x52444331
-        private const val VERSION = 2
+        private const val VERSION = 3
         private const val HEADER_BYTES = 44
         private const val MAX_PAYLOAD_BYTES = 512 * 1024 * 1024 - HEADER_BYTES
         const val MAX_FILE_BYTES = MAX_PAYLOAD_BYTES + HEADER_BYTES

@@ -1,5 +1,8 @@
 package com.risediary.app.ui.form
 
+import com.risediary.app.ui.components.RiseDialogAction
+import com.risediary.app.ui.components.DialogActionTone
+
 import com.risediary.app.ui.components.rememberTopBlurProgress
 import android.app.Activity
 import android.content.Intent
@@ -76,8 +79,6 @@ import com.risediary.app.ui.components.uiActionHeightDp
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.risediary.app.ui.components.LiquidAlertDialog
-import com.risediary.app.ui.components.liquidDialogCancelButtonColors
-import com.risediary.app.ui.components.liquidDialogConfirmButtonColors
 import com.risediary.app.ui.components.LiquidSingleDatePickerDialog
 import com.risediary.app.ui.components.SecondaryPageScaffold
 import com.risediary.app.ui.theme.RiseCard
@@ -221,7 +222,7 @@ fun RecordFormScreen(
             }
             RiseCard(modifier = Modifier.fillMaxWidth()) {
                 Column(
-                    modifier = Modifier.padding(18.dp),
+                    modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     FormSectionTitle(
@@ -257,7 +258,7 @@ fun RecordFormScreen(
 
             RiseCard(modifier = Modifier.fillMaxWidth()) {
                 Column(
-                    modifier = Modifier.padding(18.dp),
+                    modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     FormSectionTitle(
@@ -313,6 +314,7 @@ fun RecordFormScreen(
                                     onValueChange = { if (active && !vm.useEstimatedMode) vm.updateManualVolume(it) },
                                     enabled = active && !vm.isSaving,
                                     label = stringResource(R.string.form_volume_ml_label),
+                                    useLabelAsPlaceholder = true,
                                     leadingIcon = {
                                         Icon(
                                             AppIcons.WaterDrop,
@@ -357,6 +359,7 @@ fun RecordFormScreen(
                             value = vm.distanceCm,
                             onValueChange = vm::setDistanceInput,
                             label = stringResource(R.string.form_distance_label),
+                            useLabelAsPlaceholder = true,
                             leadingIcon = {
                                 Icon(
                                     AppIcons.Straighten,
@@ -410,7 +413,7 @@ fun RecordFormScreen(
 
             RiseCard(modifier = Modifier.fillMaxWidth()) {
                 Column(
-                    modifier = Modifier.padding(18.dp),
+                    modifier = Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     FormSectionTitle(
@@ -476,10 +479,13 @@ fun RecordFormScreen(
                         }
                     }
 
+                    Text(stringResource(R.string.form_note_label), style = MiuixTheme.textStyles.body1, fontWeight = FontWeight.Medium)
                     TextField(
                         value = vm.moodNote,
                         onValueChange = vm::setMoodNoteInput,
                         label = stringResource(R.string.form_note_label),
+                        useLabelAsPlaceholder = true,
+                        minLines = 3,
                         leadingIcon = {
                             Icon(
                                 AppIcons.Notes,
@@ -571,10 +577,7 @@ fun RecordFormScreen(
 
         LiquidAlertDialog(
             onDismissRequest = { showTimePicker = false },
-            confirmButton = {
-                TextButton(
-                    text = stringResource(R.string.action_confirm),
-                    onClick = {
+            confirmAction = RiseDialogAction(text = stringResource(R.string.action_confirm), onClick = {
                         val currentDate = Instant.ofEpochMilli(vm.startTime)
                             .atZone(ZoneId.systemDefault())
                             .toLocalDate()
@@ -585,17 +588,8 @@ fun RecordFormScreen(
                                 .toEpochMilli()
                         )
                         showTimePicker = false
-                    },
-                    colors = liquidDialogConfirmButtonColors()
-                )
-            },
-            dismissButton = {
-                TextButton(
-                    text = stringResource(R.string.action_cancel),
-                    onClick = { showTimePicker = false },
-                    colors = liquidDialogCancelButtonColors()
-                )
-            },
+                    }, tone = DialogActionTone.Normal),
+            dismissAction = RiseDialogAction(text = stringResource(R.string.action_cancel), onClick = { showTimePicker = false }, tone = DialogActionTone.Normal),
             title = {
                 Text(
                     stringResource(R.string.form_pick_start_time),
@@ -639,17 +633,11 @@ fun RecordFormScreen(
     vm.saveWarning?.let { warning ->
         if (activeAchievement == null) {
             LiquidAlertDialog(
-                onDismissRequest = vm::dismissSaveWarning,
-                confirmButton = {
-                    TextButton(
-                        text = stringResource(R.string.form_got_it),
-                        onClick = vm::dismissSaveWarning,
-                        colors = liquidDialogConfirmButtonColors()
-                    )
-                },
-                title = { Text("记录已保存", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) },
-                text = { Text(warning, style = MiuixTheme.textStyles.body1) }
-            )
+            onDismissRequest = vm::dismissSaveWarning,
+            confirmAction = RiseDialogAction(text = stringResource(R.string.form_got_it), onClick = vm::dismissSaveWarning, tone = DialogActionTone.Normal),
+            title = { Text("记录已保存", modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center) },
+            text = { Text(warning, style = MiuixTheme.textStyles.body1) }
+        )
         }
     }
 
@@ -659,13 +647,8 @@ fun RecordFormScreen(
             modifier = Modifier.verticalScroll(rememberScrollState()),
             title = { Text("放弃填写？") },
             text = { Text("未保存的内容将被丢弃。") },
-            confirmButton = {
-                TextButton("放弃", { vm.discardAndLeave { navigator.pop() } },
-                    colors = liquidDialogConfirmButtonColors())
-            },
-            dismissButton = {
-                TextButton("继续填写", vm::cancelDiscard, colors = liquidDialogCancelButtonColors())
-            },
+            confirmAction = RiseDialogAction(text = "放弃", onClick = { vm.discardAndLeave { navigator.pop() } }, tone = DialogActionTone.Destructive),
+            dismissAction = RiseDialogAction(text = "继续填写", onClick = vm::cancelDiscard, tone = DialogActionTone.Normal),
             adaptiveActions = true
         )
     }
@@ -680,13 +663,7 @@ fun RecordFormScreen(
         }
         LiquidAlertDialog(
             onDismissRequest = { vm.consumeAchievement(key) },
-            confirmButton = {
-                TextButton(
-                    text = stringResource(R.string.form_got_it),
-                    onClick = { vm.consumeAchievement(key) },
-                    colors = liquidDialogConfirmButtonColors()
-                )
-            },
+            confirmAction = RiseDialogAction(text = stringResource(R.string.form_got_it), onClick = { vm.consumeAchievement(key) }, tone = DialogActionTone.Normal),
             title = {
                 Text(
                     stringResource(R.string.form_achievement_unlocked),

@@ -1,6 +1,8 @@
 /* Copyright (C) 2026 sky-shunfengjun. SPDX-License-Identifier: GPL-3.0-only */
 package com.risediary.app.ui.updateintro
 
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.ScrollState
@@ -85,7 +87,7 @@ internal fun RecordingTimerIntroPage(
         stringResource(R.string.update_intro_recording_subtitle), scroll, preview = { height ->
             IntroScreenshot(R.drawable.update_intro_quantity, stringResource(R.string.update_intro_recording_demo), height)
         }) {
-        if (state.ready) Card(Modifier.fillMaxWidth()) {
+        if (state.ready) Card(Modifier.fillMaxWidth(), colors = top.yukonga.miuix.kmp.basic.CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)) {
             GuidePredictionMaximumControl(state.predictionMaxTicks, enabled, onMaximum,
                 title = stringResource(R.string.settings_prediction_max))
         }
@@ -104,7 +106,7 @@ internal fun NotificationsIntroPage(
         stringResource(R.string.update_intro_notifications_page_subtitle), scroll, preview = { height ->
             IntroScreenshot(R.drawable.update_intro_notifications, stringResource(R.string.update_intro_notification_demo), minOf(height, 160.dp))
         }) {
-        if (state.ready) Card(Modifier.fillMaxWidth()) {
+        if (state.ready) Card(Modifier.fillMaxWidth(), colors = top.yukonga.miuix.kmp.basic.CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)) {
             SettingsToggleItem(AppIcons.Schedule, stringResource(R.string.settings_live_updates),
                 stringResource(R.string.update_intro_live_summary), state.liveUpdatesEnabled,
                 { if (enabled) onLiveUpdates(it) }, enabled)
@@ -127,7 +129,7 @@ internal fun VideoPrivacyIntroPage(
         stringResource(R.string.update_intro_video_subtitle), scroll, preview = { height ->
             IntroScreenshot(R.drawable.update_intro_video, stringResource(R.string.update_intro_player_demo), height)
         }) {
-        if (state.ready) Card(Modifier.fillMaxWidth()) {
+        if (state.ready) Card(Modifier.fillMaxWidth(), colors = top.yukonga.miuix.kmp.basic.CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surfaceContainer)) {
             SettingsToggleItem(AppIcons.VisibilityOff, stringResource(R.string.settings_detail_video_hidden),
                 stringResource(R.string.update_intro_hidden_summary), state.detailVideoHidden,
                 { if (enabled) onVideoHidden(it) }, enabled)

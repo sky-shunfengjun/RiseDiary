@@ -4,6 +4,17 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class FullscreenVideoPolicyTest {
+    @Test fun preferredPortraitDoesNotRotateForLandscapeOrDelayedMetadataButCanBeToggled() {
+        for (size in listOf(1920 to 1080, 0 to 0)) {
+            val state = beginVideoOrientation(size.first, size.second, 1f, VideoOrientation.LANDSCAPE,
+                preferred = VideoOrientation.PORTRAIT)
+            assertEquals(VideoOrientation.PORTRAIT, state.direction)
+            assertEquals(state, resolveVideoOrientation(state, 1920, 1080, 1f))
+            val manual = toggleVideoOrientation(state)
+            assertEquals(VideoOrientation.LANDSCAPE, manual.direction)
+            assertEquals(manual, resolveVideoOrientation(manual, 1080, 1920, 1f))
+        }
+    }
     @Test fun displaySizeChoosesDirectionIncludingPixelRatio() {
         assertEquals(VideoOrientation.LANDSCAPE, videoOrientation(1920, 1080, 1f))
         assertEquals(VideoOrientation.PORTRAIT, videoOrientation(1080, 1920, 1f))

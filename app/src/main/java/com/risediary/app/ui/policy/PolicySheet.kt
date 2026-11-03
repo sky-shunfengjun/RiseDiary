@@ -1,6 +1,11 @@
 /* Copyright (C) 2026 sky-shunfengjun. SPDX-License-Identifier: GPL-3.0-only */
 package com.risediary.app.ui.policy
 
+import com.risediary.app.ui.components.RiseDialogAction
+import com.risediary.app.ui.components.DialogActionTone
+import com.risediary.app.ui.components.RiseDialogActions
+import com.risediary.app.ui.components.RiseDialogActionButton
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -56,11 +61,7 @@ fun PolicySheet(document: PolicyDocument?, onDismiss: () -> Unit) {
                 ) {
                     Text(stringResource(R.string.policy_date, shownDocument.date), style = MiuixTheme.textStyles.body2, color = MiuixTheme.colorScheme.onSurfaceVariantSummary)
                     Text(stringResource(shownDocument.body), style = MiuixTheme.textStyles.body1, modifier = Modifier.testTag("policy_body"))
-                    TextButton(
-                        text = stringResource(R.string.policy_project), enabled = document != null,
-                        onClick = { linkError = runCatching { uriHandler.openUri(projectUrl) }.isFailure },
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-                    )
+                    RiseDialogActionButton(RiseDialogAction(stringResource(R.string.policy_project), { linkError = runCatching { uriHandler.openUri(projectUrl) }.isFailure }, DialogActionTone.Normal, enabled = document != null), Modifier.fillMaxWidth().heightIn(min = 48.dp), emphasized = false)
                     if (linkError) Text(stringResource(R.string.update_error_link), color = MiuixTheme.colorScheme.error)
                 }
             }

@@ -1,5 +1,8 @@
 package com.risediary.app.ui
 
+import com.risediary.app.ui.components.RiseDialogAction
+import com.risediary.app.ui.components.DialogActionTone
+
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -20,6 +23,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 @Composable
 fun ModeSelectScreen(vm: ModeSelectViewModel = hiltViewModel()) {
     val navigator = LocalNavigator.current
+    var chooseSource by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(vm.nextRoute) {
         vm.nextRoute?.let { navigator.push(it); vm.consumeRoute() }
     }
@@ -31,11 +35,13 @@ fun ModeSelectScreen(vm: ModeSelectViewModel = hiltViewModel()) {
                 Triple(FlightEntry.MANUAL, stringResource(R.string.mode_select_manual), stringResource(R.string.mode_select_manual_summary))
             )
             choices.forEach { (entry, title, summary) ->
-                RiseCard(modifier = Modifier.fillMaxWidth().semantics { if (vm.busy) disabled() }, enabled = !vm.busy, onClick = { if (!vm.busy) vm.open(entry) }) {
+                RiseCard(modifier = Modifier.fillMaxWidth().semantics { if (vm.busy) disabled() }, enabled = !vm.busy, onClick = {
+                    if (!vm.busy) { if (entry == FlightEntry.VIDEO) chooseSource = true else vm.open(entry) }
+                }) {
                     Row(Modifier.padding(20.dp), verticalAlignment = Alignment.CenterVertically) {
                         Icon(when (entry) {
                             FlightEntry.NORMAL -> AppIcons.Schedule
-                            FlightEntry.VIDEO -> AppIcons.Video
+                            FlightEntry.VIDEO, FlightEntry.LIBRARY -> AppIcons.Video
                             FlightEntry.MANUAL -> AppIcons.Edit
                         }, null, Modifier.size(40.dp), tint = MiuixTheme.colorScheme.primary)
                         Spacer(Modifier.width(16.dp))
@@ -51,14 +57,24 @@ fun ModeSelectScreen(vm: ModeSelectViewModel = hiltViewModel()) {
             }
         }
     }
+    VideoSourceSheet(chooseSource, { chooseSource = false },
+        onLibrary = { chooseSource = false; vm.open(FlightEntry.LIBRARY) },
+        onPhone = { chooseSource = false; vm.open(FlightEntry.VIDEO) })
     if (vm.currentTimer != null) {
-        LiquidAlertDialog(onDismissRequest = vm::dismissCurrent,
-            adaptiveActions = true, title = { Text(stringResource(R.string.mode_current_timer)) },
-            confirmButton = { TextButton(stringResource(R.string.mode_return_timer), vm::returnToTimer, colors = liquidDialogConfirmButtonColors()) },
-            dismissButton = { TextButton(stringResource(R.string.action_cancel), vm::dismissCurrent, colors = liquidDialogCancelButtonColors()) })
+        LiquidAlertDialog(
+            onDismissRequest = vm::dismissCurrent,
+            adaptiveActions = true,
+            title = { Text(stringResource(R.string.mode_current_timer)) },
+            confirmAction = RiseDialogAction(text = stringResource(R.string.mode_return_timer), onClick = vm::returnToTimer, tone = DialogActionTone.Normal),
+            dismissAction = RiseDialogAction(text = stringResource(R.string.action_cancel), onClick = vm::dismissCurrent, tone = DialogActionTone.Normal)
+        )
     }
     vm.error?.let { message ->
-        LiquidAlertDialog(onDismissRequest = vm::dismissError, adaptiveActions = true, title = { Text(message) },
-            confirmButton = { TextButton(stringResource(R.string.action_got_it), vm::dismissError, colors = liquidDialogConfirmButtonColors()) })
+        LiquidAlertDialog(
+            onDismissRequest = vm::dismissError,
+            adaptiveActions = true,
+            title = { Text(message) },
+            confirmAction = RiseDialogAction(text = stringResource(R.string.action_got_it), onClick = vm::dismissError, tone = DialogActionTone.Normal)
+        )
     }
 }

@@ -25,6 +25,7 @@ import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import com.kyant.backdrop.Backdrop
 import com.risediary.app.R
@@ -114,7 +115,8 @@ internal fun VideoTransportControls(
     onInteraction: () -> Unit,
     modifier: Modifier = Modifier,
     onTouch: (Boolean) -> Unit = {},
-    enabled: Boolean = true
+    enabled: Boolean = true,
+    trailingAction: (@Composable (Dp) -> Unit)? = null
 ) {
     val snapshot by controller.playback.collectAsStateWithLifecycle()
 
@@ -188,8 +190,9 @@ internal fun VideoTransportControls(
         BoxWithConstraints(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
             val viewportWidth = minOf(maxWidth, 560.dp)
             val buttonSize = if (viewportWidth >= 308.dp) 52.dp else 48.dp
-            val playSize = buttonSize + 8.dp
-            val speedWidth = maxOf(buttonSize, (16f + 36f * fontScale).dp)
+            val sharedSize = maxOf(buttonSize + 8.dp, (16f + 36f * fontScale).dp)
+            val playSize = if (trailingAction != null) sharedSize else buttonSize + 8.dp
+            val speedWidth = if (trailingAction != null) sharedSize else maxOf(buttonSize, (16f + 36f * fontScale).dp)
             val requiredWidth = speedWidth + buttonSize * 3 + playSize + 32.dp
             val overflowing = requiredWidth > viewportWidth
             val scroll = rememberScrollState()
@@ -202,7 +205,8 @@ internal fun VideoTransportControls(
                     backdrop = backdrop, fullScreen = fullScreen,
                     label = stringResource(R.string.video_speed_value, speedLabel),
                     enabled = enabled, dimWhenDisabled = enabled,
-                    description = speedDescription, modifier = Modifier.width(speedWidth).height(maxOf(buttonSize, (24f * fontScale + 20f).dp))
+                    description = speedDescription, modifier = if (trailingAction != null) Modifier.size(sharedSize)
+                        else Modifier.width(speedWidth).height(maxOf(buttonSize, (24f * fontScale + 20f).dp))
                 )
             }
             val backButton: @Composable () -> Unit = {
@@ -265,14 +269,27 @@ internal fun VideoTransportControls(
             val rowModifier = Modifier.width(viewportWidth)
                 .then(if (overflowing) Modifier.horizontalScroll(scroll).widthIn(min = contentWidth) else Modifier)
                 .padding(horizontal = edgePadding, vertical = 4.dp)
-            Row(rowModifier,
-                horizontalArrangement = if (overflowing) Arrangement.spacedBy(6.dp) else Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically) {
-                speedButton()
-                backButton()
-                playButton()
-                forwardButton()
-                loopButton()
+            if (trailingAction != null) {
+                // The primary action stays reachable; narrow screens scroll only playback controls.
+                Row(Modifier.width(viewportWidth), horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically) {
+                    Row(Modifier.weight(1f).horizontalScroll(scroll).padding(vertical = 4.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
+                        playButton()
+                        speedButton()
+                    }
+                    trailingAction(sharedSize)
+                }
+            } else {
+                Row(rowModifier,
+                    horizontalArrangement = if (overflowing) Arrangement.spacedBy(6.dp) else Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically) {
+                    speedButton()
+                    backButton()
+                    playButton()
+                    forwardButton()
+                    loopButton()
+                }
             }
         }
     }

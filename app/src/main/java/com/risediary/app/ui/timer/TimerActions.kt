@@ -52,7 +52,8 @@ internal fun TimerActionDock(
     fullScreen: Boolean = false,
     modifier: Modifier = Modifier,
     compact: Boolean = false,
-    iconOnly: Boolean = false
+    iconOnly: Boolean = false,
+    finishWhileRunning: Boolean = false
 ) {
     val state = timerActionState(session, transferring, transferFailed)
     val colors = MiuixTheme.colorScheme
@@ -79,7 +80,8 @@ internal fun TimerActionDock(
         else -> ({})
     }
     val canAct = enabled && state != TimerActionState.OPENING && state != TimerActionState.CONFIRMING
-    val paired = state == TimerActionState.CONTINUE_FINISH || state == TimerActionState.CONFIRMING
+    val paired = state == TimerActionState.CONTINUE_FINISH || state == TimerActionState.CONFIRMING ||
+        (finishWhileRunning && state == TimerActionState.PAUSE)
     val buttonSurface = if (fullScreen) Color.Black.copy(alpha = 0.22f) else Color.Unspecified
     val finishText = stringResource(R.string.video_timer_finish)
     val buttonHeight = if (iconOnly) 56.dp else if (compact) maxOf(48.dp, (28f * fontScale + 20f).dp) else maxOf(58.dp, (32f * fontScale + 24f).dp)

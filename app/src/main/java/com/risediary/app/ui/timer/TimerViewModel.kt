@@ -183,9 +183,18 @@ class TimerViewModel @Inject constructor(
     }
 
     fun requestFinish() = requestFinish {}
-    fun requestFinish(beforeSend: () -> Unit) {
+    fun requestFinish(beforeSend: () -> Unit) = prepareFinish(beforeSend, allowRunning = false)
+
+    /** The library's finish shortcut does not require pausing the timer first. */
+    fun requestLibraryFinish(beforeSend: () -> Unit) {
+        if (session.value.videoSource !is com.risediary.app.media.VideoSourceRef.LibraryVideo) return
+        prepareFinish(beforeSend, allowRunning = true)
+    }
+
+    private fun prepareFinish(beforeSend: () -> Unit, allowRunning: Boolean) {
         val current = session.value
-        if (current.status != TimerStatus.PAUSED || current.finishCandidate != null || persistenceError.value) return
+        if ((current.status != TimerStatus.PAUSED && !(allowRunning && current.status == TimerStatus.RUNNING)) ||
+            current.finishCandidate != null || persistenceError.value) return
         current.sessionId?.let { id ->
             // Capture the click instant before waiting for either the player or the service.
             val wall = wallClock.millis()

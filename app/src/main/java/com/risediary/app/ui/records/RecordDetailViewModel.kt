@@ -12,6 +12,7 @@ import com.risediary.app.media.VideoAccessState
 import com.risediary.app.media.VideoFileAccess
 import com.risediary.app.media.VideoGrantRegistry
 import com.risediary.app.media.localVideoRef
+import com.risediary.app.media.playbackVideoRef
 import com.risediary.app.reminder.ReminderScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import java.util.UUID
@@ -75,7 +76,7 @@ class RecordDetailViewModel @Inject constructor(
                 _flight.value = current
                 loadedGeneration = generation
                 _videoAccess.value = null
-                current?.localVideoRef()?.let { video ->
+                current?.playbackVideoRef()?.let { video ->
                     val state = try { videoFiles.check(video) }
                     catch (cancelled: CancellationException) { throw cancelled }
                     catch (_: Exception) { VideoAccessState.INVALID }
@@ -98,7 +99,7 @@ class RecordDetailViewModel @Inject constructor(
 
     fun beginVideoSelection(): Boolean {
         val current = _flight.value ?: return false
-        if (_loading.value || _videoBusy.value || current.videoUri == null) return false
+        if (_loading.value || _videoBusy.value || (current.videoUri == null && current.materialId == null)) return false
         selection = Selection(current, loadedGeneration)
         _videoBusy.value = true
         _error.value = null

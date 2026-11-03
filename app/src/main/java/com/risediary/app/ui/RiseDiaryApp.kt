@@ -1,5 +1,8 @@
 package com.risediary.app.ui
 
+import com.risediary.app.ui.components.RiseDialogAction
+import com.risediary.app.ui.components.DialogActionTone
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -121,6 +124,7 @@ class MainPagerState(
     private var navJob: Job? = null
 
     fun animateToPage(targetIndex: Int) {
+        if (targetIndex !in 0 until pagerState.pageCount) return
         if (targetIndex == selectedPage) return
         navJob?.cancel()
         selectedPage = targetIndex
@@ -317,21 +321,19 @@ private fun MainAppContent(
     val timerPersistenceError by timerCoordinator.persistenceError.collectAsStateWithLifecycle()
     val timerNoticeContext = androidx.compose.ui.platform.LocalContext.current
     val snackbarHostState = remember { androidx.compose.material3.SnackbarHostState() }
-    val pagerState = rememberPagerState(pageCount = { 3 })
+    val pagerState = rememberPagerState(pageCount = { MainTab.entries.size })
     val pagerCoroutineScope = rememberCoroutineScope()
     val recordsViewModel: RecordsViewModel = hiltViewModel()
     val writeError by recordsViewModel.writeError.collectAsStateWithLifecycle()
     val canRetryRecordWrite by recordsViewModel.canRetryWrite.collectAsStateWithLifecycle()
     val recordsWriting by recordsViewModel.isWriting.collectAsStateWithLifecycle()
     if (writeError != null) com.risediary.app.ui.components.LiquidAlertDialog(
-        onDismissRequest = { if (!recordsWriting) recordsViewModel.clearWriteError() },
-        title = { top.yukonga.miuix.kmp.basic.Text("操作未完成") },
-        text = { top.yukonga.miuix.kmp.basic.Text(writeError.orEmpty()) },
-        confirmButton = { top.yukonga.miuix.kmp.basic.TextButton("重试", enabled = !recordsWriting && canRetryRecordWrite,
-            onClick = recordsViewModel::retryWrite) },
-        dismissButton = { top.yukonga.miuix.kmp.basic.TextButton("关闭", enabled = !recordsWriting,
-            onClick = recordsViewModel::clearWriteError) }
-    )
+            onDismissRequest = { if (!recordsWriting) recordsViewModel.clearWriteError() },
+            title = { top.yukonga.miuix.kmp.basic.Text("操作未完成") },
+            text = { top.yukonga.miuix.kmp.basic.Text(writeError.orEmpty()) },
+            confirmAction = RiseDialogAction(text = "重试", onClick = recordsViewModel::retryWrite, tone = DialogActionTone.Normal, enabled = !recordsWriting && canRetryRecordWrite),
+            dismissAction = RiseDialogAction(text = "关闭", onClick = recordsViewModel::clearWriteError, tone = DialogActionTone.Normal, enabled = !recordsWriting)
+        )
     val deletedMessage = stringResource(R.string.records_deleted)
     val undoAction = stringResource(R.string.action_undo)
     fun showDetailDeletionUndo(target: com.risediary.app.data.entity.Flight) {
@@ -398,7 +400,7 @@ private fun MainAppContent(
         when (destination) {
             NotificationDestination.RECORDS -> {
                 navigator.popUntil { it is Route.Main }
-                mainPagerState.animateToPage(1)
+                mainPagerState.animateToPage(MainTab.RECORDS.ordinal)
             }
             NotificationDestination.LENGTH_HISTORY -> {
                 navigator.push(Route.LengthHistory)
@@ -454,6 +456,7 @@ private fun MainAppContent(
                                                         if (isMain && !returningToRoot && !interactionsBlocked) navigator.push(Route.ModeSelect)
                                                     },
                                                     backdrop = mainSceneBackdrop,
+                                                    contrastSamplingActive = isMain && !returningToRoot && !interactionsBlocked,
                                                     modifier = Modifier
                                                         .align(Alignment.BottomCenter)
                                                         .graphicsLayer {
@@ -463,7 +466,7 @@ private fun MainAppContent(
                                                         }
                                                         .blockInteractionsAndAccessibility(!isMain || returningToRoot || interactionsBlocked)
                                                         .navigationBarsPadding()
-                                                        .padding(start = 20.dp, end = 20.dp, bottom = 8.dp)
+                                                        .padding(start = 12.dp, end = 12.dp, bottom = 8.dp)
                                                 )
                                             },
                                         ) {
@@ -477,6 +480,15 @@ private fun MainAppContent(
                                             )
                                         }
                                         pageEntry<Route.ModeSelect>(navigationMotion) { ModeSelectScreen() }
+                                        pageEntry<Route.LibraryViewer>(navigationMotion) { route ->
+                                            com.risediary.app.ui.library.LibraryViewerScreen(route)
+                                        }
+                                        pageEntry<Route.LibraryBrowse>(navigationMotion) {
+                                            com.risediary.app.ui.library.LibraryScreen(standalone = true)
+                                        }
+                                        pageEntry<Route.LibraryFolder>(navigationMotion) { route ->
+                                            com.risediary.app.ui.library.LibraryScreen(folderRootId = route.folderId)
+                                        }
                                         pageEntry<Route.Timer>(navigationMotion) { TimerScreen() }
                                         pageEntry<Route.VideoTimer>(navigationMotion) { route ->
                                             com.risediary.app.ui.video.VideoTimerScreen(route)
@@ -570,7 +582,7 @@ private fun MainAppContent(
                                 .padding(
                                     start = 20.dp,
                                     end = 20.dp,
-                                    bottom = if (isMain) 84.dp else 20.dp
+                                    bottom = if (isMain) com.risediary.app.ui.components.mainBottomBarHeight() + 20.dp else 20.dp
                                 )
                         )
                         LiquidDialogHost(
@@ -590,7 +602,7 @@ private fun MainAppContent(
 }
 
 /**
- * 主界面场景：三页 Pager。根布局管理底栏状态，底栏只在 Main 导航层绘制一次。
+ * 主界面场景：四页 Pager。根布局管理底栏状态，底栏只在 Main 导航层绘制一次。
  */
 @Composable
 private fun MainScene(
@@ -625,7 +637,8 @@ private fun MainScene(
                     ) {
                         when (page) {
                             0 -> HomeScreen()
-                            1 -> RecordsScreen(
+                            1 -> com.risediary.app.ui.library.LibraryScreen()
+                            2 -> RecordsScreen(
                                 viewModel = recordsViewModel,
                                 snackbarHostState = snackbarHostState,
                                 snackbarScope = snackbarScope
@@ -655,7 +668,7 @@ private fun MainScene(
     )
 }
 
-private fun Modifier.blockInteractionsAndAccessibility(blocked: Boolean): Modifier {
+internal fun Modifier.blockInteractionsAndAccessibility(blocked: Boolean): Modifier {
     if (!blocked) return this
     return pointerInput(Unit) {
         awaitPointerEventScope {
